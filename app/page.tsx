@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { 
   ShieldCheck, Activity, Terminal, Users, BookOpen, 
   Settings, Key, Server, Lock, Download, ChevronRight,
-  Search, Bell, FileText, CheckCircle2, AlertCircle
+  Search, Bell, FileText, CheckCircle2, AlertCircle, MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DashboardView } from '@/components/dashboard-view';
@@ -12,8 +12,9 @@ import { ExecutionsView } from '@/components/executions-view';
 import { AgentsView } from '@/components/agents-view';
 import { GovernanceView } from '@/components/governance-view';
 import { EnterpriseProofView } from '@/components/enterprise-proof-view';
+import { AgentPlaygroundView } from '@/components/agent-playground-view';
 
-type View = 'dashboard' | 'agents' | 'executions' | 'governance' | 'proof';
+type View = 'dashboard' | 'agents' | 'executions' | 'governance' | 'proof' | 'chat';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -21,6 +22,7 @@ export default function App() {
   const navItems = [
     { id: 'dashboard', label: 'Mission Control', icon: Activity },
     { id: 'agents', label: 'Agents & Runtime', icon: Terminal },
+    { id: 'chat', label: 'Live Agent Chat', icon: MessageSquare },
     { id: 'executions', label: 'Execution & Audit', icon: ShieldCheck },
     { id: 'governance', label: 'Governance Policies', icon: Lock },
     { id: 'proof', label: 'Enterprise Proof', icon: FileText },
@@ -30,6 +32,7 @@ export default function App() {
     switch(currentView) {
       case 'dashboard': return <DashboardView />;
       case 'agents': return <AgentsView />;
+      case 'chat': return <AgentPlaygroundView />;
       case 'executions': return <ExecutionsView />;
       case 'governance': return <GovernanceView />;
       case 'proof': return <EnterpriseProofView />;
