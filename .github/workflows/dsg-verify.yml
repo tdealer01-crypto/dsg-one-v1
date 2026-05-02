@@ -1,10 +1,14 @@
 name: DSG Verify
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
   push:
     branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   verify:
@@ -15,5 +19,11 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - run: node --version
+      - run: npm --version
       - run: npm ci
+      - run: npm run dsg:claim-gate
+      - run: npm run dsg:runtime-check
+      - run: npm run dsg:typecheck
+      - run: npm run lint
       - run: npm run dsg:verify
