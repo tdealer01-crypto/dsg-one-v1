@@ -1,0 +1,53 @@
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const root = process.cwd();
+const required = [
+  'supabase/migrations/20260502174934_create_dsg_runtime_core_step_2.sql',
+  'supabase/migrations/20260502175200_harden_dsg_runtime_functions_step_2.sql',
+  'lib/dsg/runtime/stable-json.ts',
+  'lib/dsg/runtime/hash.ts',
+  'lib/dsg/runtime/planner.ts',
+  'lib/dsg/runtime/audit.ts',
+  'lib/dsg/runtime/evidence.ts',
+  'lib/dsg/runtime/replay.ts',
+  'lib/dsg/runtime/completion.ts',
+  'lib/dsg/runtime/no-mock-guard.ts',
+  'lib/dsg/connectors/openapi.ts',
+  'lib/dsg/server/context.ts',
+  'lib/dsg/server/repository.ts',
+  'app/api/dsg/jobs/route.ts',
+  'app/api/dsg/verify/route.ts',
+];
+
+const missing = required.filter((file) => !existsSync(join(root, file)));
+if (missing.length) {
+  console.error('DSG deterministic runtime check failed: missing files');
+  for (const file of missing) console.error(`- ${file}`);
+  process.exit(1);
+}
+
+const migration = readFileSync(join(root, 'supabase/migrations/20260502174934_create_dsg_runtime_core_step_2.sql'), 'utf8');
+const tables = [
+  'dsg_runtime_jobs',
+  'dsg_task_plans',
+  'dsg_wave_plans',
+  'dsg_evidence_items',
+  'dsg_audit_ledger',
+  'dsg_replay_proofs',
+  'dsg_completion_reports',
+  'dsg_deployment_proofs',
+  'dsg_production_flow_proofs',
+];
+
+for (const table of tables) {
+  if (!migration.includes(table)) {
+    console.error(`DSG deterministic runtime check failed: migration missing ${table}`);
+    process.exit(1);
+  }
+}
+
+const combined = required.map((file) => readFileSync(join(root, file), 'utf8')).join('\n---DSG---\n');
+const digest = createHash('sha256').update(combined, 'utf8').digest('hex');
+console.log(`DSG deterministic runtime check passed sha256:${digest}`);
