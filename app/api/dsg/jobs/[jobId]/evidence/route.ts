@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { assertDsgPermission, devHeaderActor } from '@/lib/dsg/server/context';
+import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
 import { writeEvidence } from '@/lib/dsg/server/repository';
 import { getBearerToken } from '@/lib/dsg/server/supabase-rpc';
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
-  const actor = assertDsgPermission(devHeaderActor(request.headers), 'evidence:write');
+  const actor = await requireVerifiedDsgActor(request.headers, 'evidence:write');
   const { jobId } = await context.params;
   const body = (await request.json().catch(() => null)) as {
     evidenceType?: string;
