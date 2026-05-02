@@ -144,6 +144,43 @@ export async function recordReplayProof(
   return { id };
 }
 
+export async function recordDeploymentProof(
+  context: DsgRepositoryContext,
+  input: { jobId: string; environment: string; deploymentUrl: string; proofHash: string; status: 'PASS' | 'BLOCK' | 'FAILED'; details?: Record<string, unknown> },
+): Promise<{ id: string }> {
+  assertRepositoryContext(context);
+  if (!input.jobId || !input.environment || !input.deploymentUrl || !input.proofHash) throw new Error('DSG_DEPLOYMENT_PROOF_REQUIRED');
+
+  const id = await callDsgRpc<string>(getDsgSupabaseRpcConfig(context.userAccessToken), 'dsg_record_deployment_proof', {
+    p_job_id: input.jobId,
+    p_environment: input.environment,
+    p_deployment_url: input.deploymentUrl,
+    p_proof_hash: input.proofHash,
+    p_status: input.status,
+    p_details: input.details ?? {},
+  });
+
+  return { id };
+}
+
+export async function recordProductionFlowProof(
+  context: DsgRepositoryContext,
+  input: { jobId: string; flowName: string; proofHash: string; status: 'PASS' | 'BLOCK' | 'FAILED'; details?: Record<string, unknown> },
+): Promise<{ id: string }> {
+  assertRepositoryContext(context);
+  if (!input.jobId || !input.flowName || !input.proofHash) throw new Error('DSG_PRODUCTION_FLOW_PROOF_REQUIRED');
+
+  const id = await callDsgRpc<string>(getDsgSupabaseRpcConfig(context.userAccessToken), 'dsg_record_production_flow_proof', {
+    p_job_id: input.jobId,
+    p_flow_name: input.flowName,
+    p_proof_hash: input.proofHash,
+    p_status: input.status,
+    p_details: input.details ?? {},
+  });
+
+  return { id };
+}
+
 export async function createCompletionReport(
   context: DsgRepositoryContext,
   input: {
