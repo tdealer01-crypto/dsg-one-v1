@@ -7,6 +7,7 @@ const required = [
   'supabase/migrations/20260502174934_create_dsg_runtime_core_step_2.sql',
   'supabase/migrations/20260502175200_harden_dsg_runtime_functions_step_2.sql',
   'supabase/migrations/20260502181720_add_dsg_runtime_policies_and_rpc.sql',
+  'supabase/migrations/20260502183649_add_dsg_plan_audit_completion_rpc.sql',
   'lib/dsg/runtime/stable-json.ts',
   'lib/dsg/runtime/hash.ts',
   'lib/dsg/runtime/planner.ts',
@@ -21,8 +22,12 @@ const required = [
   'lib/dsg/server/supabase-rpc.ts',
   'app/api/dsg/workspaces/route.ts',
   'app/api/dsg/jobs/route.ts',
+  'app/api/dsg/jobs/[jobId]/plan/route.ts',
   'app/api/dsg/jobs/[jobId]/evidence/route.ts',
+  'app/api/dsg/jobs/[jobId]/evidence/manifest/route.ts',
+  'app/api/dsg/jobs/[jobId]/audit/export/route.ts',
   'app/api/dsg/jobs/[jobId]/replay/route.ts',
+  'app/api/dsg/jobs/[jobId]/completion/route.ts',
   'app/api/dsg/verify/route.ts',
   'docs/DSG_SUPABASE_BACKEND_WIRING.md',
 ];
@@ -58,6 +63,15 @@ const rpcSource = readFileSync(join(root, 'supabase/migrations/20260502181720_ad
 const rpcNames = ['dsg_create_workspace', 'dsg_create_runtime_job', 'dsg_record_evidence', 'dsg_record_replay_proof'];
 for (const rpcName of rpcNames) {
   if (!rpcSource.includes(rpcName)) {
+    console.error(`DSG deterministic runtime check failed: migration missing ${rpcName}`);
+    process.exit(1);
+  }
+}
+
+const completionRpcSource = readFileSync(join(root, 'supabase/migrations/20260502183649_add_dsg_plan_audit_completion_rpc.sql'), 'utf8');
+const completionRpcNames = ['dsg_create_plan', 'dsg_create_evidence_manifest', 'dsg_create_audit_export', 'dsg_create_completion_report'];
+for (const rpcName of completionRpcNames) {
+  if (!completionRpcSource.includes(rpcName)) {
     console.error(`DSG deterministic runtime check failed: migration missing ${rpcName}`);
     process.exit(1);
   }

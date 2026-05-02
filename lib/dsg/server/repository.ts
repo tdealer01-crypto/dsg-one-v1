@@ -1,3 +1,4 @@
+import { createRuntimePlan as buildRuntimePlan } from '../runtime/planner';
 import type { RuntimeTask } from '../runtime/types';
 import { callDsgRpc, getDsgSupabaseRpcConfig } from './supabase-rpc';
 
@@ -52,11 +53,28 @@ export async function createRuntimeJob(
   return { id };
 }
 
-export async function createRuntimePlan(context: DsgRepositoryContext, input: { jobId: string; tasks: RuntimeTask[] }): Promise<never> {
+export async function createRuntimePlan(
+  context: DsgRepositoryContext,
+  input: { jobId: string; tasks: RuntimeTask[] },
+): Promise<{ taskPlanId: string; wavePlanId: string; planHash: string; waveHash: string }> {
   assertRepositoryContext(context);
   if (!input.jobId) throw new Error('DSG_JOB_REQUIRED');
-  if (input.tasks.length === 0) throw new Error('DSG_TASKS_REQUIRED');
-  throw new Error('DSG_PLAN_RPC_NOT_IMPLEMENTED');
+  const plan = buildRuntimePlan(input.tasks);
+
+  const data = await callDsgRpc<{ taskPlanId: string; wavePlanId: string }>(
+    getDsgSupabaseRpcConfig(context.userAccessToken),
+    'dsg_create_plan',
+    {
+      p_job_id: input.jobId,
+      p_plan_hash: plan.planHash,
+      p_tasks: plan.tasks,
+      p_dependency_edges: plan.edges,
+      p_wave_hash: plan.waveHash,
+      p_waves: plan.waves,
+    },
+  );
+
+  return { ...data, planHash: plan.planHash, waveHash: plan.waveHash };
 }
 
 export async function writeEvidence(
@@ -78,6 +96,37 @@ export async function writeEvidence(
   return { id };
 }
 
+export async function createEvidenceManifest(
+  context: DsgRepositoryContext,
+  input: { jobId: string; manifestHash: string; evidenceIds: string[] },
+): Promise<{ id: string }> {
+  assertRepositoryContext(context);
+  if (!input.jobId || !input.manifestHash || input.evidenceIds.length === 0) throw new Error('DSG_MANIFEST_REQUIRED');
+
+  const id = await callDsgRpc<string>(getDsgSupabaseRpcConfig(context.userAccessToken), 'dsg_create_evidence_manifest', {
+    p_job_id: input.jobId,
+    p_manifest_hash: input.manifestHash,
+    p_evidence_ids: input.evidenceIds,
+  });
+
+  return { id };
+}
+
+export async function createAuditExport(
+  context: DsgRepositoryContext,
+  input: { jobId: string; exportHash: string },
+): Promise<{ id: string }> {
+  assertRepositoryContext(context);
+  if (!input.jobId || !input.exportHash) throw new Error('DSG_AUDIT_EXPORT_REQUIRED');
+
+  const id = await callDsgRpc<string>(getDsgSupabaseRpcConfig(context.userAccessToken), 'dsg_create_audit_export', {
+    p_job_id: input.jobId,
+    p_export_hash: input.exportHash,
+  });
+
+  return { id };
+}
+
 export async function recordReplayProof(
   context: DsgRepositoryContext,
   input: { jobId: string; replayHash: string; status: 'PASS' | 'BLOCK' | 'FAILED'; details?: Record<string, unknown> },
@@ -90,6 +139,40 @@ export async function recordReplayProof(
     p_replay_hash: input.replayHash,
     p_status: input.status,
     p_details: input.details ?? {},
+  });
+
+  return { id };
+}
+
+export async function createCompletionReport(
+  context: DsgRepositoryContext,
+  input: {
+    jobId: string;
+    reportHash: string;
+    evidenceManifestId: string;
+    auditExportId: string;
+    replayProofId: string;
+    deploymentProofId?: string | null;
+    productionFlowProofId?: string | null;
+    usesMockState?: boolean;
+    isDevOrSmokeOnly?: boolean;
+  },
+): Promise<{ id: string }> {
+  assertRepositoryContext(context);
+  if (!input.jobId || !input.reportHash || !input.evidenceManifestId || !input.auditExportId || !input.replayProofId) {
+    throw new Error('DSG_COMPLETION_REQUIRED');
+  }
+
+  const id = await callDsgRpc<string>(getDsgSupabaseRpcConfig(context.userAccessToken), 'dsg_create_completion_report', {
+    p_job_id: input.jobId,
+    p_report_hash: input.reportHash,
+    p_evidence_manifest_id: input.evidenceManifestId,
+    p_audit_export_id: input.auditExportId,
+    p_replay_proof_id: input.replayProofId,
+    p_deployment_proof_id: input.deploymentProofId ?? null,
+    p_production_flow_proof_id: input.productionFlowProofId ?? null,
+    p_uses_mock_state: input.usesMockState ?? false,
+    p_is_dev_or_smoke_only: input.isDevOrSmokeOnly ?? true,
   });
 
   return { id };
