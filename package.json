@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "clean": "next clean"
+    "clean": "next clean",
+    "dsg:claim-gate": "node scripts/dsg-claim-gate-check.mjs",
+    "dsg:verify": "npm run dsg:claim-gate && npm run lint"
   },
   "dependencies": {
     "@google/genai": "^1.17.0",
