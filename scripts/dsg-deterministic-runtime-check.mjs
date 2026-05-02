@@ -42,6 +42,15 @@ if (missing.length) {
   process.exit(1);
 }
 
+const apiRouteFiles = required.filter((file) => file.startsWith('app/api/dsg/') && file.endsWith('/route.ts'));
+for (const file of apiRouteFiles) {
+  const source = readFileSync(join(root, file), 'utf8');
+  if (source.includes('devHeaderActor') || source.includes('x-dsg-actor-role')) {
+    console.error(`DSG deterministic runtime check failed: route uses dev actor bridge ${file}`);
+    process.exit(1);
+  }
+}
+
 const migration = readFileSync(join(root, 'supabase/migrations/20260502174934_create_dsg_runtime_core_step_2.sql'), 'utf8');
 const tables = [
   'dsg_runtime_jobs',
