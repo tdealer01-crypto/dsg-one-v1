@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
-import { assertDsgPermission, devHeaderActor } from '@/lib/dsg/server/context';
+import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
 import { createRuntimeJob } from '@/lib/dsg/server/repository';
 import { getBearerToken } from '@/lib/dsg/server/supabase-rpc';
 
 export async function GET(request: Request) {
-  const actor = assertDsgPermission(devHeaderActor(request.headers), 'job:read');
+  const actor = await requireVerifiedDsgActor(request.headers, 'job:read');
   return NextResponse.json({ ok: true, data: { actor, jobs: [], source: 'database-read-route-pending' } });
 }
 
 export async function POST(request: Request) {
-  const actor = assertDsgPermission(devHeaderActor(request.headers), 'job:create');
+  const actor = await requireVerifiedDsgActor(request.headers, 'job:create');
   const body = (await request.json().catch(() => null)) as { goal?: string; successCriteria?: unknown[] } | null;
   if (!body?.goal?.trim()) {
     return NextResponse.json({ ok: false, error: { code: 'DSG_GOAL_REQUIRED' } }, { status: 400 });
