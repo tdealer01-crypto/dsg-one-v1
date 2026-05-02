@@ -51,6 +51,20 @@ for (const file of apiRouteFiles) {
   }
 }
 
+const rpcClientSource = readFileSync(join(root, 'lib/dsg/server/supabase-rpc.ts'), 'utf8');
+if (!rpcClientSource.includes('DSG_ONE_V1_SUPABASE_URL') || !rpcClientSource.includes('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY')) {
+  console.error('DSG deterministic runtime check failed: repo-scoped Supabase env names are missing');
+  process.exit(1);
+}
+
+const envDoc = readFileSync(join(root, '.env.example'), 'utf8');
+for (const name of ['NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL', 'NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY', 'DSG_ONE_V1_SUPABASE_URL', 'DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY']) {
+  if (!envDoc.includes(name)) {
+    console.error(`DSG deterministic runtime check failed: .env.example missing ${name}`);
+    process.exit(1);
+  }
+}
+
 const migration = readFileSync(join(root, 'supabase/migrations/20260502174934_create_dsg_runtime_core_step_2.sql'), 'utf8');
 const tables = [
   'dsg_runtime_jobs',
