@@ -12,11 +12,11 @@ export type DsgRpcError = {
 };
 
 export function getDsgSupabaseRpcConfig(userAccessToken?: string): DsgSupabaseRpcConfig {
-  const url = process.env.DSG_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const key = process.env.DSG_SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.DSG_ONE_V1_SUPABASE_URL;
+  const key = process.env.DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url) throw new Error('DSG_SUPABASE_URL_REQUIRED');
-  if (!key) throw new Error('DSG_SUPABASE_SERVICE_ROLE_KEY_REQUIRED');
+  if (!url) throw new Error('DSG_ONE_V1_SUPABASE_URL_REQUIRED');
+  if (!key) throw new Error('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY_REQUIRED');
 
   return { url: url.replace(/\/$/, ''), key, userAccessToken };
 }
