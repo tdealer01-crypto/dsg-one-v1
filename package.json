@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "clean": "next clean",
     "dsg:claim-gate": "node scripts/dsg-claim-gate-check.mjs",
-    "dsg:verify": "npm run dsg:claim-gate && npm run lint"
+    "dsg:runtime-check": "node scripts/dsg-deterministic-runtime-check.mjs",
+    "dsg:typecheck": "tsc --noEmit",
+    "dsg:verify": "npm run dsg:claim-gate && npm run dsg:runtime-check && npm run dsg:typecheck && npm run lint"
   },
   "dependencies": {
     "@google/genai": "^1.17.0",
