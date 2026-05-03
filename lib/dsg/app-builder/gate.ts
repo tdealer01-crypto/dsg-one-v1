@@ -1,4 +1,5 @@
-import type { AppBuilderGateIssue, AppBuilderGateResult, AppBuilderProposedPlan, AppBuilderRiskLevel } from './model';
+import type { AppBuilderGateIssue, AppBuilderGateResult, AppBuilderProposedPlan } from './model';
+import type { AppBuilderRiskLevel } from './status';
 
 const blockedExactPaths = ['**', '.env', '.env.local', '.env.production', '.git', 'node_modules'];
 const blockedPathParts = ['../', '/.env', '.env.', '.git/', 'node_modules/'];
