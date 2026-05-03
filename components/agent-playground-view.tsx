@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle2, FileText, Loader2, PlayCircle, Send, ShieldCheck } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ExternalLink, FileText, GitPullRequest, Loader2, PlayCircle, Send, ShieldCheck } from 'lucide-react';
 
 type ApiResult<T> = { ok: true; data: T } | { ok: false; error: { code?: string; message?: string } };
 
@@ -29,6 +29,17 @@ type Handoff = {
   runtimeStatus: string;
 };
 
+type Execution = {
+  status: string;
+  claimStatus: string;
+  branchName: string;
+  pullRequestUrl: string;
+  pullRequestNumber: number;
+  repository: string;
+  generatedFiles: Array<{ path: string; evidenceKind: string }>;
+  evidence: { planHash: string; approvalHash: string; generatedFileCount: number; note: string };
+};
+
 function shortHash(value?: string) {
   return value ? `${value.slice(0, 10)}…${value.slice(-6)}` : 'missing';
 }
@@ -41,11 +52,12 @@ function readResult<T>(json: ApiResult<T>): T {
 export function AgentPlaygroundView() {
   const [workspaceId, setWorkspaceId] = useState('demo-workspace');
   const [actorId, setActorId] = useState('operator');
-  const [goal, setGoal] = useState('Build a governed full-stack app builder surface with PRD, plan, approval, and proof boundary.');
-  const [criteria, setCriteria] = useState('User sees PRD before plan\nApproval required before runtime handoff\nNo production claim without evidence ids');
-  const [constraints, setConstraints] = useState('Do not run actions before approval\nShow missing evidence instead of hiding it\nDo not claim production readiness');
+  const [goal, setGoal] = useState('Build a governed full-stack todo app with frontend, backend API, database table, evidence runbook, and GitHub PR output.');
+  const [criteria, setCriteria] = useState('User can create a database-backed item\nGenerated code is written to a GitHub branch\nA pull request URL is returned as implementation evidence\nNo production claim without CI/deployment proof');
+  const [constraints, setConstraints] = useState('Do not run action before approval\nDo not write outside approved paths\nDo not claim deployable or production until evidence exists');
   const [job, setJob] = useState<BuilderJob | null>(null);
   const [handoff, setHandoff] = useState<Handoff | null>(null);
+  const [execution, setExecution] = useState<Execution | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,13 +90,14 @@ export function AgentPlaygroundView() {
 
   const createJob = () => runStep('goal', async () => {
     setHandoff(null);
+    setExecution(null);
     const data = await api<BuilderJob>('/api/dsg/app-builder/jobs', {
       method: 'POST',
       body: JSON.stringify({
         goal,
         successCriteria: criteria.split('\n').map((x) => x.trim()).filter(Boolean),
         constraints: constraints.split('\n').map((x) => x.trim()).filter(Boolean),
-        targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'none', auth: 'none', deploy: 'none' },
+        targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'supabase-postgres', auth: 'none', deploy: 'vercel' },
       }),
     });
     setJob(data);
@@ -93,12 +106,14 @@ export function AgentPlaygroundView() {
   const createPlan = () => runStep('plan', async () => {
     if (!job) throw new Error('APP_BUILDER_JOB_REQUIRED');
     setHandoff(null);
+    setExecution(null);
     setJob(await api<BuilderJob>(`/api/dsg/app-builder/jobs/${job.id}/plan`, { method: 'POST' }));
   });
 
   const approvePlan = () => runStep('approval', async () => {
     if (!job?.proposedPlan) throw new Error('APP_BUILDER_PLAN_REQUIRED');
     setHandoff(null);
+    setExecution(null);
     setJob(await api<BuilderJob>(`/api/dsg/app-builder/jobs/${job.id}/approval`, {
       method: 'POST',
       body: JSON.stringify({ decision: 'APPROVE', reason: 'Visible plan reviewed in the App Builder Agent UI.' }),
@@ -110,6 +125,13 @@ export function AgentPlaygroundView() {
     setHandoff(await api<Handoff>(`/api/dsg/app-builder/jobs/${job.id}/runtime-handoff`, { method: 'POST' }));
   });
 
+  const executeToPr = () => runStep('execute', async () => {
+    if (!job?.approvalHash) throw new Error('APP_BUILDER_APPROVAL_REQUIRED');
+    const data = await api<{ job: BuilderJob; execution: Execution }>(`/api/dsg/app-builder/jobs/${job.id}/execute`, { method: 'POST' });
+    setJob(data.job);
+    setExecution(data.execution);
+  });
+
   const gateBlocked = job?.gateResult?.status === 'BLOCK';
   const stages = [
     ['Goal lock', job?.goal ? `goalHash ${shortHash(job.goal.goalHash)}` : 'waiting for user goal'],
@@ -118,20 +140,21 @@ export function AgentPlaygroundView() {
     ['Gate', job?.gateResult ? `${job.gateResult.status} / ${job.gateResult.riskLevel}` : 'missing'],
     ['Approval', job?.approvalHash ? `approvalHash ${shortHash(job.approvalHash)}` : 'missing'],
     ['Runtime handoff', handoff ? `planHash ${shortHash(handoff.planHash)}` : 'missing'],
+    ['Execution', execution ? `PR #${execution.pullRequestNumber} on ${execution.branchName}` : 'missing'],
   ];
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-5 text-sm leading-7 text-amber-100">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-amber-200"><ShieldCheck className="h-4 w-4" /> App Builder Agent · governed planning</div>
-        <p className="mt-3">This screen calls the real Step 15 App Builder API. It can lock a goal, create PRD and plan, run the plan gate, record approval, and create a runtime handoff. It does not run commands, change files, deploy previews, or claim production readiness.</p>
+      <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-5 text-sm leading-7 text-emerald-100">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-200"><ShieldCheck className="h-4 w-4" /> App Builder Agent · governed execution</div>
+        <p className="mt-3">This screen locks a goal, creates a PRD and plan, requires approval, then executes through the governed runtime. Execution writes generated app files to a GitHub branch and opens a PR. It still blocks deployable/production claims until CI, migration, deployment, and production-flow proof exist.</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <section className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-5">
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">Build with review before action</h1>
-            <p className="mt-1 text-sm text-slate-500">User goal → PRD → proposed plan → gate → approval → handoff.</p>
+            <h1 className="text-2xl font-bold text-slate-100">Build full-stack app with proof</h1>
+            <p className="mt-1 text-sm text-slate-500">Goal → PRD → plan → gate → approval → GitHub PR implementation.</p>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -151,17 +174,19 @@ export function AgentPlaygroundView() {
             <button onClick={createPlan} disabled={!!busy || !job} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 disabled:text-slate-600">{busy === 'plan' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} PRD + plan</button>
             <button onClick={approvePlan} disabled={!!busy || !job?.proposedPlan || gateBlocked} className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-bold text-emerald-200 hover:bg-emerald-500/15 disabled:border-slate-800 disabled:text-slate-600">{busy === 'approval' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Approve plan</button>
             <button onClick={createHandoff} disabled={!!busy || !job?.approvalHash} className="inline-flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-bold text-amber-100 hover:bg-amber-500/15 disabled:border-slate-800 disabled:text-slate-600">{busy === 'handoff' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />} Runtime handoff</button>
+            <button onClick={executeToPr} disabled={!!busy || !job?.approvalHash || job.status !== 'READY_FOR_RUNTIME'} className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm font-bold text-indigo-100 hover:bg-indigo-500/15 disabled:border-slate-800 disabled:text-slate-600">{busy === 'execute' ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitPullRequest className="h-4 w-4" />} Execute to GitHub PR</button>
           </div>
         </section>
 
         <section className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-          <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold text-slate-100">Visible state</h2><span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400">{job?.claimStatus ?? 'NO_JOB'}</span></div>
+          <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold text-slate-100">Visible state</h2><span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400">{job?.status ?? 'NO_JOB'} · {job?.claimStatus ?? 'NO_CLAIM'}</span></div>
           <div className="grid gap-3 md:grid-cols-2">
             {stages.map(([label, detail]) => <div key={label} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"><p className="font-semibold text-slate-200">{label}</p><p className="mt-1 text-xs font-mono text-slate-500">{detail}</p></div>)}
           </div>
           {job?.prd && <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"><p className="font-semibold text-slate-200">PRD</p><p className="mt-2 text-sm leading-6 text-slate-400">{job.prd.summary}</p></div>}
           {job?.proposedPlan && <div className="space-y-3">{job.proposedPlan.steps.map((step) => <div key={step.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"><p className="text-xs font-mono text-slate-500">{step.id} · {step.phase} · {step.riskLevel}{step.requiresApproval ? ' · approval required' : ''}</p><p className="mt-1 font-semibold text-slate-200">{step.title}</p><p className="mt-2 text-xs text-slate-500">Evidence: {step.expectedEvidence.join(', ') || 'missing'}</p></div>)}</div>}
-          {handoff && <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm text-emerald-100">Runtime handoff exists with planHash {shortHash(handoff.planHash)}. This is authorization data only, not execution proof.</div>}
+          {handoff && <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-100">Runtime handoff exists with planHash {shortHash(handoff.planHash)}. This authorizes execution, not production readiness.</div>}
+          {execution && <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm text-emerald-100"><p className="font-bold">Implementation PR created</p><p className="mt-2">Repository: {execution.repository}</p><p>Branch: {execution.branchName}</p><p>Generated files: {execution.generatedFiles.length}</p><a href={execution.pullRequestUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-emerald-200 underline">Open PR #{execution.pullRequestNumber}<ExternalLink className="h-3.5 w-3.5" /></a><p className="mt-3 text-xs text-emerald-200/80">{execution.evidence.note}</p></div>}
         </section>
       </div>
     </div>
