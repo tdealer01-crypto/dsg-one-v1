@@ -1,15 +1,17 @@
 import type {
   AppBuilderApprovedPlan,
-  AppBuilderClaimStatus,
   AppBuilderGateResult,
   AppBuilderGoalInput,
   AppBuilderJob,
-  AppBuilderJobStatus,
   AppBuilderPrd,
   AppBuilderProposedPlan,
   LockedAppBuilderGoal,
 } from '@/lib/dsg/app-builder/model';
-import type { AppBuilderApprovalDecision } from '@/lib/dsg/app-builder/status';
+import type {
+  AppBuilderApprovalDecision,
+  AppBuilderClaimStatus,
+  AppBuilderJobStatus,
+} from '@/lib/dsg/app-builder/status';
 import type { AppBuilderRequestContext } from './context';
 import { supabaseRest } from './supabase-rest';
 
