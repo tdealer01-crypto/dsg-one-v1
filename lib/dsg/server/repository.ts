@@ -1,6 +1,6 @@
 import { createRuntimePlan as buildRuntimePlan } from '../runtime/planner';
 import type { RuntimeTask } from '../runtime/types';
-import { callDsgRpc, getDsgSupabaseRpcConfig } from './supabase-rpc';
+import { callDsgRpc, getDsgSupabaseRpcConfig, readDsgRest } from './supabase-rpc';
 
 export type DsgRepositoryContext = {
   workspaceId: string;
@@ -13,14 +13,106 @@ export type DsgRuntimeJobRecord = {
   workspaceId: string;
   goal: string;
   status: string;
+  riskLevel?: string;
+  currentWaveId?: string | null;
+  currentStepId?: string | null;
+  completionReportId?: string | null;
   createdBy: string;
   createdAt: string;
+  updatedAt?: string;
+  metadata?: Record<string, unknown>;
+};
+
+type DsgJobRow = {
+  id: string;
+  workspace_id: string;
+  goal: string;
+  status: string;
+  risk_level: string;
+  current_wave_id: string | null;
+  current_step_id: string | null;
+  completion_report_id: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  metadata: Record<string, unknown>;
 };
 
 export function assertRepositoryContext(context: DsgRepositoryContext): void {
   if (!context.workspaceId) throw new Error('DSG_WORKSPACE_REQUIRED');
   if (!context.actorId) throw new Error('DSG_ACTOR_REQUIRED');
   if (!context.userAccessToken) throw new Error('DSG_USER_ACCESS_TOKEN_REQUIRED');
+}
+
+function mapJob(row: DsgJobRow): DsgRuntimeJobRecord {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    goal: row.goal,
+    status: row.status,
+    riskLevel: row.risk_level,
+    currentWaveId: row.current_wave_id,
+    currentStepId: row.current_step_id,
+    completionReportId: row.completion_report_id,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    metadata: row.metadata,
+  };
+}
+
+export async function listRuntimeJobs(context: DsgRepositoryContext): Promise<DsgRuntimeJobRecord[]> {
+  assertRepositoryContext(context);
+  const rows = await readDsgRest<DsgJobRow[]>(getDsgSupabaseRpcConfig(context.userAccessToken), 'dsg_runtime_jobs', {
+    workspace_id: `eq.${context.workspaceId}`,
+    select: 'id,workspace_id,goal,status,risk_level,current_wave_id,current_step_id,completion_report_id,created_by,created_at,updated_at,metadata',
+    order: 'created_at.desc',
+    limit: '50',
+  });
+  return rows.map(mapJob);
+}
+
+export async function getRuntimeJob(context: DsgRepositoryContext, jobId: string): Promise<DsgRuntimeJobRecord> {
+  assertRepositoryContext(context);
+  if (!jobId) throw new Error('DSG_JOB_REQUIRED');
+  const rows = await readDsgRest<DsgJobRow[]>(getDsgSupabaseRpcConfig(context.userAccessToken), 'dsg_runtime_jobs', {
+    id: `eq.${jobId}`,
+    workspace_id: `eq.${context.workspaceId}`,
+    select: 'id,workspace_id,goal,status,risk_level,current_wave_id,current_step_id,completion_report_id,created_by,created_at,updated_at,metadata',
+    limit: '1',
+  });
+  const row = rows[0];
+  if (!row) throw new Error('DSG_JOB_NOT_FOUND');
+  return mapJob(row);
+}
+
+export async function getRuntimeJobTimeline(context: DsgRepositoryContext, jobId: string): Promise<{
+  job: DsgRuntimeJobRecord;
+  events: unknown[];
+  evidenceItems: unknown[];
+  evidenceManifests: unknown[];
+  auditExports: unknown[];
+  replayProofs: unknown[];
+  deploymentProofs: unknown[];
+  productionFlowProofs: unknown[];
+  completionReports: unknown[];
+}> {
+  const job = await getRuntimeJob(context, jobId);
+  const config = getDsgSupabaseRpcConfig(context.userAccessToken);
+  const base = { job_id: `eq.${jobId}`, workspace_id: `eq.${context.workspaceId}` };
+
+  const [events, evidenceItems, evidenceManifests, auditExports, replayProofs, deploymentProofs, productionFlowProofs, completionReports] = await Promise.all([
+    readDsgRest<unknown[]>(config, 'dsg_runtime_events', { ...base, select: '*', order: 'created_at.asc' }),
+    readDsgRest<unknown[]>(config, 'dsg_evidence_items', { ...base, select: '*', order: 'created_at.asc' }),
+    readDsgRest<unknown[]>(config, 'dsg_evidence_manifests', { ...base, select: '*', order: 'created_at.asc' }),
+    readDsgRest<unknown[]>(config, 'dsg_audit_exports', { ...base, select: '*', order: 'created_at.asc' }),
+    readDsgRest<unknown[]>(config, 'dsg_replay_proofs', { ...base, select: '*', order: 'created_at.asc' }),
+    readDsgRest<unknown[]>(config, 'dsg_deployment_proofs', { ...base, select: '*', order: 'created_at.asc' }),
+    readDsgRest<unknown[]>(config, 'dsg_production_flow_proofs', { ...base, select: '*', order: 'created_at.asc' }),
+    readDsgRest<unknown[]>(config, 'dsg_completion_reports', { ...base, select: '*', order: 'created_at.asc' }),
+  ]);
+
+  return { job, events, evidenceItems, evidenceManifests, auditExports, replayProofs, deploymentProofs, productionFlowProofs, completionReports };
 }
 
 export async function createWorkspace(

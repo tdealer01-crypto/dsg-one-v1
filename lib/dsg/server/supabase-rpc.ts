@@ -21,6 +21,10 @@ export function getDsgSupabaseRpcConfig(userAccessToken?: string): DsgSupabaseRp
   return { url: url.replace(/\/$/, ''), key, userAccessToken };
 }
 
+function parseJsonBody<T>(text: string): T | DsgRpcError | null {
+  return text ? (JSON.parse(text) as T | DsgRpcError) : null;
+}
+
 export async function callDsgRpc<T>(
   config: DsgSupabaseRpcConfig,
   functionName: string,
@@ -38,12 +42,40 @@ export async function callDsgRpc<T>(
     cache: 'no-store',
   });
 
-  const text = await response.text();
-  const payload = text ? (JSON.parse(text) as T | DsgRpcError) : null;
+  const payload = parseJsonBody<T>(await response.text());
 
   if (!response.ok) {
     const error = payload as DsgRpcError | null;
     throw new Error(error?.message ?? `DSG_RPC_${response.status}`);
+  }
+
+  return payload as T;
+}
+
+export async function readDsgRest<T>(
+  config: DsgSupabaseRpcConfig,
+  tableName: string,
+  searchParams: Record<string, string>,
+): Promise<T> {
+  const url = new URL(`${config.url}/rest/v1/${tableName}`);
+  for (const [key, value] of Object.entries(searchParams)) {
+    url.searchParams.set(key, value);
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      apikey: config.key,
+      Authorization: `Bearer ${config.key}`,
+      Accept: 'application/json',
+    },
+    cache: 'no-store',
+  });
+
+  const payload = parseJsonBody<T>(await response.text());
+
+  if (!response.ok) {
+    const error = payload as DsgRpcError | null;
+    throw new Error(error?.message ?? `DSG_REST_${response.status}`);
   }
 
   return payload as T;

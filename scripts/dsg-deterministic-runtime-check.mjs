@@ -23,6 +23,7 @@ const required = [
   'lib/dsg/server/supabase-rpc.ts',
   'app/api/dsg/workspaces/route.ts',
   'app/api/dsg/jobs/route.ts',
+  'app/api/dsg/jobs/[jobId]/route.ts',
   'app/api/dsg/jobs/[jobId]/plan/route.ts',
   'app/api/dsg/jobs/[jobId]/evidence/route.ts',
   'app/api/dsg/jobs/[jobId]/evidence/manifest/route.ts',
@@ -55,6 +56,18 @@ const rpcClientSource = readFileSync(join(root, 'lib/dsg/server/supabase-rpc.ts'
 if (!rpcClientSource.includes('DSG_ONE_V1_SUPABASE_URL') || !rpcClientSource.includes('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY')) {
   console.error('DSG deterministic runtime check failed: repo-scoped Supabase env names are missing');
   process.exit(1);
+}
+if (!rpcClientSource.includes('readDsgRest')) {
+  console.error('DSG deterministic runtime check failed: Supabase read helper is missing');
+  process.exit(1);
+}
+
+const repositorySource = readFileSync(join(root, 'lib/dsg/server/repository.ts'), 'utf8');
+for (const name of ['listRuntimeJobs', 'getRuntimeJob', 'getRuntimeJobTimeline']) {
+  if (!repositorySource.includes(name)) {
+    console.error(`DSG deterministic runtime check failed: missing read repository method ${name}`);
+    process.exit(1);
+  }
 }
 
 const envDoc = readFileSync(join(root, '.env.example'), 'utf8');
