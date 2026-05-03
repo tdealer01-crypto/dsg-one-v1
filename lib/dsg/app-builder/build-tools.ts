@@ -75,7 +75,8 @@ function findTool(name: string): AppBuilderToolDefinition {
 }
 
 function assertApprovedToolCall(job: AppBuilderJob, tool: AppBuilderToolDefinition, args: Record<string, unknown>) {
-  if (tool.requiresApproval && job.status !== 'READY_FOR_RUNTIME' && job.status !== 'ENVIRONMENT_READY') {
+  const allowedStatuses = ['READY_FOR_RUNTIME', 'ENVIRONMENT_READY', 'EXECUTING'];
+  if (tool.requiresApproval && !allowedStatuses.includes(job.status)) {
     throw new Error('APP_BUILDER_TOOL_APPROVAL_REQUIRED');
   }
   if (!job.approvedPlan) throw new Error('APP_BUILDER_APPROVED_PLAN_REQUIRED');
