@@ -11,6 +11,7 @@
     "dsg:claim-gate": "node scripts/dsg-claim-gate-check.mjs",
     "dsg:runtime-check": "node scripts/dsg-deterministic-runtime-check.mjs",
     "dsg:typecheck": "tsc --noEmit",
+    "dsg:production-flow-check": "node scripts/dsg-production-flow-check.mjs",
     "dsg:verify": "npm run dsg:claim-gate && npm run dsg:runtime-check && npm run dsg:typecheck && npm run lint"
   },
   "dependencies": {

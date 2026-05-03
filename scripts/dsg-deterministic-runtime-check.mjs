@@ -21,6 +21,7 @@ const required = [
   'lib/dsg/server/context.ts',
   'lib/dsg/server/repository.ts',
   'lib/dsg/server/supabase-rpc.ts',
+  'scripts/dsg-production-flow-check.mjs',
   'app/api/dsg/workspaces/route.ts',
   'app/api/dsg/jobs/route.ts',
   'app/api/dsg/jobs/[jobId]/route.ts',
@@ -34,6 +35,7 @@ const required = [
   'app/api/dsg/jobs/[jobId]/completion/route.ts',
   'app/api/dsg/verify/route.ts',
   'docs/DSG_SUPABASE_BACKEND_WIRING.md',
+  'docs/DSG_LAYER_3_PRODUCTION_FLOW_PROOF.md',
 ];
 
 const missing = required.filter((file) => !existsSync(join(root, file)));
@@ -66,6 +68,20 @@ const repositorySource = readFileSync(join(root, 'lib/dsg/server/repository.ts')
 for (const name of ['listRuntimeJobs', 'getRuntimeJob', 'getRuntimeJobTimeline']) {
   if (!repositorySource.includes(name)) {
     console.error(`DSG deterministic runtime check failed: missing read repository method ${name}`);
+    process.exit(1);
+  }
+}
+
+const packageSource = readFileSync(join(root, 'package.json'), 'utf8');
+if (!packageSource.includes('dsg:production-flow-check')) {
+  console.error('DSG deterministic runtime check failed: production flow check script is missing from package.json');
+  process.exit(1);
+}
+
+const productionFlowSource = readFileSync(join(root, 'scripts/dsg-production-flow-check.mjs'), 'utf8');
+for (const requiredText of ['DSG_ONE_V1_PRODUCTION_URL', 'https://', 'proofHash=sha256:']) {
+  if (!productionFlowSource.includes(requiredText)) {
+    console.error(`DSG deterministic runtime check failed: production flow script missing ${requiredText}`);
     process.exit(1);
   }
 }
