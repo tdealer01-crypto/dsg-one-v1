@@ -6,6 +6,14 @@ import type {
   AppBuilderRiskLevel,
 } from './status';
 
+export type {
+  AppBuilderApprovalDecision,
+  AppBuilderClaimStatus,
+  AppBuilderGateStatus,
+  AppBuilderJobStatus,
+  AppBuilderRiskLevel,
+};
+
 export type AppBuilderTargetStack = {
   frontend?: 'nextjs' | 'react' | 'vue' | 'svelte' | 'other';
   backend?: 'next-api' | 'express' | 'fastify' | 'supabase' | 'other';
