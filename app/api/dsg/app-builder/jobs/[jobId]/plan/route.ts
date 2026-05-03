@@ -1,0 +1,41 @@
+import { NextResponse } from 'next/server';
+import { createDeterministicAppBuilderPrd } from '@/lib/dsg/app-builder/prd-generator';
+import { createAppBuilderProposedPlan } from '@/lib/dsg/app-builder/plan-generator';
+import { gateAppBuilderPlan } from '@/lib/dsg/app-builder/gate';
+import { getDevAppBuilderContext } from '@/lib/dsg/server/app-builder/context';
+import { getAppBuilderJob, updateAppBuilderJob } from '@/lib/dsg/server/app-builder/repository';
+
+function fail(error: unknown) {
+  const code = error instanceof Error ? error.message : 'APP_BUILDER_PLAN_FAILED';
+  return NextResponse.json({ ok: false, error: { code, message: code } }, { status: 400 });
+}
+
+export async function POST(req: Request, context: { params: Promise<{ jobId: string }> }) {
+  try {
+    const { jobId } = await context.params;
+    const ctx = getDevAppBuilderContext(req);
+    const job = await getAppBuilderJob(ctx, jobId);
+    if (!job.goal) throw new Error('APP_BUILDER_GOAL_NOT_LOCKED');
+
+    const prd = job.prd ?? createDeterministicAppBuilderPrd(job.goal);
+    const proposedPlan = createAppBuilderProposedPlan({ goal: job.goal, prd });
+    const gateResult = gateAppBuilderPlan(proposedPlan);
+    const status = gateResult.status === 'BLOCK' ? 'BLOCKED' : gateResult.approvalRequired ? 'WAITING_APPROVAL' : 'PLAN_READY';
+
+    const updated = await updateAppBuilderJob({
+      ctx,
+      id: jobId,
+      patch: {
+        status,
+        claim_status: 'PLANNED_ONLY',
+        prd,
+        proposed_plan: proposedPlan,
+        gate_result: gateResult,
+      },
+    });
+
+    return NextResponse.json({ ok: true, data: updated });
+  } catch (error) {
+    return fail(error);
+  }
+}
