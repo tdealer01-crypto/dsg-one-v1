@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle2, ExternalLink, FileText, GitPullRequest, Loader2, PlayCircle, Send, ShieldCheck } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ExternalLink, FileText, GitPullRequest, Loader2, PlayCircle, Send, ShieldCheck, Wrench } from 'lucide-react';
 
 type ApiResult<T> = { ok: true; data: T } | { ok: false; error: { code?: string; message?: string } };
 
@@ -40,6 +40,17 @@ type Execution = {
   evidence: { planHash: string; approvalHash: string; generatedFileCount: number; note: string };
 };
 
+type ToolCall = {
+  toolName: string;
+  status: string;
+  riskLevel: string;
+  claimStatus: string;
+  output: Execution;
+  evidence: { approvalChecked: boolean; planHashChecked: boolean; allowedToolChecked: boolean; note: string };
+};
+
+const BUILD_TOOL_NAME = 'dsg.app_builder.generate_fullstack_pr';
+
 function shortHash(value?: string) {
   return value ? `${value.slice(0, 10)}…${value.slice(-6)}` : 'missing';
 }
@@ -58,6 +69,7 @@ export function AgentPlaygroundView() {
   const [job, setJob] = useState<BuilderJob | null>(null);
   const [handoff, setHandoff] = useState<Handoff | null>(null);
   const [execution, setExecution] = useState<Execution | null>(null);
+  const [toolCall, setToolCall] = useState<ToolCall | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,6 +103,7 @@ export function AgentPlaygroundView() {
   const createJob = () => runStep('goal', async () => {
     setHandoff(null);
     setExecution(null);
+    setToolCall(null);
     const data = await api<BuilderJob>('/api/dsg/app-builder/jobs', {
       method: 'POST',
       body: JSON.stringify({
@@ -107,6 +120,7 @@ export function AgentPlaygroundView() {
     if (!job) throw new Error('APP_BUILDER_JOB_REQUIRED');
     setHandoff(null);
     setExecution(null);
+    setToolCall(null);
     setJob(await api<BuilderJob>(`/api/dsg/app-builder/jobs/${job.id}/plan`, { method: 'POST' }));
   });
 
@@ -114,6 +128,7 @@ export function AgentPlaygroundView() {
     if (!job?.proposedPlan) throw new Error('APP_BUILDER_PLAN_REQUIRED');
     setHandoff(null);
     setExecution(null);
+    setToolCall(null);
     setJob(await api<BuilderJob>(`/api/dsg/app-builder/jobs/${job.id}/approval`, {
       method: 'POST',
       body: JSON.stringify({ decision: 'APPROVE', reason: 'Visible plan reviewed in the App Builder Agent UI.' }),
@@ -125,11 +140,15 @@ export function AgentPlaygroundView() {
     setHandoff(await api<Handoff>(`/api/dsg/app-builder/jobs/${job.id}/runtime-handoff`, { method: 'POST' }));
   });
 
-  const executeToPr = () => runStep('execute', async () => {
+  const executeBuildTool = () => runStep('tool-call', async () => {
     if (!job?.approvalHash) throw new Error('APP_BUILDER_APPROVAL_REQUIRED');
-    const data = await api<{ job: BuilderJob; execution: Execution }>(`/api/dsg/app-builder/jobs/${job.id}/execute`, { method: 'POST' });
+    const data = await api<{ job: BuilderJob; toolCall: ToolCall }>(`/api/dsg/app-builder/jobs/${job.id}/tool-call`, {
+      method: 'POST',
+      body: JSON.stringify({ toolName: BUILD_TOOL_NAME, arguments: { mode: 'github_pr' } }),
+    });
     setJob(data.job);
-    setExecution(data.execution);
+    setToolCall(data.toolCall);
+    setExecution(data.toolCall.output);
   });
 
   const gateBlocked = job?.gateResult?.status === 'BLOCK';
@@ -140,21 +159,22 @@ export function AgentPlaygroundView() {
     ['Gate', job?.gateResult ? `${job.gateResult.status} / ${job.gateResult.riskLevel}` : 'missing'],
     ['Approval', job?.approvalHash ? `approvalHash ${shortHash(job.approvalHash)}` : 'missing'],
     ['Runtime handoff', handoff ? `planHash ${shortHash(handoff.planHash)}` : 'missing'],
+    ['Tool call', toolCall ? `${toolCall.toolName} · ${toolCall.status}` : 'missing'],
     ['Execution', execution ? `PR #${execution.pullRequestNumber} on ${execution.branchName}` : 'missing'],
   ];
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-5 text-sm leading-7 text-emerald-100">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-200"><ShieldCheck className="h-4 w-4" /> App Builder Agent · governed execution</div>
-        <p className="mt-3">This screen locks a goal, creates a PRD and plan, requires approval, then executes through the governed runtime. Execution writes generated app files to a GitHub branch and opens a PR. It still blocks deployable/production claims until CI, migration, deployment, and production-flow proof exist.</p>
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-200"><ShieldCheck className="h-4 w-4" /> App Builder Agent · governed tool execution</div>
+        <p className="mt-3">This screen locks a goal, creates a PRD and plan, requires approval, then calls the build tool through the governed tool-call route. The build tool writes generated app files to a GitHub branch and opens a PR. It still blocks deployable/production claims until CI, migration, deployment, and production-flow proof exist.</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <section className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-5">
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">Build full-stack app with proof</h1>
-            <p className="mt-1 text-sm text-slate-500">Goal → PRD → plan → gate → approval → GitHub PR implementation.</p>
+            <h1 className="text-2xl font-bold text-slate-100">Build full-stack app with tool proof</h1>
+            <p className="mt-1 text-sm text-slate-500">Goal → PRD → plan → gate → approval → build tool → GitHub PR implementation.</p>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -174,7 +194,7 @@ export function AgentPlaygroundView() {
             <button onClick={createPlan} disabled={!!busy || !job} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 disabled:text-slate-600">{busy === 'plan' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} PRD + plan</button>
             <button onClick={approvePlan} disabled={!!busy || !job?.proposedPlan || gateBlocked} className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-bold text-emerald-200 hover:bg-emerald-500/15 disabled:border-slate-800 disabled:text-slate-600">{busy === 'approval' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Approve plan</button>
             <button onClick={createHandoff} disabled={!!busy || !job?.approvalHash} className="inline-flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-bold text-amber-100 hover:bg-amber-500/15 disabled:border-slate-800 disabled:text-slate-600">{busy === 'handoff' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />} Runtime handoff</button>
-            <button onClick={executeToPr} disabled={!!busy || !job?.approvalHash || job.status !== 'READY_FOR_RUNTIME'} className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm font-bold text-indigo-100 hover:bg-indigo-500/15 disabled:border-slate-800 disabled:text-slate-600">{busy === 'execute' ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitPullRequest className="h-4 w-4" />} Execute to GitHub PR</button>
+            <button onClick={executeBuildTool} disabled={!!busy || !job?.approvalHash || job.status !== 'READY_FOR_RUNTIME'} className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm font-bold text-indigo-100 hover:bg-indigo-500/15 disabled:border-slate-800 disabled:text-slate-600">{busy === 'tool-call' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />} Call build tool</button>
           </div>
         </section>
 
@@ -185,7 +205,8 @@ export function AgentPlaygroundView() {
           </div>
           {job?.prd && <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"><p className="font-semibold text-slate-200">PRD</p><p className="mt-2 text-sm leading-6 text-slate-400">{job.prd.summary}</p></div>}
           {job?.proposedPlan && <div className="space-y-3">{job.proposedPlan.steps.map((step) => <div key={step.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"><p className="text-xs font-mono text-slate-500">{step.id} · {step.phase} · {step.riskLevel}{step.requiresApproval ? ' · approval required' : ''}</p><p className="mt-1 font-semibold text-slate-200">{step.title}</p><p className="mt-2 text-xs text-slate-500">Evidence: {step.expectedEvidence.join(', ') || 'missing'}</p></div>)}</div>}
-          {handoff && <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-100">Runtime handoff exists with planHash {shortHash(handoff.planHash)}. This authorizes execution, not production readiness.</div>}
+          {handoff && <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-100">Runtime handoff exists with planHash {shortHash(handoff.planHash)}. This authorizes tool execution, not production readiness.</div>}
+          {toolCall && <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/10 p-4 text-sm text-indigo-100"><p className="font-bold">Build tool executed</p><p className="mt-2 font-mono text-xs">{toolCall.toolName}</p><p className="mt-2">Risk: {toolCall.riskLevel}</p><p>Checks: approval {String(toolCall.evidence.approvalChecked)}, plan hash {String(toolCall.evidence.planHashChecked)}, permission {String(toolCall.evidence.allowedToolChecked)}</p><p className="mt-2 text-xs text-indigo-200/80">{toolCall.evidence.note}</p></div>}
           {execution && <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm text-emerald-100"><p className="font-bold">Implementation PR created</p><p className="mt-2">Repository: {execution.repository}</p><p>Branch: {execution.branchName}</p><p>Generated files: {execution.generatedFiles.length}</p><a href={execution.pullRequestUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-emerald-200 underline">Open PR #{execution.pullRequestNumber}<ExternalLink className="h-3.5 w-3.5" /></a><p className="mt-3 text-xs text-emerald-200/80">{execution.evidence.note}</p></div>}
         </section>
       </div>
