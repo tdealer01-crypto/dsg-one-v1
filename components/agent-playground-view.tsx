@@ -33,8 +33,17 @@ const AGENTS = [
   }
 ];
 
+function createAgentGreeting(agentId: string): ChatMessage {
+  return {
+    id: `${agentId}-${Date.now().toString()}-greeting`,
+    role: 'model',
+    text: `Connected to **${AGENTS.find(a => a.id === agentId)?.name}**.\\n\\nReady to receive execution input.`,
+    timestamp: new Date().toLocaleTimeString()
+  };
+}
+
 export function AgentPlaygroundView() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [createAgentGreeting(AGENTS[0].id)]);
   const [input, setInput] = useState('');
   const [activeAgentId, setActiveAgentId] = useState(AGENTS[0].id);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -46,18 +55,13 @@ export function AgentPlaygroundView() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isGenerating]);
 
-  // Reset chat when agent changes
-  useEffect(() => {
-    setMessages([{
-      id: Date.now().toString(),
-      role: 'model',
-      text: `Connected to **${AGENTS.find(a => a.id === activeAgentId)?.name}**.\\n\\nReady to receive execution input.`,
-      timestamp: new Date().toLocaleTimeString()
-    }]);
-    setError(null);
-  }, [activeAgentId]);
-
   const activeAgent = AGENTS.find(a => a.id === activeAgentId) || AGENTS[0];
+
+  const handleAgentChange = (agentId: string) => {
+    setActiveAgentId(agentId);
+    setMessages([createAgentGreeting(agentId)]);
+    setError(null);
+  };
 
   const handleSendMessage = async () => {
     if (!input.trim() || isGenerating) return;
@@ -160,7 +164,7 @@ export function AgentPlaygroundView() {
             {AGENTS.map(agent => (
               <button
                 key={agent.id}
-                onClick={() => setActiveAgentId(agent.id)}
+                onClick={() => handleAgentChange(agent.id)}
                 className={cn(
                   "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
                   activeAgentId === agent.id 
