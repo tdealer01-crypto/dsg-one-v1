@@ -9,7 +9,7 @@ function supabaseConfig() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('GENERATED_APP_SUPABASE_ENV_REQUIRED');
-  return { url: url.replace(//$/, ''), key };
+  return { url: url.replace(/\/$/, ''), key };
 }
 
 async function supabaseRest<T>(input: SupabaseRequest): Promise<T> {
