@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { callAppBuilderBuildTool, type AppBuilderToolCallInput } from '@/lib/dsg/app-builder/build-tools';
 import { getDevAppBuilderContext } from '@/lib/dsg/server/app-builder/context';
-import { getAppBuilderJob, updateAppBuilderJob } from '@/lib/dsg/server/app-builder/repository';
+import { getAppBuilderJob, recordAppBuilderToolAudit, updateAppBuilderJob } from '@/lib/dsg/server/app-builder/repository';
 
 export const runtime = 'nodejs';
 
@@ -33,6 +33,15 @@ export async function POST(req: Request, context: { params: Promise<{ jobId: str
 
     const freshJob = await getAppBuilderJob(ctx, jobId);
     const result = await callAppBuilderBuildTool(freshJob, body);
+
+    await recordAppBuilderToolAudit({
+      ctx,
+      jobId,
+      toolName: result.toolName,
+      outcome: result.auditEvent.outcome,
+      evidenceRefs: result.auditEvent.evidenceRefs,
+      auditEvent: result.auditEvent as unknown as Record<string, unknown>,
+    });
 
     const updated = await updateAppBuilderJob({
       ctx,
