@@ -113,3 +113,26 @@ export async function recordAppBuilderApproval(input: {
     },
   });
 }
+
+export async function recordAppBuilderToolAudit(input: {
+  ctx: AppBuilderRequestContext;
+  jobId: string;
+  toolName: string;
+  outcome: string;
+  evidenceRefs: string[];
+  auditEvent: Record<string, unknown>;
+}): Promise<void> {
+  await supabaseRest<Row[]>({
+    method: 'POST',
+    path: 'dsg_app_builder_tool_audits',
+    body: {
+      app_builder_job_id: input.jobId,
+      workspace_id: input.ctx.workspaceId,
+      actor_id: input.ctx.actorId,
+      tool_name: input.toolName,
+      outcome: input.outcome,
+      evidence_refs: input.evidenceRefs,
+      audit_event: input.auditEvent,
+    },
+  });
+}
