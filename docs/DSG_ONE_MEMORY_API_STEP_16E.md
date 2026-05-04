@@ -64,6 +64,12 @@ The smoke verifies:
 5. all responses declare productionReadyClaim=false
 ```
 
+## Deployment retry log
+
+```text
+2026-05-04: preview deployment retry requested after Vercel build-rate-limit block.
+```
+
 ## Correct claim
 
 ```text
