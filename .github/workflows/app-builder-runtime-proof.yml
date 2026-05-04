@@ -1,0 +1,84 @@
+name: App Builder Runtime Proof
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/app-builder-runtime-proof.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PROD_HOST: dsg-one-v1.vercel.app
+      WORKSPACE_ID: runtime-proof-workspace
+      ACTOR_ID: github-actions-runtime-proof
+    steps:
+      - name: Run App Builder runtime proof
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const base = `https://${process.env.PROD_HOST}`;
+          const headers = {
+            'content-type': 'application/json',
+            'x-dsg-workspace-id': process.env.WORKSPACE_ID,
+            'x-dsg-actor-id': process.env.ACTOR_ID,
+          };
+          const proof = { status: 'failed', stage: 'start', jobId: null, planHash: null, approvalHash: null, handoffPlanHash: null, manifestPath: null, pullRequestUrl: null, auditRefs: 0, error: null };
+          async function post(stage, path, body = {}) {
+            proof.stage = stage;
+            const res = await fetch(`${base}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+            const text = await res.text();
+            let json;
+            try { json = text ? JSON.parse(text) : null; } catch { throw new Error(`${stage}: invalid json`); }
+            if (!res.ok || !json?.ok) throw new Error(`${stage}: ${json?.error?.message || json?.error?.code || res.status}`);
+            return json.data;
+          }
+          async function main() {
+            try {
+              const job = await post('create-job', '/api/dsg/app-builder/jobs', {
+                goal: 'Runtime proof: launch App Builder agent runtime and create implementation evidence.',
+                successCriteria: ['job created', 'plan generated', 'approval recorded', 'handoff returned', 'runtime tool executed', 'manifest created', 'PR created', 'audit evidence returned'],
+                constraints: ['no action before approval', 'no production claim without proof'],
+                targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'supabase-postgres', auth: 'none', deploy: 'vercel' }
+              });
+              proof.jobId = job.id;
+              await post('plan', `/api/dsg/app-builder/jobs/${job.id}/plan`);
+              const approved = await post('approval', `/api/dsg/app-builder/jobs/${job.id}/approval`, { decision: 'APPROVE', reason: 'GitHub Actions runtime proof.' });
+              proof.planHash = approved.planHash || null;
+              proof.approvalHash = approved.approvalHash || null;
+              const handoff = await post('handoff', `/api/dsg/app-builder/jobs/${job.id}/runtime-handoff`);
+              proof.handoffPlanHash = handoff.planHash || null;
+              const result = await post('tool-call', `/api/dsg/app-builder/jobs/${job.id}/tool-call`, { toolName: 'dsg.app_builder.launch_agent_runtime', arguments: { mode: 'agent_runtime_fullstack_pr' } });
+              proof.manifestPath = result.toolCall?.environment?.manifestPath || null;
+              proof.pullRequestUrl = result.toolCall?.output?.pullRequestUrl || null;
+              proof.auditRefs = result.toolCall?.auditEvent?.evidenceRefs?.length || 0;
+              proof.status = proof.manifestPath && proof.pullRequestUrl && proof.auditRefs > 0 ? 'passed' : 'failed';
+            } catch (error) {
+              proof.error = error instanceof Error ? error.message : String(error);
+            }
+            const md = [
+              '# App Builder Runtime Proof',
+              `- Status: ${proof.status}`,
+              `- Stage: ${proof.stage}`,
+              `- Job ID: ${proof.jobId || 'missing'}`,
+              `- Plan hash: ${proof.planHash || 'missing'}`,
+              `- Approval hash: ${proof.approvalHash || 'missing'}`,
+              `- Handoff plan hash: ${proof.handoffPlanHash || 'missing'}`,
+              `- Manifest path: ${proof.manifestPath || 'missing'}`,
+              `- Pull request URL: ${proof.pullRequestUrl || 'missing'}`,
+              `- Audit refs: ${proof.auditRefs}`,
+              `- Error: ${proof.error || 'none'}`,
+              '',
+              proof.status === 'passed' ? 'Claim remains IMPLEMENTED_UNVERIFIED until CI/deploy proof passes.' : 'Runtime proof did not complete.'
+            ].join('\n');
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + '\n');
+            if (proof.status !== 'passed') process.exit(1);
+          }
+          main();
+          NODE
