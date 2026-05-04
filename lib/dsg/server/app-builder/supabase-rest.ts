@@ -6,9 +6,12 @@ type SupabaseRequest = {
 };
 
 function getSupabaseRestConfig() {
-  const url = process.env.SUPABASE_URL;
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('SUPABASE_SERVER_ENV_REQUIRED');
+
+  if (!url) throw new Error('SUPABASE_SERVER_ENV_REQUIRED:SUPABASE_URL_OR_NEXT_PUBLIC_SUPABASE_URL');
+  if (!key) throw new Error('SUPABASE_SERVER_ENV_REQUIRED:SUPABASE_SERVICE_ROLE_KEY');
+
   return { url: url.replace(/\/$/, ''), key };
 }
 
