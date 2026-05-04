@@ -5,6 +5,10 @@ export type DsgMemoryRequestContext = {
   permissions: string[];
 };
 
+function isDevHeaderGateEnabled(): boolean {
+  return process.env.DSG_ALLOW_DEV_AUTH_HEADERS?.trim().toLowerCase() === 'true';
+}
+
 export function memoryBoundary() {
   return {
     productionReadyClaim: false,
@@ -16,7 +20,7 @@ export function memoryBoundary() {
 }
 
 export function getDevMemoryContext(req: Request, requiredPermissions: string[]): DsgMemoryRequestContext {
-  if (process.env.DSG_ALLOW_DEV_AUTH_HEADERS !== 'true') {
+  if (!isDevHeaderGateEnabled()) {
     throw new Error('DSG_DEV_AUTH_HEADERS_DISABLED');
   }
 
