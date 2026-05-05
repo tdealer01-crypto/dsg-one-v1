@@ -1,4 +1,4 @@
-import { PRDViewer } from '@/components/dsg/app-builder/PRDViewer';
+import { AppBuilderConsoleClient } from '@/components/dsg/app-builder/AppBuilderConsoleClient';
 import { DSG_APP_TEMPLATES } from '@/lib/dsg/app-builder/templates/template-registry';
 import type { DsgAppBuilderPrd } from '@/lib/dsg/app-builder/types/prd';
 
@@ -25,17 +25,17 @@ export default function DsgAppBuilderPage() {
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-indigo-200">DSG One Step 17</p>
           <h1 className="mt-4 text-4xl font-black tracking-tight md:text-5xl">App Builder Product Console</h1>
           <p className="mt-4 max-w-3xl text-base leading-7 text-slate-300">
-            This page turns the builder foundation into a visible product surface: PRD preview, template registry,
+            This page turns the builder foundation into a visible product surface: prompt-to-PRD, template registry,
             Z3 observer boundary, and production-proof checklist. It is not a Manus-level or production-ready claim yet.
           </p>
           <div className="mt-6 grid gap-3 md:grid-cols-4">
-            {['Goal Lock', 'PRD Preview', 'Z3 Observer', 'Proof Gate'].map((item) => (
+            {['Goal Lock', 'Prompt → PRD', 'Z3 Observer', 'Proof Gate'].map((item) => (
               <div key={item} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm font-bold text-slate-200">{item}</div>
             ))}
           </div>
         </section>
 
-        <PRDViewer prd={demoPrd} />
+        <AppBuilderConsoleClient initialPrd={demoPrd} />
 
         <section className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
@@ -74,11 +74,11 @@ export default function DsgAppBuilderPage() {
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
               <h3 className="font-black text-emerald-200">Allowed now</h3>
-              <p className="mt-2 text-sm text-slate-300">STEP_17_FOUNDATION_MERGED, TEMPLATE_REGISTRY_ADDED, PRD_PREVIEW_UI_ADDED</p>
+              <p className="mt-2 text-sm text-slate-300">PRD_DRAFT_ONLY, TEMPLATE_REGISTRY_ADDED, PRD_PREVIEW_UI_ADDED</p>
             </div>
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
               <h3 className="font-black text-amber-200">Still pending</h3>
-              <p className="mt-2 text-sm text-slate-300">OpenRouter smoke, prompt-to-app automation, auth/RBAC proof, production flow proof</p>
+              <p className="mt-2 text-sm text-slate-300">OpenRouter smoke, runtime execution button, auth/RBAC proof, production flow proof</p>
             </div>
             <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4">
               <h3 className="font-black text-rose-200">Blocked claim</h3>
