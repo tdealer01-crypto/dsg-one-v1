@@ -1,0 +1,58 @@
+name: DSG App Builder Build Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        required: true
+        type: string
+      branch:
+        required: true
+        type: string
+      tree_hash:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+      - run: npm run dsg:typecheck
+      - run: npm run dsg:test
+      - run: npm run build
+
+      - name: Write build proof artifact
+        if: always()
+        run: |
+          mkdir -p .dsg-build-proof
+          cat > .dsg-build-proof/build-proof.json <<JSON
+          {
+            "jobId": "${{ inputs.job_id }}",
+            "branch": "${{ inputs.branch }}",
+            "treeHash": "${{ inputs.tree_hash }}",
+            "githubRunId": "${{ github.run_id }}",
+            "githubSha": "${{ github.sha }}",
+            "status": "${{ job.status }}"
+          }
+          JSON
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dsg-build-proof-${{ inputs.job_id }}
+          path: .dsg-build-proof/
+          retention-days: 7

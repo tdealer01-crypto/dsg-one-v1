@@ -151,6 +151,17 @@ try {
     }),
   }));
 
+
+  steps.push({
+    id: 'crud_smoke_probe',
+    name: 'CRUD smoke probe',
+    status: 'BLOCK',
+    durationMs: 0,
+    screenshot: null,
+    error: 'CRUD proof requires generated CRUD route and test data contract; /api/health is not CRUD proof.',
+    evidence: {},
+  });
+
   steps.push(await runStep({
     id: 'logout_or_session_boundary',
     name: 'Logout or session boundary',
