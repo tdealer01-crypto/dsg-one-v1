@@ -75,10 +75,6 @@ function envPresent(key: string): boolean {
   return typeof process.env[key] === 'string' && process.env[key]!.trim().length > 0;
 }
 
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
-}
-
 function pushFailure(failures: AppBuilderRuntimeGateFailure[], failure: AppBuilderRuntimeGateFailure) {
   failures.push(failure);
 }
@@ -202,7 +198,7 @@ export function evaluateRuntimeGateSnapshot(snapshot: AppBuilderRuntimeGateSnaps
 
   const status: AppBuilderRuntimeGateStatus = failures.some((failure) => failure.severity === 'HARD') ? 'BLOCKED' : 'READY';
   const evaluatedAt = new Date().toISOString();
-  const gateHash = sha256({ status, failures, evaluatedAt, snapshot });
+  const gateHash = sha256({ status, failures, snapshot });
 
   return {
     status,
@@ -247,11 +243,20 @@ function rowFromSnapshot(input: AppBuilderRuntimeGateDecision): SnapshotRow {
 }
 
 export async function recordRuntimeGateSnapshot(decision: AppBuilderRuntimeGateDecision): Promise<void> {
+  const row = rowFromSnapshot(decision);
+  const updatedRows = await supabaseRest<SnapshotRow[]>({
+    method: 'PATCH',
+    path: 'dsg_app_builder_runtime_gate_snapshots',
+    query: `?app_builder_job_id=eq.${decision.snapshot.appBuilderJobId}&select=id`,
+    body: row,
+  });
+
+  if (updatedRows.length > 0) return;
+
   await supabaseRest<SnapshotRow[]>({
     method: 'POST',
     path: 'dsg_app_builder_runtime_gate_snapshots',
-    query: '?on_conflict=app_builder_job_id',
-    body: rowFromSnapshot(decision),
+    body: row,
   });
 }
 
