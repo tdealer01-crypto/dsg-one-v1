@@ -114,7 +114,7 @@ Acceptance:
 
 ## Branch
 
-codex/dsg-6-build-proof-callback
+`codex/dsg-6-build-proof-callback`
 
 ## Scope
 
@@ -122,7 +122,6 @@ codex/dsg-6-build-proof-callback
 - `scripts/dsg-upload-build-proof-evidence.mjs`
 - `app/api/dsg/runtime/build-proof/callback/route.ts`
 - Keep `app/api/dsg/jobs/[jobId]/build-proof/route.ts` fail-closed unless it only triggers the workflow safely.
-
 
 ## Codex Prompt
 
@@ -182,7 +181,7 @@ Acceptance:
 
 ## Branch
 
-codex/dsg-7-vercel-preview-proof
+`codex/dsg-7-vercel-preview-proof`
 
 ## Scope
 
@@ -190,7 +189,6 @@ codex/dsg-7-vercel-preview-proof
 - `scripts/dsg-vercel-preview-proof.mjs`
 - Deploy proof route/callback only if needed.
 - Preserve existing secure deployment proof route if it already uses verified actor + repository write.
-
 
 ## Codex Prompt
 
@@ -241,14 +239,13 @@ Acceptance:
 
 ## Branch
 
-codex/dsg-8-auth-rbac-proof-probe
+`codex/dsg-8-auth-rbac-proof-probe`
 
 ## Scope
 
 - `lib/dsg/runtime/auth-rbac-proof.ts`
 - `app/api/dsg/jobs/[jobId]/auth-rbac-proof/route.ts`
 - External runner/test scripts if needed.
-
 
 ## Codex Prompt
 
@@ -300,7 +297,7 @@ Acceptance:
 
 ## Branch
 
-codex/dsg-9-crud-generator-contract
+`codex/dsg-9-crud-generator-contract`
 
 ## Scope
 
@@ -308,7 +305,6 @@ codex/dsg-9-crud-generator-contract
 - `lib/dsg/app-builder/crud-generator.ts`
 - `scripts/dsg-production-flow-runner.mjs`
 - `tests/dsg/database-crud-generator.test.ts`
-
 
 ## Codex Prompt
 
@@ -377,55 +373,41 @@ npm run dsg:verify
 
 Start together:
 
-DSG-5
-
-DSG-8
-
-DSG-9
-
+- DSG-5
+- DSG-8
+- DSG-9
 
 Wait:
 
-DSG-6 waits for DSG-5
-
-DSG-7 waits for DSG-6
-
+- DSG-6 waits for DSG-5
+- DSG-7 waits for DSG-6
 
 ## Claim Restrictions
 
 Until all Codex PRs actually pass, do not claim:
 
-“เท่า Manus”
-
-“production ready”
-
-“production proof complete”
-
-“build/deploy/auth/CRUD proof complete”
-
+- “เท่า Manus”
+- “production ready”
+- “production proof complete”
+- “build/deploy/auth/CRUD proof complete”
 
 ## Allowed statement at this stage
 
-“Codex execution plan is ready.”
-
-“Real integration lanes are split into isolated PRs with fail-closed proof boundaries.”
-
+- “Codex execution plan is ready.”
+- “Real integration lanes are split into isolated PRs with fail-closed proof boundaries.”
 
 ## Integrity Constraints
 
-Do not inject false information.
-
-Do not guess.
-
-Use only verifiable repository evidence.
-
-If capacity/limit risk appears, report it and propose mitigation.
-
-Prefer concrete, simple, and testable user-value outcomes.
-
+- Do not inject false information.
+- Do not guess.
+- Use only verifiable repository evidence.
+- If capacity/limit risk appears, report it and propose mitigation.
+- Prefer concrete, simple, and testable user-value outcomes.
 
 ## Codex Prompt Rule
 
 Each Codex task must use the detailed lane prompt from this file.
 
-Do not let Codex infer missing implementation details. Do not let Codex merge multiple lanes into one PR. Do not let Codex mark a lane complete without tests and clear evidence.
+Do not let Codex infer missing implementation details.
+Do not let Codex merge multiple lanes into one PR.
+Do not let Codex mark a lane complete without tests and clear evidence.
