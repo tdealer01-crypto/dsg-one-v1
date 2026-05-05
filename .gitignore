@@ -5,3 +5,8 @@ coverage/
 *.log
 .env*
 !.env.example
+.vercel
+.env*.local
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
