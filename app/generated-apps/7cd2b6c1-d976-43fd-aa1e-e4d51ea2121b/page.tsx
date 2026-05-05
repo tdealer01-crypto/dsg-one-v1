@@ -38,8 +38,15 @@ export default function GeneratedDsgAppPage() {
     await loadItems();
   }
 
+  // Generated preview page intentionally loads external preview data after mount.
   useEffect(() => {
-    loadItems().catch((error) => setStatus(error instanceof Error ? error.message : 'GENERATED_APP_LOAD_FAILED'));
+    const timer = window.setTimeout(() => {
+      void loadItems().catch((error) => {
+        setStatus(error instanceof Error ? error.message : 'GENERATED_APP_LOAD_FAILED');
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (
