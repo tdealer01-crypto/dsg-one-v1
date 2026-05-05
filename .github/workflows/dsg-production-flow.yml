@@ -1,4 +1,5 @@
 name: DSG Production Flow
+
 on:
   workflow_dispatch:
     inputs:
@@ -14,24 +15,56 @@ on:
       gate_hash:
         required: true
         type: string
+
+permissions:
+  contents: read
+
 jobs:
   production-flow:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - run: npm ci
-      - run: node scripts/dsg-production-flow-runner.mjs
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save @playwright/test@1.58.2
+          npx playwright install --with-deps chromium
+
+      - name: Run DSG production flow
+        run: node scripts/dsg-production-flow-runner.mjs
         env:
           DSG_EXECUTION_ID: ${{ inputs.execution_id }}
+          DSG_JOB_ID: ${{ inputs.job_id }}
           DSG_PREVIEW_URL: ${{ inputs.preview_url }}
+          DSG_GATE_HASH: ${{ inputs.gate_hash }}
           DSG_TEST_IDENTITY: ${{ secrets.DSG_TEST_IDENTITY }}
-      - run: node scripts/dsg-upload-production-flow-evidence.mjs
+
+      - name: Upload DSG production flow evidence
+        if: always()
+        run: node scripts/dsg-upload-production-flow-evidence.mjs
         env:
           DSG_CALLBACK_URL: ${{ secrets.DSG_CALLBACK_URL }}
           DSG_CALLBACK_SECRET: ${{ secrets.DSG_CALLBACK_SECRET }}
+
+      - name: Upload local artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsg-production-flow-${{ inputs.execution_id }}
+          path: |
+            dsg-production-flow-result.json
+            .dsg-production-flow/
+          retention-days: 7
+
       - name: Fail if production flow did not pass
+        if: always()
         run: |
           node -e "const fs=require('fs'); const r=JSON.parse(fs.readFileSync('dsg-production-flow-result.json','utf8')); process.exit(r.production_flow_passed ? 0 : 1)"
