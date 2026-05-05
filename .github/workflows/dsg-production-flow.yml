@@ -1,0 +1,37 @@
+name: DSG Production Flow
+on:
+  workflow_dispatch:
+    inputs:
+      execution_id:
+        required: true
+        type: string
+      job_id:
+        required: true
+        type: string
+      preview_url:
+        required: true
+        type: string
+      gate_hash:
+        required: true
+        type: string
+jobs:
+  production-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: node scripts/dsg-production-flow-runner.mjs
+        env:
+          DSG_EXECUTION_ID: ${{ inputs.execution_id }}
+          DSG_PREVIEW_URL: ${{ inputs.preview_url }}
+          DSG_TEST_IDENTITY: ${{ secrets.DSG_TEST_IDENTITY }}
+      - run: node scripts/dsg-upload-production-flow-evidence.mjs
+        env:
+          DSG_CALLBACK_URL: ${{ secrets.DSG_CALLBACK_URL }}
+          DSG_CALLBACK_SECRET: ${{ secrets.DSG_CALLBACK_SECRET }}
+      - name: Fail if production flow did not pass
+        run: |
+          node -e "const fs=require('fs'); const r=JSON.parse(fs.readFileSync('dsg-production-flow-result.json','utf8')); process.exit(r.production_flow_passed ? 0 : 1)"
