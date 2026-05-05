@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { callAppBuilderBuildTool, type AppBuilderToolCallInput } from '@/lib/dsg/app-builder/build-tools';
+import { assertRuntimeGateReady } from '@/lib/dsg/app-builder/runtime-gate-snapshot';
 import { getDevAppBuilderContext } from '@/lib/dsg/server/app-builder/context';
 import { getAppBuilderJob, recordAppBuilderToolAudit, updateAppBuilderJob } from '@/lib/dsg/server/app-builder/repository';
 
@@ -17,6 +18,8 @@ export async function POST(req: Request, context: { params: Promise<{ jobId: str
     const ctx = getDevAppBuilderContext(req);
     const job = await getAppBuilderJob(ctx, jobId);
 
+    const runtimeGate = await assertRuntimeGateReady(job);
+
     await updateAppBuilderJob({
       ctx,
       id: jobId,
@@ -25,6 +28,11 @@ export async function POST(req: Request, context: { params: Promise<{ jobId: str
         claim_status: 'APPROVED_ONLY',
         metadata: {
           ...(job.metadata ?? {}),
+          runtimeGate: {
+            status: runtimeGate.status,
+            gateHash: runtimeGate.gateHash,
+            evaluatedAt: runtimeGate.evaluatedAt,
+          },
           toolCallStartedAt: new Date().toISOString(),
           requestedTool: body.toolName,
         },
@@ -40,7 +48,15 @@ export async function POST(req: Request, context: { params: Promise<{ jobId: str
       toolName: result.toolName,
       outcome: result.auditEvent.outcome,
       evidenceRefs: result.auditEvent.evidenceRefs,
-      auditEvent: result.auditEvent as unknown as Record<string, unknown>,
+      auditEvent: {
+        ...(result.auditEvent as unknown as Record<string, unknown>),
+        runtimeGate: {
+          status: runtimeGate.status,
+          gateHash: runtimeGate.gateHash,
+          evaluatedAt: runtimeGate.evaluatedAt,
+          snapshot: runtimeGate.snapshot,
+        },
+      },
     });
 
     const updated = await updateAppBuilderJob({
@@ -51,6 +67,11 @@ export async function POST(req: Request, context: { params: Promise<{ jobId: str
         claim_status: result.claimStatus,
         metadata: {
           ...(freshJob.metadata ?? {}),
+          runtimeGate: {
+            status: runtimeGate.status,
+            gateHash: runtimeGate.gateHash,
+            evaluatedAt: runtimeGate.evaluatedAt,
+          },
           toolCallResult: result,
           executionResult: result.output,
           toolCallCompletedAt: new Date().toISOString(),
@@ -59,7 +80,7 @@ export async function POST(req: Request, context: { params: Promise<{ jobId: str
       },
     });
 
-    return NextResponse.json({ ok: true, data: { job: updated, toolCall: result } });
+    return NextResponse.json({ ok: true, data: { job: updated, runtimeGate, toolCall: result } });
   } catch (error) {
     return fail(error);
   }
