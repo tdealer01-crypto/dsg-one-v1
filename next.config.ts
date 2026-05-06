@@ -1,14 +1,5 @@
 import type {NextConfig} from 'next';
 
-function isTermuxBuildEnvironment() {
-  return Boolean(
-    process.env.TERMUX_VERSION ||
-    process.env.PREFIX?.includes('/com.termux') ||
-    process.env.HOME?.includes('/com.termux') ||
-    process.env.DSG_DISABLE_WEBPACK_CACHE === 'true'
-  );
-}
-
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   eslint: {
@@ -31,12 +22,10 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   transpilePackages: ['motion'],
   webpack: (config, {dev}) => {
-    // Termux/Android filesystem snapshots can fail inside webpack PackFileCacheStrategy.
-    // Disable webpack's persistent filesystem cache there; this keeps builds deterministic
-    // and avoids css-loader/postcss-loader failures surfaced from app/globals.css.
-    if (isTermuxBuildEnvironment()) {
-      config.cache = false;
-    }
+    // Android/Termux and some ephemeral CI filesystems can fail while webpack tries
+    // to snapshot loader dependencies for its persistent cache. Disable that cache
+    // globally for deterministic DSG builds. Next still performs normal compilation.
+    config.cache = false;
 
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
     // Do not modify-file watching is disabled to prevent flickering during agent edits.
