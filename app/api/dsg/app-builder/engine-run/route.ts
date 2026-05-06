@@ -61,7 +61,11 @@ export async function POST(req: Request) {
     const engine = requireEngine(engineId);
     const successCriteria = Array.isArray(input.successCriteria) ? input.successCriteria : [];
     const preview = inferPreview(input.goal, successCriteria);
-    const blocked = engine.status === 'blocked' || (mode === 'generate_pr' && engine.status !== 'available');
+    const envReady = engine.requiredEnv.every((key) => Boolean(process.env[key]));
+    const blocked =
+      engine.status === 'blocked' ||
+      (engine.status === 'requires_config' && !envReady) ||
+      (mode === 'generate_pr' && engine.status !== 'available');
 
     const result: DsgAppBuilderEngineRunResult = {
       ok: true,
@@ -70,14 +74,15 @@ export async function POST(req: Request) {
       mode,
       claimStatus: blocked ? 'BLOCKED' : mode === 'generate_pr' ? 'IMPLEMENTED_UNVERIFIED' : 'PLANNED_ONLY',
       summary: blocked
-        ? `${engine.label} is not ready for this run mode. Use DSG Native preview first or configure required evidence.`
+        ? `${engine.label} is not ready for ${mode}. DSG kept this run blocked and returned preview/planning evidence only.`
         : `${engine.label} produced a governed ${mode.replace('_', ' ')} result with DSG evidence gates still active.`,
       nextActions: blocked
-        ? ['Use dsg-native preview mode', 'Configure required environment variables', 'Keep production claim blocked']
-        : ['Review preview screens', 'Check required evidence', 'Run PRD/Plan/Handoff gates', 'Generate PR only after sandbox and license gates pass'],
+        ? ['Use DSG Native preview mode', 'Configure required environment variables if this adapter is approved', 'Complete license/security review', 'Keep production claim blocked']
+        : ['Review preview screens', 'Check license and security gates', 'Run PRD/Plan/Handoff gates', 'Generate PR only after sandbox and evidence gates pass'],
       preview,
       evidence: {
         licenseGate: engine.licenseBoundary,
+        securityGate: engine.securityBoundary,
         sandboxGate: engine.capabilities.includes('sandbox') ? 'SANDBOX_REQUIRED' : 'NOT_APPLICABLE_FOR_PREVIEW',
         pathGate: 'ALLOWED_PATHS_REQUIRED_BEFORE_FILE_WRITE',
         secretGate: engine.requiredEnv.length ? `REQUIRES_${engine.requiredEnv.join('_')}` : 'NO_ENGINE_SECRET_REQUIRED',
