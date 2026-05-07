@@ -1,103 +1,116 @@
 # DSG ONE V1 — Governed App Builder Runtime
 
-> From user goal to PRD, gated plan, approval, runtime handoff, generated app evidence, and deployable proof trail.
+> Governed app-builder control plane with user-confirmed API calls, visible evidence boundary, and deployable proof workflow.
 
-![Product Ready Gate](https://img.shields.io/badge/product--ready--gate-PASS-brightgreen)
-![Build](https://img.shields.io/badge/build-PASS-brightgreen)
-![Vercel](https://img.shields.io/badge/vercel-production--deployed-brightgreen)
+![Latest Build](https://img.shields.io/badge/latest--build-PASS-brightgreen)
 ![Truth Boundary](https://img.shields.io/badge/production--verified-not--claimed-orange)
 
 ## Current status
 
-**Last operator verification:** 2026-05-07 21:00 ICT
+**Last status update:** 2026-05-08 05:56 ICT
 
-DSG ONE V1 now has a passing product-ready environment gate, a passing production build, a clean `git diff --check`, and a successful Vercel production deployment.
+Latest guided App Builder flow has been merged. The user can now start with a short idea, let the agent ask follow-up questions, review the generated settings, and confirm before the real App Builder API is called.
 
 ```text
-Status: DEPLOYABLE / PRODUCT_READY_GATE_PASS
+Status: GUIDED_APP_BUILDER_BUILD_PASS
 Production verified: false
 Production alias: https://dsg-one-v1.vercel.app
-Latest Vercel production URL: https://dsg-one-v1-18wq8x7m4-tdealer01-cryptos-projects.vercel.app
 ```
 
 Safe claim right now:
 
 ```text
-governed app-builder runtime with product-ready gate pass and production deployment evidence
+governed app-builder runtime with guided API confirmation flow and latest local build pass evidence
 ```
 
 Do not claim yet:
 
 ```text
 PRODUCTION_VERIFIED
+latest guided UX deployed to production, unless a fresh vercel --prod result is attached
 ```
 
-Full production verification still requires live runtime proof, Supabase audit rows, generated GitHub branch / PR evidence, deployment proof artifact, and production-flow proof.
+## Latest guided App Builder update
 
-## Verified checks
+Changed files:
 
 ```text
-PASS: DSG_ONE_V1_SUPABASE_URL
-PASS: DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY
-PASS: GITHUB_TOKEN
-PASS: OPENAI_API_KEY
-PASS: DSG_BUILDER_GITHUB_OWNER
-PASS: DSG_BUILDER_GITHUB_REPO
-PASS: DSG_BUILDER_BASE_BRANCH
-PASS: APP_URL
-PASS: VERCEL_TOKEN
-PASS: VERCEL_ORG_ID
-PASS: VERCEL_PROJECT_ID
+components/guided-app-builder-view.tsx
+components/agent-playground-view.tsx
+```
+
+Latest commits:
+
+```text
+e9b747ea89a22cac6e2a7423d338d420930ccf55  feat: add guided app builder api confirmation
+eb6b91566cf37b72b49c8c69f6c8d13514785fc1  feat: route agent playground to guided builder
+```
+
+User-facing flow:
+
+```text
+User types a short idea, for example Todo
+  -> Agent asks follow-up questions
+  -> User selects features
+  -> User selects style
+  -> Agent composes Goal / Success criteria / Constraints in the visible monitor
+  -> User reviews the generated settings
+  -> User clicks: ยืนยันและเรียก API สร้างแผน
+  -> UI calls the real App Builder APIs
+```
+
+The confirmation button explicitly says it will call:
+
+```text
+POST /api/dsg/app-builder/jobs
+POST /api/dsg/app-builder/jobs/:jobId/plan
+```
+
+## Latest verification evidence
+
+Verified by operator screenshot after the guided App Builder update:
+
+```text
 PASS: npm run build
-PASS: git diff --check
-PASS: vercel --prod
 ```
 
-## Verification commands
-
-Run this before any status claim:
-
-```bash
-npm run dsg:claim-gate \
-&& npm run dsg:runtime-check \
-&& npm run dsg:typecheck \
-&& npm run lint \
-&& npm run dsg:product-ready
-```
-
-Then run:
-
-```bash
-npm run build
-git diff --check
-vercel --prod
-```
-
-## What DSG ONE V1 does
-
-DSG ONE V1 is a governed AI app-builder and action-runtime control plane.
-
-It is designed to make app generation visible, reviewable, auditable, fail-closed, evidence-driven, and safe to operate before production claims.
-
-Core rule:
+Build output included:
 
 ```text
-No production claim without real runtime evidence.
+/dsg/app-builder   11.3 kB
+[dsg-build] Restored app/globals.css.
+[dsg-build] Restored postcss.config.mjs.
+```
+
+Observed warning, not a build blocker:
+
+```text
+[DEP0190] DeprecationWarning: Passing args to a child process with shell option true...
+```
+
+Still required before fresh production deployment claim:
+
+```bash
+npm run dsg:typecheck
+npm run lint
+git diff --check
+npm run dsg:product-ready
+vercel --prod
 ```
 
 ## Product flow
 
 ```text
-User goal
+User chats with App Builder Agent
+  -> Agent asks follow-up questions
+  -> Agent prepares visible Goal / Success criteria / Constraints
+  -> User confirms API call
   -> Goal lock
   -> PRD
   -> Plan gate
   -> Approval
   -> Runtime handoff
   -> App Builder orchestration tool
-  -> Runtime environment provisioner
-  -> Agent action layer
-  -> Full-stack build tool
   -> GitHub branch / PR evidence
   -> DB-backed audit
   -> Product-ready check
@@ -117,35 +130,20 @@ User goal
 /api/dsg/*                      Runtime, memory, proof, and app-builder APIs
 ```
 
-## Claim vocabulary
+## API surface
 
 ```text
-PLANNED_ONLY              PRD or plan exists only.
-APPROVED_ONLY             Approval exists, execution proof is missing.
-ENVIRONMENT_READY         Runtime environment exists, build/deploy proof is incomplete.
-IMPLEMENTED_UNVERIFIED    Code or PR evidence exists, verification is incomplete.
-DEPLOYABLE                Build and deployment gates passed with evidence.
-PRODUCTION_VERIFIED       Live production-flow proof passed with recorded evidence.
-BLOCKED                   Required env, approval, proof, or audit evidence is missing.
-```
-
-Current safe level:
-
-```text
-DEPLOYABLE / PRODUCT_READY_GATE_PASS
-```
-
-Not claimed:
-
-```text
-PRODUCTION_VERIFIED
+POST /api/dsg/app-builder/jobs
+POST /api/dsg/app-builder/jobs/:jobId/plan
+POST /api/dsg/app-builder/jobs/:jobId/approval
+POST /api/dsg/app-builder/jobs/:jobId/runtime-handoff
+GET  /api/dsg/app-builder/tools
+POST /api/dsg/app-builder/jobs/:jobId/tool-call
 ```
 
 ## Truth boundary
 
-This repo currently proves that the implementation surface can pass the configured product-ready gate and deploy to Vercel production.
-
-It does not yet prove that every generated workflow is production verified.
+The latest proof shows that the guided App Builder update builds locally. It does not prove that the latest guided UX is deployed to production or that every generated workflow is production verified.
 
 Missing proof must stay missing. Mock data, local-only state, browser-only state, or unchecked logs must not be presented as production evidence.
 
@@ -164,8 +162,6 @@ browser-visible status after real execution
 
 ## Required environment variables
 
-Server-only runtime variables:
-
 ```bash
 DSG_ONE_V1_SUPABASE_URL=
 DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY=
@@ -174,11 +170,6 @@ OPENAI_API_KEY=
 VERCEL_TOKEN=
 VERCEL_ORG_ID=
 VERCEL_PROJECT_ID=
-```
-
-Builder target variables:
-
-```bash
 DSG_BUILDER_GITHUB_OWNER=tdealer01-crypto
 DSG_BUILDER_GITHUB_REPO=dsg-one-v1
 DSG_BUILDER_BASE_BRANCH=main
@@ -187,102 +178,49 @@ APP_URL=https://dsg-one-v1.vercel.app
 
 Do not expose server secrets through `NEXT_PUBLIC_*`.
 
-## Local development
+## Verification commands
 
 ```bash
-npm install
-npm run dev
-```
+npm run dsg:claim-gate \
+&& npm run dsg:runtime-check \
+&& npm run dsg:typecheck \
+&& npm run lint \
+&& npm run dsg:product-ready
 
-Open:
-
-```text
-http://localhost:3000
-```
-
-## Available DSG scripts
-
-```bash
-npm run dsg:claim-gate
-npm run dsg:runtime-check
-npm run dsg:typecheck
-npm run dsg:production-flow-check
-npm run dsg:product-ready
-npm run dsg:verify
-npm run smoke:app-builder-flow-proof
-npm run smoke:memory-api
-```
-
-## Termux / Android workflow
-
-```bash
-npm run clean
-npm run build:termux
-npm run dev:termux
-```
-
-Termux wrappers keep local proof possible on Android where cache paths, PostCSS/Tailwind snapshots, or watcher permissions can be unstable.
-
-## API surface
-
-Key App Builder endpoints:
-
-```text
-POST /api/dsg/app-builder/jobs
-POST /api/dsg/app-builder/jobs/:jobId/plan
-POST /api/dsg/app-builder/jobs/:jobId/approval
-POST /api/dsg/app-builder/jobs/:jobId/runtime-handoff
-GET  /api/dsg/app-builder/tools
-POST /api/dsg/app-builder/jobs/:jobId/tool-call
-```
-
-Runtime and proof endpoints:
-
-```text
-POST /api/dsg/jobs/:jobId/runtime/start
-POST /api/dsg/jobs/:jobId/replay
-GET  /api/dsg/jobs/:jobId/production-flow-proof
-POST /api/dsg/runtime/build-proof/callback
-POST /api/dsg/runtime/production-flow/callback
-GET  /api/dsg/product-ready
-GET  /api/dsg/verify
-```
-
-Memory/context endpoints:
-
-```text
-POST /api/dsg/memory/ingest
-POST /api/dsg/memory/search
-POST /api/dsg/memory/gate
-GET  /api/dsg/memory/context-pack
-GET  /api/dsg/workspaces
+npm run build
+git diff --check
+vercel --prod
 ```
 
 ## Product-ready checklist
 
-- [x] Required server env configured for local product-ready gate
-- [x] GitHub token configured with writer capability
-- [x] Builder repo target configured
-- [x] Vercel deployment variables configured
-- [x] Local production build passes
-- [x] Vercel production deployment passes
-- [ ] Supabase migrations applied-state proof attached
+- [x] Guided App Builder confirmation flow merged
+- [x] Guided App Builder local build passed
+- [ ] Guided App Builder rerun: `npm run dsg:typecheck`
+- [ ] Guided App Builder rerun: `npm run lint`
+- [ ] Guided App Builder rerun: `git diff --check`
+- [ ] Guided App Builder rerun: `npm run dsg:product-ready`
+- [ ] Guided App Builder deployed after fresh verification
 - [ ] Live App Builder runtime run attached
 - [ ] GitHub branch / PR evidence attached for a live generated app
-- [ ] `dsg_app_builder_tool_audits` audit row attached
+- [ ] Supabase audit row attached
 - [ ] Deployment proof artifact attached
 - [ ] Production-flow proof attached
 
 ## Next proof targets
 
 ```text
-1. Run a real App Builder job.
-2. Capture runtime handoff evidence.
-3. Generate a GitHub branch / PR from runtime.
-4. Confirm Supabase audit row evidence.
-5. Attach deployment proof artifact.
-6. Run production-flow proof.
-7. Only then consider PRODUCTION_VERIFIED.
+1. Pull latest main.
+2. Run typecheck, lint, build, diff check, and product-ready gate.
+3. Deploy once after local verification passes.
+4. Open production and test the guided App Builder confirmation flow.
+5. Run a real App Builder job from the guided UI.
+6. Capture runtime handoff evidence.
+7. Generate a GitHub branch / PR from runtime.
+8. Confirm Supabase audit row evidence.
+9. Attach deployment proof artifact.
+10. Run production-flow proof.
+11. Only then consider PRODUCTION_VERIFIED.
 ```
 
 ## Operator notes
@@ -291,10 +229,10 @@ Safe wording:
 
 ```text
 governed app-builder runtime
-product-ready gate pass
-deployable evidence workflow
+guided App Builder confirmation flow
+user-confirmed API call before plan generation
+latest guided UX local build pass
 implementation surface with proof boundary
-runtime handoff scaffold
 ```
 
 Do not claim:
@@ -304,8 +242,5 @@ certified enterprise system
 guaranteed compliant
 fully autonomous production builder
 PRODUCTION_VERIFIED without live proof
+latest guided UX deployed without fresh Vercel evidence
 ```
-
-## License
-
-Private/operator-controlled project unless a license file is added.
