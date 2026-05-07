@@ -407,24 +407,61 @@ npm run build:termux
 
 ## Current status summary
 
+Verified locally on **2026-05-07 UTC** from branch `work` at commit `a59e7fb` (`Add DSG Codex closure notes for instructions 6 7 8 (#61)`).
+
 ```text
-IMPLEMENTED:
+LOCAL CHECK RESULT:
+- PASS: npm run dsg:claim-gate
+- PASS: npm run dsg:runtime-check
+- PASS: npm run dsg:typecheck
+- PASS: npm run lint
+- PASS: npm run build
+- BLOCKED BY MISSING ENV: npm run dsg:product-ready
+
+LATEST BUILD-SURFACE SNAPSHOT:
+- Next.js production build completes successfully.
+- Build generated 37 static pages during the production build.
+- The App Builder console is available at /dsg/app-builder.
+- The App Builder sandbox is available at /dsg/app-builder/sandbox.
+- The Product Ready page is available at /product-ready.
+- Generated app pages currently present:
+  - /generated-apps/2f3b20b0-824c-4d4a-ae6a-250bd18f3392
+  - /generated-apps/7cd2b6c1-d976-43fd-aa1e-e4d51ea2121b
+  - /generated-apps/abc-game-worker
+  - /generated-apps/my-new-app
+- Generated app item APIs currently present for the same generated app IDs.
+
+IMPLEMENTED SURFACES:
 - App Builder product console
+- App Builder job detail page
+- App Builder sandbox page
 - Product-ready page and API
 - Runtime handoff routes
 - Runtime start/replay/proof callback routes
+- Build-proof, deployment-proof, auth/RBAC-proof, completion, evidence, and audit-export routes
 - Memory/context endpoints
+- Generated task and generated-app item APIs
 - Deterministic runtime check script
+- Production-flow check and runner scripts
+- Product-ready check script
 - Termux/mobile build wrapper
 - DB-backed audit path scaffolding
 
-STILL REQUIRES LIVE EVIDENCE BEFORE PRODUCTION_VERIFIED:
-- Supabase applied-state proof
-- successful live App Builder runtime run
-- generated GitHub PR evidence
-- audit row evidence
-- deployment proof
-- production-flow proof
+CURRENT BLOCKERS BEFORE PRODUCTION_VERIFIED:
+- DSG_ONE_V1_SUPABASE_URL or SUPABASE_URL is not configured in the local check environment.
+- DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SERVICE_ROLE_KEY is not configured in the local check environment.
+- GITHUB_TOKEN is not configured in the local check environment.
+- Supabase applied-state proof is still required.
+- A successful live App Builder runtime run is still required.
+- Generated GitHub PR evidence is still required for any live generated-app claim.
+- Audit row evidence is still required.
+- Deployment proof is still required.
+- Production-flow proof is still required.
+
+WARNINGS / NON-BLOCKING LOCAL OBSERVATIONS:
+- npm reports an "Unknown env config http-proxy" warning in this environment.
+- Next.js build completes, but Node prints DEP0190 about shell option argument handling from the build wrapper path.
+- Optional/local proof variables are not configured: DSG_BUILDER_GITHUB_OWNER, DSG_BUILDER_GITHUB_REPO, DSG_BUILDER_BASE_BRANCH, APP_URL, VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID.
 ```
 
 ---
