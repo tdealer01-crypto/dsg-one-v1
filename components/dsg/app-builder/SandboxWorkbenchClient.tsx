@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+type SandboxFileWrite = { path: string; mode?: string; gate?: string; bytes?: number };
+
 type SandboxResult = {
   ok?: boolean;
   error?: { code: string; message: string };
@@ -96,7 +98,9 @@ export function SandboxWorkbenchClient() {
   }
 
   const visible = prResult || plan;
-  const files = visible?.fileWrites?.length ? visible.fileWrites : (visible?.paths || []).map((path) => ({ path }));
+  const files: SandboxFileWrite[] = visible?.fileWrites?.length
+    ? visible.fileWrites
+    : (visible?.paths || []).map((path) => ({ path }));
   const resultOk = prResult?.ok ?? plan?.ok;
 
   return (
