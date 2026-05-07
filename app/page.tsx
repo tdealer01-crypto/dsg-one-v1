@@ -31,31 +31,132 @@ import { AgentPlaygroundView } from '@/components/agent-playground-view';
 
 type View = 'dashboard' | 'agents' | 'executions' | 'governance' | 'proof' | 'chat';
 type ProbeState = 'checking' | 'pass' | 'review' | 'blocked';
+type Lang = 'th' | 'en';
 
 type LiveProbe = {
-  id: string;
-  label: string;
+  id: 'product-ready' | 'katzilla' | 'public-ux-research';
   endpoint: string;
   state: ProbeState;
   detail: string;
   checkedAt?: string;
 };
 
-const navItems = [
-  { id: 'chat', label: 'App Builder', helper: 'Goal → PRD → Plan', icon: MessageSquare },
-  { id: 'dashboard', label: 'Mission Control', helper: 'Live operating view', icon: Activity },
-  { id: 'agents', label: 'Agents & Runtime', helper: 'Tool and agent layer', icon: Terminal },
-  { id: 'executions', label: 'Evidence Boundary', helper: 'Proof before claims', icon: ShieldCheck },
-  { id: 'governance', label: 'Governance', helper: 'Policy and approval', icon: Lock },
-  { id: 'proof', label: 'Enterprise Proof', helper: 'Audit-ready view', icon: FileText },
-] as const;
+type NavItem = {
+  id: View;
+  icon: typeof MessageSquare;
+  label: Record<Lang, string>;
+  helper: Record<Lang, string>;
+};
 
-const principles = [
-  'Public research needs source citation before use',
-  'Show real endpoint state only',
-  'Fail closed when proof is missing',
-  'Separate deployable from production verified',
+const navItems: NavItem[] = [
+  { id: 'chat', label: { en: 'App Builder', th: 'ตัวสร้างแอป' }, helper: { en: 'Goal → PRD → Plan', th: 'เป้าหมาย → PRD → แผน' }, icon: MessageSquare },
+  { id: 'dashboard', label: { en: 'Mission Control', th: 'ศูนย์ควบคุม' }, helper: { en: 'Live operating view', th: 'ดูการทำงานแบบสด' }, icon: Activity },
+  { id: 'agents', label: { en: 'Agents & Runtime', th: 'เอเจนต์และรันไทม์' }, helper: { en: 'Tool and agent layer', th: 'ชั้นเครื่องมือและเอเจนต์' }, icon: Terminal },
+  { id: 'executions', label: { en: 'Evidence Boundary', th: 'ขอบเขตหลักฐาน' }, helper: { en: 'Proof before claims', th: 'มีหลักฐานก่อนเคลม' }, icon: ShieldCheck },
+  { id: 'governance', label: { en: 'Governance', th: 'กำกับดูแล' }, helper: { en: 'Policy and approval', th: 'นโยบายและอนุมัติ' }, icon: Lock },
+  { id: 'proof', label: { en: 'Enterprise Proof', th: 'หลักฐานองค์กร' }, helper: { en: 'Audit-ready view', th: 'พร้อมตรวจสอบ' }, icon: FileText },
 ];
+
+const copy = {
+  en: {
+    brandSub: 'Governed runtime',
+    navTitle: 'User-first flow',
+    designRules: 'Design evidence rules',
+    principles: [
+      'Public research needs source citation before use',
+      'Show real endpoint state only',
+      'Fail closed when proof is missing',
+      'Separate deployable from production verified',
+    ],
+    operator: 'Operator',
+    evidenceMode: 'Evidence-first mode',
+    controlPlane: 'Control Plane',
+    searchPlaceholder: 'Search disabled until real evidence index exists',
+    notificationLabel: 'Notifications unavailable until evidence events exist',
+    noMock: 'No mock claims',
+    heroKicker: 'DSG App Builder Cockpit',
+    heroTitle: 'Build with evidence, monitor live, and never claim what is not proven.',
+    heroBody: 'Gold highlights verified operating state, red exposes risk, and silver holds neutral review details. The right monitor shows live processing status and proof boundaries for user trust.',
+    currentWorkspace: 'Current workspace',
+    currentWorkspaceBody: 'Status, evidence, and next action stay visible before execution.',
+    cards: {
+      readable: ['Readable priority', 'Large labels, clear sections, and one primary work surface at a time.'],
+      trust: ['Trust boundary', 'Risk and missing proof stay visible instead of being hidden behind success styling.'],
+      research: ['Public research ready', 'Consumer evidence must come from cited public sources before it shapes the claim layer.'],
+    },
+    monitor: {
+      kicker: 'Live Monitor',
+      title: 'Real work, real proof',
+      refreshLabel: 'Refresh live monitor',
+      pass: 'PASS',
+      total: 'TOTAL',
+      block: 'BLOCK',
+      checked: 'Checked',
+      trustBoundary: 'Trust Boundary',
+      trustBoundaryBody: 'No back-office data, no guessed survey claims, and no mock performance numbers. Public research must be cited before it becomes design evidence.',
+      notChecked: 'not checked',
+      probes: {
+        'product-ready': { label: 'Product-ready gate', defaultDetail: 'Checking live readiness API.' },
+        katzilla: { label: 'Katzilla agent catalog', defaultDetail: 'Checking optional free public-data connector.' },
+        'public-ux-research': { label: 'Public UX research evidence', defaultDetail: 'Use public consumer research and market UX benchmarks only after source citation is attached. No internal survey data or mock assumptions are shown.' },
+      },
+      endpointOk: 'Live endpoint returned a usable response.',
+      serverEvidenceMissing: 'Required server-side evidence is missing.',
+      endpointHttp: 'Endpoint returned HTTP',
+      endpointUnreachable: 'Endpoint could not be reached.',
+    },
+    language: 'Language',
+  },
+  th: {
+    brandSub: 'รันไทม์แบบมีการกำกับ',
+    navTitle: 'ลำดับงานในมุมผู้ใช้',
+    designRules: 'กฎหลักฐานในการออกแบบ',
+    principles: [
+      'ข้อมูลวิจัยสาธารณะต้องมีแหล่งอ้างอิงก่อนนำมาใช้',
+      'แสดงเฉพาะสถานะจาก endpoint จริง',
+      'ถ้าหลักฐานหายให้หยุดและบอกตรง ๆ',
+      'แยกคำว่า deployable ออกจาก production verified',
+    ],
+    operator: 'ผู้ปฏิบัติงาน',
+    evidenceMode: 'โหมดทำงานจากหลักฐานจริง',
+    controlPlane: 'ศูนย์ควบคุม',
+    searchPlaceholder: 'ปิดค้นหาไว้จนกว่าจะมีดัชนีหลักฐานจริง',
+    notificationLabel: 'แจ้งเตือนยังไม่เปิดจนกว่าจะมี event หลักฐานจริง',
+    noMock: 'ไม่ใช้ข้อมูลจำลอง',
+    heroKicker: 'DSG App Builder Cockpit',
+    heroTitle: 'สร้างด้วยหลักฐานจริง ดูการทำงานสด และไม่เคลมสิ่งที่ยังพิสูจน์ไม่ได้',
+    heroBody: 'สีทองใช้กับสถานะที่ผ่านแล้ว สีแดงใช้กับความเสี่ยงหรือสิ่งที่ติดขัด และสีเงินใช้กับรายละเอียดที่ต้องตรวจต่อ จอมอนิเตอร์ด้านขวาแสดงการประมวลผลและขอบเขตหลักฐานแบบสดเพื่อให้ผู้ใช้วางใจ',
+    currentWorkspace: 'พื้นที่ทำงานปัจจุบัน',
+    currentWorkspaceBody: 'ผู้ใช้เห็นสถานะ หลักฐาน และขั้นต่อไปก่อนเริ่มการทำงาน',
+    cards: {
+      readable: ['อ่านง่ายก่อน', 'ใช้หัวข้อใหญ่ แบ่งหมวดชัด และให้ผู้ใช้โฟกัสงานหลักครั้งละหนึ่งจุด'],
+      trust: ['ขอบเขตความวางใจ', 'ความเสี่ยงและหลักฐานที่หายต้องแสดงให้เห็น ไม่ซ่อนอยู่หลังสีเขียว'],
+      research: ['พร้อมใช้ข้อมูลวิจัยสาธารณะ', 'ข้อมูลผู้บริโภคต้องมาจากแหล่งสาธารณะที่อ้างอิงได้ก่อนนำมาออกแบบหรือใช้ใน claim layer'],
+    },
+    monitor: {
+      kicker: 'จอมอนิเตอร์สด',
+      title: 'งานจริง หลักฐานจริง',
+      refreshLabel: 'รีเฟรชจอมอนิเตอร์',
+      pass: 'ผ่าน',
+      total: 'ทั้งหมด',
+      block: 'ติดขัด',
+      checked: 'ตรวจล่าสุด',
+      trustBoundary: 'ขอบเขตความจริง',
+      trustBoundaryBody: 'ไม่ใช้ข้อมูลหลังบ้านที่ไม่ได้ยืนยัน ไม่เดาผลแบบสอบถาม และไม่ใส่ตัวเลขประสิทธิภาพปลอม ข้อมูลวิจัยสาธารณะต้องมีแหล่งอ้างอิงก่อนเป็นหลักฐานในการออกแบบ',
+      notChecked: 'ยังไม่ได้ตรวจ',
+      probes: {
+        'product-ready': { label: 'เกตความพร้อมสินค้า', defaultDetail: 'กำลังตรวจ readiness API จริง' },
+        katzilla: { label: 'แคตตาล็อกเอเจนต์ Katzilla', defaultDetail: 'กำลังตรวจตัวดึงข้อมูลสาธารณะฟรีแบบ optional' },
+        'public-ux-research': { label: 'หลักฐาน UX จากแหล่งสาธารณะ', defaultDetail: 'ใช้ข้อมูลผู้บริโภคและ benchmark เจ้าตลาดได้เมื่อมี citation/source แนบแล้วเท่านั้น ไม่มีการเดา ไม่มีข้อมูลจำลอง และไม่แตะหลังบ้าน' },
+      },
+      endpointOk: 'endpoint จริงตอบกลับและใช้งานได้',
+      serverEvidenceMissing: 'หลักฐานฝั่ง server ที่จำเป็นยังหายอยู่',
+      endpointHttp: 'endpoint ตอบกลับ HTTP',
+      endpointUnreachable: 'ยังติดต่อ endpoint ไม่ได้',
+    },
+    language: 'ภาษา',
+  },
+} as const;
 
 function badgeClass(state: ProbeState) {
   if (state === 'pass') return 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100';
@@ -71,9 +172,9 @@ function StatusIcon({ state }: { state: ProbeState }) {
   return <AlertCircle className="h-4 w-4" />;
 }
 
-function formatTime(value?: string) {
-  if (!value) return 'not checked';
-  return new Intl.DateTimeFormat('th-TH', {
+function formatTime(value: string | undefined, lang: Lang) {
+  if (!value) return copy[lang].monitor.notChecked;
+  return new Intl.DateTimeFormat(lang === 'th' ? 'th-TH' : 'en-US', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -81,36 +182,38 @@ function formatTime(value?: string) {
   }).format(new Date(value));
 }
 
-async function probe(endpoint: string): Promise<{ state: ProbeState; detail: string }> {
+async function probe(endpoint: string, lang: Lang): Promise<{ state: ProbeState; detail: string }> {
+  const text = copy[lang].monitor;
   try {
     const response = await fetch(endpoint, { cache: 'no-store' });
     const payload = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
-    if (response.ok && payload?.ok !== false) return { state: 'pass', detail: 'Live endpoint returned a usable response.' };
-    if (response.status === 503) return { state: 'blocked', detail: payload?.error || 'Required server-side evidence is missing.' };
-    return { state: 'review', detail: payload?.error || `Endpoint returned HTTP ${response.status}.` };
+    if (response.ok && payload?.ok !== false) return { state: 'pass', detail: text.endpointOk };
+    if (response.status === 503) return { state: 'blocked', detail: payload?.error || text.serverEvidenceMissing };
+    return { state: 'review', detail: payload?.error || `${text.endpointHttp} ${response.status}` };
   } catch (error) {
-    return { state: 'review', detail: error instanceof Error ? error.message : 'Endpoint could not be reached.' };
+    return { state: 'review', detail: error instanceof Error ? error.message : text.endpointUnreachable };
   }
 }
 
-function LiveMonitor() {
+function LiveMonitor({ lang }: { lang: Lang }) {
+  const text = copy[lang].monitor;
   const [items, setItems] = useState<LiveProbe[]>([
-    { id: 'product-ready', label: 'Product-ready gate', endpoint: '/api/dsg/product-ready', state: 'checking', detail: 'Checking live readiness API.' },
-    { id: 'katzilla', label: 'Katzilla agent catalog', endpoint: '/api/dsg/katzilla/agents', state: 'checking', detail: 'Checking optional free public-data connector.' },
-    { id: 'public-ux-research', label: 'Public UX research evidence', endpoint: 'public citation required', state: 'review', detail: 'Use public consumer research and market UX benchmarks only after source citation is attached. No internal survey data or mock assumptions are shown.' },
+    { id: 'product-ready', endpoint: '/api/dsg/product-ready', state: 'checking', detail: text.probes['product-ready'].defaultDetail },
+    { id: 'katzilla', endpoint: '/api/dsg/katzilla/agents', state: 'checking', detail: text.probes.katzilla.defaultDetail },
+    { id: 'public-ux-research', endpoint: 'public citation required', state: 'review', detail: text.probes['public-ux-research'].defaultDetail },
   ]);
 
   async function refresh() {
     const checkedAt = new Date().toISOString();
     const [productReady, katzilla] = await Promise.all([
-      probe('/api/dsg/product-ready'),
-      probe('/api/dsg/katzilla/agents'),
+      probe('/api/dsg/product-ready', lang),
+      probe('/api/dsg/katzilla/agents', lang),
     ]);
 
     setItems((current) => current.map((item) => {
       if (item.id === 'product-ready') return { ...item, ...productReady, checkedAt };
       if (item.id === 'katzilla') return { ...item, ...katzilla, checkedAt };
-      return { ...item, checkedAt };
+      return { ...item, detail: text.probes['public-ux-research'].defaultDetail, checkedAt };
     }));
   }
 
@@ -118,7 +221,8 @@ function LiveMonitor() {
     void refresh();
     const timer = window.setInterval(() => void refresh(), 30_000);
     return () => window.clearInterval(timer);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   const counts = useMemo(() => ({
     pass: items.filter((item) => item.state === 'pass').length,
@@ -132,27 +236,18 @@ function LiveMonitor() {
         <section className="rounded-3xl border border-amber-300/30 bg-amber-300/10 p-5 shadow-2xl shadow-amber-950/20">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-amber-200">Live Monitor</p>
-              <h2 className="mt-2 text-2xl font-black text-white">Real work, real proof</h2>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-amber-200">{text.kicker}</p>
+              <h2 className="mt-2 text-2xl font-black text-white">{text.title}</h2>
             </div>
-            <button onClick={() => void refresh()} className="rounded-2xl border border-amber-300/30 bg-black/30 p-3 text-amber-100 hover:bg-amber-300/10" aria-label="Refresh live monitor">
+            <button onClick={() => void refresh()} className="rounded-2xl border border-amber-300/30 bg-black/30 p-3 text-amber-100 hover:bg-amber-300/10" aria-label={text.refreshLabel}>
               <RefreshCw className="h-5 w-5" />
             </button>
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-3">
-              <p className="text-xs text-emerald-200">PASS</p>
-              <p className="mt-1 text-2xl font-black text-white">{counts.pass}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-300/20 bg-slate-300/10 p-3">
-              <p className="text-xs text-slate-300">TOTAL</p>
-              <p className="mt-1 text-2xl font-black text-white">{counts.total}</p>
-            </div>
-            <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3">
-              <p className="text-xs text-red-200">BLOCK</p>
-              <p className="mt-1 text-2xl font-black text-white">{counts.blocked}</p>
-            </div>
+            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-3"><p className="text-xs text-emerald-200">{text.pass}</p><p className="mt-1 text-2xl font-black text-white">{counts.pass}</p></div>
+            <div className="rounded-2xl border border-slate-300/20 bg-slate-300/10 p-3"><p className="text-xs text-slate-300">{text.total}</p><p className="mt-1 text-2xl font-black text-white">{counts.total}</p></div>
+            <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3"><p className="text-xs text-red-200">{text.block}</p><p className="mt-1 text-2xl font-black text-white">{counts.blocked}</p></div>
           </div>
         </section>
 
@@ -161,7 +256,7 @@ function LiveMonitor() {
             <article key={item.id} className="rounded-3xl border border-slate-700 bg-slate-900/70 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-black text-slate-100">{item.label}</h3>
+                  <h3 className="text-sm font-black text-slate-100">{text.probes[item.id].label}</h3>
                   <p className="mt-1 max-w-[260px] truncate font-mono text-xs text-slate-500">{item.endpoint}</p>
                 </div>
                 <span className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-black uppercase', badgeClass(item.state))}>
@@ -170,36 +265,34 @@ function LiveMonitor() {
                 </span>
               </div>
               <p className="mt-3 text-sm leading-6 text-slate-300">{item.detail}</p>
-              <p className="mt-3 text-xs text-slate-500">Checked: {formatTime(item.checkedAt)}</p>
+              <p className="mt-3 text-xs text-slate-500">{text.checked}: {formatTime(item.checkedAt, lang)}</p>
             </article>
           ))}
         </section>
 
         <section className="mt-4 rounded-3xl border border-red-400/25 bg-red-500/10 p-5">
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-red-200">Trust Boundary</p>
-          <p className="mt-3 text-sm leading-6 text-slate-200">No back-office data, no guessed survey claims, and no mock performance numbers. Public research must be cited before it becomes design evidence.</p>
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-red-200">{text.trustBoundary}</p>
+          <p className="mt-3 text-sm leading-6 text-slate-200">{text.trustBoundaryBody}</p>
         </section>
       </div>
     </aside>
   );
 }
 
-function Hero({ label }: { label: string }) {
+function Hero({ label, lang }: { label: string; lang: Lang }) {
+  const text = copy[lang];
   return (
     <section className="mb-6 rounded-[2rem] border border-amber-300/25 bg-gradient-to-br from-amber-300/15 via-slate-950 to-red-950/40 p-6 shadow-2xl shadow-black/30">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-black/30 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] text-amber-200">
-            <Sparkles className="h-3.5 w-3.5" />
-            DSG App Builder Cockpit
-          </div>
-          <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight text-white md:text-5xl">Build with evidence, monitor live, and never claim what is not proven.</h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-300">Gold highlights verified operating state, red exposes risk, and silver holds neutral review details. The right monitor shows live processing status and proof boundaries for user trust.</p>
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-black/30 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] text-amber-200"><Sparkles className="h-3.5 w-3.5" />{text.heroKicker}</div>
+          <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight text-white md:text-5xl">{text.heroTitle}</h1>
+          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-300">{text.heroBody}</p>
         </div>
         <div className="rounded-3xl border border-slate-600 bg-slate-950/70 p-4 lg:w-72">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Current workspace</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{text.currentWorkspace}</p>
           <p className="mt-2 text-2xl font-black text-amber-100">{label}</p>
-          <p className="mt-2 text-sm text-slate-400">Status, evidence, and next action stay visible before execution.</p>
+          <p className="mt-2 text-sm text-slate-400">{text.currentWorkspaceBody}</p>
         </div>
       </div>
     </section>
@@ -208,6 +301,8 @@ function Hero({ label }: { label: string }) {
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('chat');
+  const [lang, setLang] = useState<Lang>('th');
+  const text = copy[lang];
   const current = navItems.find((item) => item.id === currentView) ?? navItems[0];
 
   const renderView = () => {
@@ -228,59 +323,66 @@ export default function App() {
         <div className="h-20 flex items-center px-6 border-b border-amber-300/20">
           <div className="flex items-center gap-3 text-amber-200 font-black text-xl tracking-wider">
             <div className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-2"><Server className="w-5 h-5" /></div>
-            <div><span>DSG ONE</span><p className="text-xs font-medium tracking-normal text-slate-500">Governed runtime</p></div>
+            <div><span>DSG ONE</span><p className="text-xs font-medium tracking-normal text-slate-500">{text.brandSub}</p></div>
           </div>
         </div>
         <div className="p-4 flex-1 overflow-y-auto">
-          <div className="text-xs font-black text-slate-500 uppercase tracking-[0.22em] mb-4 px-2">User-first flow</div>
+          <div className="text-xs font-black text-slate-500 uppercase tracking-[0.22em] mb-4 px-2">{text.navTitle}</div>
           <nav className="space-y-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentView === item.id;
               return (
-                <button key={item.id} onClick={() => setCurrentView(item.id as View)} className={cn('w-full rounded-2xl border p-3 text-left transition-colors duration-150', isActive ? 'border-amber-300/40 bg-amber-300/10 text-amber-100 shadow-lg shadow-amber-950/20' : 'border-transparent text-slate-400 hover:border-slate-700 hover:bg-slate-900 hover:text-slate-100')}>
-                  <div className="flex items-center gap-3"><Icon className={cn('w-4 h-4', isActive ? 'text-amber-200' : 'text-slate-500')} /><span className="text-sm font-black">{item.label}</span></div>
-                  <p className="mt-1 pl-7 text-xs text-slate-500">{item.helper}</p>
+                <button key={item.id} onClick={() => setCurrentView(item.id)} className={cn('w-full rounded-2xl border p-3 text-left transition-colors duration-150', isActive ? 'border-amber-300/40 bg-amber-300/10 text-amber-100 shadow-lg shadow-amber-950/20' : 'border-transparent text-slate-400 hover:border-slate-700 hover:bg-slate-900 hover:text-slate-100')}>
+                  <div className="flex items-center gap-3"><Icon className={cn('w-4 h-4', isActive ? 'text-amber-200' : 'text-slate-500')} /><span className="text-sm font-black">{item.label[lang]}</span></div>
+                  <p className="mt-1 pl-7 text-xs text-slate-500">{item.helper[lang]}</p>
                 </button>
               );
             })}
           </nav>
           <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-900/70 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Design evidence rules</p>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">{text.designRules}</p>
             <div className="mt-3 space-y-2">
-              {principles.map((item) => <div key={item} className="flex items-start gap-2 text-xs leading-5 text-slate-300"><CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-200" />{item}</div>)}
+              {text.principles.map((item) => <div key={item} className="flex items-start gap-2 text-xs leading-5 text-slate-300"><CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-200" />{item}</div>)}
             </div>
           </div>
         </div>
         <div className="p-4 border-t border-amber-300/20">
           <div className="flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/70 px-3 py-3 text-sm text-slate-500">
             <div className="w-9 h-9 rounded-full border border-slate-600 bg-slate-800 flex items-center justify-center text-slate-300"><Users className="w-4 h-4" /></div>
-            <div className="flex flex-col"><span className="text-slate-200 font-bold">Operator</span><span className="text-xs">Evidence-first mode</span></div>
+            <div className="flex flex-col"><span className="text-slate-200 font-bold">{text.operator}</span><span className="text-xs">{text.evidenceMode}</span></div>
           </div>
         </div>
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="h-20 border-b border-amber-300/20 flex items-center justify-between px-8 bg-zinc-950/70 backdrop-blur-sm z-10 sticky top-0">
-          <div className="flex items-center text-sm text-slate-500"><span>Control Plane</span><ChevronRight className="w-4 h-4 mx-2 text-slate-700" /><span className="text-amber-100 font-bold capitalize">{current.label}</span></div>
+          <div className="flex items-center text-sm text-slate-500"><span>{text.controlPlane}</span><ChevronRight className="w-4 h-4 mx-2 text-slate-700" /><span className="text-amber-100 font-bold capitalize">{current.label[lang]}</span></div>
           <div className="flex items-center gap-4">
-            <div className="relative hidden md:block"><Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" placeholder="Search disabled until real evidence index exists" disabled className="bg-slate-900 border border-slate-700 rounded-full pl-9 pr-4 py-2 text-sm text-slate-500 focus:outline-none w-80 placeholder:text-slate-600" /></div>
-            <button className="relative rounded-2xl border border-slate-700 p-2 text-slate-500" aria-label="Notifications unavailable until evidence events exist"><Bell className="w-4 h-4" /></button>
-            <div className="px-3 py-2 bg-red-500/10 text-red-100 text-xs font-black rounded-2xl uppercase tracking-wide border border-red-500/25 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" />No mock claims</div>
+            <div className="relative hidden md:block"><Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" placeholder={text.searchPlaceholder} disabled className="bg-slate-900 border border-slate-700 rounded-full pl-9 pr-4 py-2 text-sm text-slate-500 focus:outline-none w-80 placeholder:text-slate-600" /></div>
+            <div className="flex items-center rounded-2xl border border-amber-300/25 bg-amber-300/10 p-1" aria-label={text.language}>
+              {(['th', 'en'] as const).map((option) => (
+                <button key={option} onClick={() => setLang(option)} className={cn('rounded-xl px-3 py-1.5 text-xs font-black transition-colors', lang === option ? 'bg-amber-300 text-zinc-950' : 'text-amber-100 hover:bg-amber-300/10')}>
+                  {option === 'th' ? 'ไทย' : 'EN'}
+                </button>
+              ))}
+            </div>
+            <button className="relative rounded-2xl border border-slate-700 p-2 text-slate-500" aria-label={text.notificationLabel}><Bell className="w-4 h-4" /></button>
+            <div className="px-3 py-2 bg-red-500/10 text-red-100 text-xs font-black rounded-2xl uppercase tracking-wide border border-red-500/25 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" />{text.noMock}</div>
           </div>
         </header>
 
         <div className="flex min-h-0 flex-1">
           <main className="flex-1 overflow-y-auto bg-[#080b12] p-6">
-            <Hero label={current.label} />
+            <Hero label={current.label[lang]} lang={lang} />
             <section className="mb-6 grid gap-3 md:grid-cols-3">
-              <div className="rounded-3xl border border-amber-300/25 bg-amber-300/10 p-4"><Gauge className="h-5 w-5 text-amber-200" /><p className="mt-3 text-sm font-black text-white">Readable priority</p><p className="mt-1 text-sm leading-6 text-slate-400">Large labels, clear sections, and one primary work surface at a time.</p></div>
-              <div className="rounded-3xl border border-red-400/25 bg-red-500/10 p-4"><ShieldCheck className="h-5 w-5 text-red-200" /><p className="mt-3 text-sm font-black text-white">Trust boundary</p><p className="mt-1 text-sm leading-6 text-slate-400">Risk and missing proof stay visible instead of being hidden behind success styling.</p></div>
-              <div className="rounded-3xl border border-slate-500/30 bg-slate-400/10 p-4"><Database className="h-5 w-5 text-slate-200" /><p className="mt-3 text-sm font-black text-white">Public research ready</p><p className="mt-1 text-sm leading-6 text-slate-400">Consumer evidence must come from cited public sources before it shapes the claim layer.</p></div>
+              <div className="rounded-3xl border border-amber-300/25 bg-amber-300/10 p-4"><Gauge className="h-5 w-5 text-amber-200" /><p className="mt-3 text-sm font-black text-white">{text.cards.readable[0]}</p><p className="mt-1 text-sm leading-6 text-slate-400">{text.cards.readable[1]}</p></div>
+              <div className="rounded-3xl border border-red-400/25 bg-red-500/10 p-4"><ShieldCheck className="h-5 w-5 text-red-200" /><p className="mt-3 text-sm font-black text-white">{text.cards.trust[0]}</p><p className="mt-1 text-sm leading-6 text-slate-400">{text.cards.trust[1]}</p></div>
+              <div className="rounded-3xl border border-slate-500/30 bg-slate-400/10 p-4"><Database className="h-5 w-5 text-slate-200" /><p className="mt-3 text-sm font-black text-white">{text.cards.research[0]}</p><p className="mt-1 text-sm leading-6 text-slate-400">{text.cards.research[1]}</p></div>
             </section>
             <section className="rounded-[2rem] border border-slate-800 bg-slate-950/80 p-4 shadow-2xl shadow-black/30">{renderView()}</section>
           </main>
-          <LiveMonitor />
+          <LiveMonitor lang={lang} />
         </div>
       </div>
     </div>
