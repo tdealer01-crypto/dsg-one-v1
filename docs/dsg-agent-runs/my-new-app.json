@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "jobId": "my-new-app",
+  "appId": "my-new-app",
+  "goal": "สร้างแอปใหม่ที่ต้องการ",
+  "outputs": [
+    {
+      "path": "app/generated-apps/my-new-app/page.tsx",
+      "bytes": 893
+    },
+    {
+      "path": "app/api/generated-apps/my-new-app/items/route.ts",
+      "bytes": 183
+    },
+    {
+      "path": "supabase/migrations/20260507044850_create_generated_app_items_my-new-app.sql",
+      "bytes": 424
+    },
+    {
+      "path": "docs/dsg-generated-apps/my-new-app.md",
+      "bytes": 435
+    }
+  ],
+  "outputHash": "93b3a58d6f621b69a9b4cf8f0f5f9c1be74bbe3e1c81673f07be5a9e819d8e31",
+  "productionReadyClaim": false
+}
