@@ -172,13 +172,37 @@ export function AppBuilderAgentRuntimeView() {
           </div>
         </section>
 
-        <section className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-          <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold text-slate-100">Execution state</h2><span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400">{job?.status ?? 'NO_JOB'} · {job?.claimStatus ?? 'NO_CLAIM'}</span></div>
-          <div className="grid gap-3 md:grid-cols-2">{cards.map(([label, detail]) => <div key={label} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"><p className="font-semibold text-slate-200">{label}</p><p className="mt-1 text-xs font-mono text-slate-500">{detail}</p></div>)}</div>
+        <section className="space-y-4 rounded-2xl border border-indigo-500/30 bg-slate-900 p-5 shadow-2xl shadow-indigo-950/30 lg:sticky lg:top-20 lg:self-start">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-indigo-300">Right mini monitor</p>
+              <h2 className="mt-1 text-lg font-bold text-slate-100">สถานะงานสด / proof monitor</h2>
+            </div>
+            <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-100">{job?.status ?? 'NO_JOB'} · {job?.claimStatus ?? 'NO_CLAIM'}</span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {cards.map(([label, detail]) => {
+              const bad = String(detail).includes('missing') || String(detail).includes('waiting');
+              return (
+                <div key={label} className={`rounded-xl border p-4 ${bad ? 'border-rose-500/30 bg-rose-500/10' : 'border-emerald-500/30 bg-emerald-500/10'}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-slate-100">{label}</p>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${bad ? 'bg-rose-500/20 text-rose-100' : 'bg-emerald-500/20 text-emerald-100'}`}>{bad ? 'WAIT' : 'OK'}</span>
+                  </div>
+                  <p className="mt-1 break-words text-xs font-mono text-slate-400">{detail}</p>
+                </div>
+              );
+            })}
+          </div>
           {job?.proposedPlan && <div className="space-y-3">{job.proposedPlan.steps.map((step) => <div key={step.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"><p className="text-xs font-mono text-slate-500">{step.id} · {step.phase} · {step.riskLevel}{step.requiresApproval ? ' · approval required' : ''}</p><p className="mt-1 font-semibold text-slate-200">{step.title}</p><p className="mt-2 text-xs text-slate-500">Evidence: {step.expectedEvidence.join(', ') || 'missing'}</p></div>)}</div>}
           {toolCall && <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/10 p-4 text-sm text-indigo-100"><p className="font-bold">App Builder tool finished</p><p className="mt-2 font-mono text-xs">{toolCall.toolName}</p><p>Manifest: {toolCall.environment.manifestPath}</p><p>Action layer: {toolCall.actionLayer.actionLayer} / {toolCall.actionLayer.runtimeAdapter}</p><p>Audit written: {String(toolCall.evidence.auditWritten)}</p><p className="mt-2 text-xs text-indigo-200/80">{toolCall.evidence.note}</p></div>}
           {toolCall?.notification && <div className="rounded-xl border border-sky-500/25 bg-sky-500/10 p-4 text-sm text-sky-100"><p className="font-bold">{toolCall.notification.title}</p><p className="mt-2">{toolCall.notification.message}</p><p className="mt-2 text-xs text-sky-200/80">Next: {toolCall.notification.nextAction}</p></div>}
           {execution && <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm text-emerald-100"><p className="font-bold">Implementation PR created</p><p className="mt-2">Repository: {execution.repository}</p><p>Branch: {execution.branchName}</p><p>Generated files: {execution.generatedFiles.length}</p><a href={execution.pullRequestUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-emerald-200 underline">Open PR #{execution.pullRequestNumber}<ExternalLink className="h-3.5 w-3.5" /></a><p className="mt-3 text-xs text-emerald-200/80">{execution.evidence.note}</p></div>}
+          <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-xs leading-5 text-slate-400">
+            <p className="font-bold text-slate-100">User next action</p>
+            <p className="mt-2">1. Lock goal → 2. PRD + plan → 3. Approve plan → 4. Runtime handoff → 5. Launch App Builder tool → 6. Open PR / proof.</p>
+            <p className="mt-2 text-amber-200">productionReadyClaim: false จนกว่า CI/deploy/live proof จะครบ</p>
+          </div>
         </section>
       </div>
     </div>
