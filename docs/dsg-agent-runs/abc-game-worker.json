@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "jobId": "abc-game-worker",
+  "appId": "abc-game-worker",
+  "goal": "สร้างเกม ABC เด็ก 3 ขวบ มีปุ่มใหญ่และบันทึกคะแนน",
+  "outputs": [
+    {
+      "path": "app/generated-apps/abc-game-worker/page.tsx",
+      "bytes": 953
+    },
+    {
+      "path": "app/api/generated-apps/abc-game-worker/items/route.ts",
+      "bytes": 188
+    },
+    {
+      "path": "supabase/migrations/20260507033406_create_generated_app_items_abc-game-wor.sql",
+      "bytes": 429
+    },
+    {
+      "path": "docs/dsg-generated-apps/abc-game-worker.md",
+      "bytes": 510
+    }
+  ],
+  "outputHash": "ce513f447122ae9c7d4f2f05e27d1ff77fe194c3acbe5321f78f10156f24cfe4",
+  "productionReadyClaim": false
+}
