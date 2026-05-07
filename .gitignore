@@ -13,3 +13,5 @@ tsconfig.tsbuildinfo
 
 # DSG local secrets
 .dsg-local/
+
+.dsg-prod-flow-debug*/
