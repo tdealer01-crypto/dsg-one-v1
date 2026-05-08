@@ -45,29 +45,31 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { id: 'chat', label: { th: 'คุยกับเอเจนต์', en: 'Agent chat' }, helper: { th: 'เริ่มงานตรงนี้', en: 'Start work here' }, icon: MessageSquare },
-  { id: 'dashboard', label: { th: 'ภาพรวม', en: 'Overview' }, helper: { th: 'สถานะจริง', en: 'Real status' }, icon: Activity },
-  { id: 'agents', label: { th: 'เอเจนต์', en: 'Agents' }, helper: { th: 'เครื่องมือและรันไทม์', en: 'Tools and runtime' }, icon: Terminal },
-  { id: 'executions', label: { th: 'หลักฐาน', en: 'Evidence' }, helper: { th: 'ก่อนเคลม', en: 'Before claims' }, icon: ShieldCheck },
+  { id: 'chat', label: { th: 'สร้างแอป', en: 'Build app' }, helper: { th: 'เริ่มจากไอเดีย', en: 'Start from an idea' }, icon: MessageSquare },
+  { id: 'dashboard', label: { th: 'โปรเจกต์ของฉัน', en: 'My projects' }, helper: { th: 'สถานะและขั้นตอนถัดไป', en: 'Status and next actions' }, icon: Activity },
+  { id: 'agents', label: { th: 'บริการเอเจนต์', en: 'Agent services' }, helper: { th: 'เครื่องมือที่ใช้ได้', en: 'Usable tools' }, icon: Terminal },
+  { id: 'executions', label: { th: 'หลักฐาน', en: 'Evidence' }, helper: { th: 'PR / branch / proof', en: 'PR / branch / proof' }, icon: ShieldCheck },
   { id: 'governance', label: { th: 'กำกับดูแล', en: 'Governance' }, helper: { th: 'นโยบายและอนุมัติ', en: 'Policy and approval' }, icon: Lock },
-  { id: 'proof', label: { th: 'ตรวจสอบ', en: 'Audit' }, helper: { th: 'พร้อมตรวจ', en: 'Audit view' }, icon: FileText },
+  { id: 'proof', label: { th: 'ส่งมอบงาน', en: 'Handoff' }, helper: { th: 'รายงานให้ลูกค้า', en: 'Customer report' }, icon: FileText },
 ];
 
 const copy = {
   th: {
-    brandSub: 'รันไทม์มีหลักฐาน',
-    controlPlane: 'ศูนย์ควบคุม',
+    brandSub: 'บริการสร้างแอปมีหลักฐาน',
+    controlPlane: 'พื้นที่บริการลูกค้า',
     language: 'ภาษา',
-    searchPlaceholder: 'ค้นหาจะเปิดเมื่อมีดัชนีหลักฐานจริง',
-    notificationLabel: 'แจ้งเตือนยังไม่เปิดจนกว่าจะมี event จริง',
+    searchPlaceholder: 'ค้นหาเมนู เช่น สร้างแอป, หลักฐาน, ตรวจสอบ',
+    notificationLabel: 'ดูคำแนะนำขั้นตอนถัดไป',
     noMock: 'ไม่ใช้ข้อมูลจำลอง',
     workTitle: 'พื้นที่ทำงานหลัก',
-    workSubtitle: 'คุยงานกับเอเจนต์เป็นหลัก หน้าจออื่นเป็นหมวดเสริม ไม่ใส่ช่องใหญ่ที่กดไม่ได้',
+    workSubtitle: 'ทุกหน้าต้องกดแล้วได้ผล: สร้างงาน, เปิดหลักฐาน, คัดลอก proof, หรือดาวน์โหลดรายงาน',
     rulesTitle: 'กฎหน้าจอ',
+    searchNoResult: 'ไม่พบเมนูที่ตรงกัน ลองพิมพ์ สร้างแอป / หลักฐาน / ตรวจสอบ',
+    notificationText: 'เริ่มที่ “สร้างแอป” → อนุมัติแผน → สร้าง PR → คัดลอก proof JSON. ยังไม่ใช้ Vercel จนกว่าจะต้องตรวจ preview/production proof.',
     rules: [
-      'ใช้เฉพาะข้อมูลจริงจาก endpoint หรือแหล่งสาธารณะที่อ้างอิงได้',
-      'ไม่เดาผลผู้บริโภค ไม่แตะหลังบ้าน และไม่แสดงตัวเลขปลอม',
-      'ทอง = ผ่าน/พร้อม, แดง = เสี่ยง/ติดขัด, เงิน = รายละเอียดตรวจต่อ',
+      'ใช้เฉพาะข้อมูลจริงจาก endpoint หรือหลักฐานที่คัดลอก/ดาวน์โหลดได้',
+      'ไม่แสดงตัวเลขปลอม ไม่ใส่ปุ่มที่กดแล้วไม่เกิดอะไร',
+      'ทอง = พร้อมทำต่อ, แดง = ติดขัด, เงิน = รายละเอียดตรวจต่อ',
     ],
     monitor: {
       title: 'สด',
@@ -90,19 +92,21 @@ const copy = {
     },
   },
   en: {
-    brandSub: 'Evidence runtime',
-    controlPlane: 'Control plane',
+    brandSub: 'Evidence-backed app service',
+    controlPlane: 'Customer workspace',
     language: 'Language',
-    searchPlaceholder: 'Search opens after a real evidence index exists',
-    notificationLabel: 'Notifications open after real evidence events exist',
+    searchPlaceholder: 'Search menu: build app, evidence, handoff',
+    notificationLabel: 'Show next-step guidance',
     noMock: 'No mock data',
     workTitle: 'Primary workspace',
-    workSubtitle: 'Agent chat is the main work area. Other screens are supporting categories. No large inactive blocks.',
+    workSubtitle: 'Every screen should produce a tangible action: create work, open evidence, copy proof, or download a report.',
     rulesTitle: 'Screen rules',
+    searchNoResult: 'No matching menu. Try build app / evidence / handoff.',
+    notificationText: 'Start at Build app → approve plan → create PR → copy proof JSON. Do not spend Vercel quota until preview/production proof is required.',
     rules: [
-      'Use only real endpoints or cited public research sources',
-      'No guessed consumer results, no back-office access, no fake metrics',
-      'Gold = ready, red = risk, silver = review detail',
+      'Use only real endpoints or proof users can copy/download',
+      'No fake metrics and no dead buttons',
+      'Gold = ready, red = blocked, silver = review detail',
     ],
     monitor: {
       title: 'Live',
@@ -125,6 +129,17 @@ const copy = {
     },
   },
 } as const;
+
+function viewFromHash(): View {
+  if (typeof window === 'undefined') return 'chat';
+  const value = window.location.hash.replace('#', '') as View;
+  return navItems.some((item) => item.id === value) ? value : 'chat';
+}
+
+function navigateTo(view: View) {
+  window.location.hash = view;
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
+}
 
 function statusClass(state: ProbeState) {
   if (state === 'pass') return 'border-[#d6a63a]/40 bg-[#d6a63a]/10 text-[#f5d27a]';
@@ -246,8 +261,36 @@ function LiveMonitor({ lang }: { lang: Lang }) {
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('chat');
   const [lang, setLang] = useState<Lang>('th');
+  const [searchQuery, setSearchQuery] = useState('');
   const text = copy[lang];
   const current = navItems.find((item) => item.id === currentView) ?? navItems[0];
+
+  useEffect(() => {
+    const syncHash = () => setCurrentView(viewFromHash());
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+    return () => window.removeEventListener('hashchange', syncHash);
+  }, []);
+
+  function handleNavigate(view: View) {
+    setCurrentView(view);
+    navigateTo(view);
+  }
+
+  function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = searchQuery.trim().toLowerCase();
+    const found = navItems.find((item) => {
+      const labels = [item.id, item.label.th, item.label.en, item.helper.th, item.helper.en].join(' ').toLowerCase();
+      return labels.includes(query);
+    });
+    if (found) {
+      handleNavigate(found.id);
+      setSearchQuery('');
+      return;
+    }
+    window.alert(text.searchNoResult);
+  }
 
   const renderView = () => {
     switch(currentView) {
@@ -279,7 +322,7 @@ export default function App() {
             return (
               <button
                 key={item.id}
-                onClick={() => setCurrentView(item.id)}
+                onClick={() => handleNavigate(item.id)}
                 className={cn(
                   'w-full rounded-xl border px-3 py-2 text-left transition-colors',
                   active ? 'border-[#d6a63a]/35 bg-[#d6a63a]/10 text-[#f5d27a]' : 'border-transparent text-[#c8c8c8] hover:border-[#c8c8c8]/20 hover:bg-[#c8c8c8]/5',
@@ -317,14 +360,15 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="relative hidden md:block">
+            <form onSubmit={handleSearchSubmit} className="relative hidden md:block">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8d8d8d]" />
               <input
-                disabled
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder={text.searchPlaceholder}
-                className="h-9 w-72 rounded-xl border border-[#c8c8c8]/15 bg-[#111113] pl-8 pr-3 text-xs text-[#8d8d8d] outline-none"
+                className="h-9 w-72 rounded-xl border border-[#c8c8c8]/15 bg-[#111113] pl-8 pr-3 text-xs text-[#d9d9d9] outline-none focus:border-[#d6a63a]/40"
               />
-            </div>
+            </form>
             <div className="flex rounded-xl border border-[#d6a63a]/25 bg-[#d6a63a]/5 p-0.5" aria-label={text.language}>
               {(['th', 'en'] as const).map((option) => (
                 <button
@@ -336,7 +380,7 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <button className="rounded-xl border border-[#c8c8c8]/15 p-2 text-[#8d8d8d]" aria-label={text.notificationLabel}>
+            <button onClick={() => window.alert(text.notificationText)} className="rounded-xl border border-[#c8c8c8]/15 p-2 text-[#8d8d8d] hover:border-[#d6a63a]/35 hover:text-[#d6a63a]" aria-label={text.notificationLabel}>
               <Bell className="h-4 w-4" />
             </button>
             <span className="hidden rounded-xl border border-[#b4232b]/30 bg-[#b4232b]/10 px-2.5 py-2 text-[11px] font-black uppercase text-[#ffb4b8] lg:inline-flex">
