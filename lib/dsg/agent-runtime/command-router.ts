@@ -41,6 +41,18 @@ function includesAny(value: string, words: string[]) {
   return words.some((word) => value.includes(word));
 }
 
+function isVirtualPcRequest(value: string) {
+  return includesAny(value, [
+    'virtual pc', 'virtual desktop', 'remote mouse', 'remote monitor', 'windows vm', 'windows desktop',
+    'pc เสมือน', 'คอมเสมือน', 'คอมพิวเตอร์เสมือน', 'รีโมตเมาส์', 'รีโหมดเม้า', 'เมาส์', 'เม้าส์', 'เม้า',
+    'มอนิเตอร์', 'จอ', 'วินโด้', 'วินโดว์', 'windows', 'ควบคุมจากที่อื่น', 'เอเจ้นคุม', 'agent control',
+  ]);
+}
+
+function isBuildAppRequest(value: string) {
+  return includesAny(value, ['build app', 'create app', 'generate app', 'สร้างแอป', 'ทำแอป', 'แอป']) || isVirtualPcRequest(value);
+}
+
 export function routeAgentCommand(input: AgentCommandInput): AgentCommandRoute {
   const command = input.command.trim();
   if (!command) throw new Error('AGENT_COMMAND_REQUIRED');
@@ -59,20 +71,40 @@ export function routeAgentCommand(input: AgentCommandInput): AgentCommandRoute {
     };
   }
 
-  if (includesAny(value, ['build app', 'create app', 'generate app', 'สร้างแอป', 'ทำแอป'])) {
+  if (isBuildAppRequest(value)) {
+    const virtualPc = isVirtualPcRequest(value);
     return {
       intent: 'build_app',
       status: 'approval_required',
-      actionLabel: 'Create governed App Builder job',
+      actionLabel: virtualPc ? 'Create governed Virtual PC Agent App job' : 'Create governed App Builder job',
       endpoint: '/api/dsg/app-builder/jobs',
       method: 'POST',
-      payload: {
-        goal: command,
-        successCriteria: ['Visible plan is created', 'User approves before runtime execution', 'PR/evidence is returned after build'],
-      },
+      payload: virtualPc
+        ? {
+            goal: command,
+            successCriteria: [
+              'Virtual PC monitor surface is visible in the app',
+              'Remote mouse API contract exists for external agents',
+              'DSG invariant gate evaluates every remote mouse action before execution',
+              'Every governed action returns audit/evidence output',
+              'The builder returns PR/branch/proof evidence before production deployment',
+            ],
+            constraints: [
+              'Do not claim a real Windows VM is provisioned until a provider proves it',
+              'Do not use mock evidence as production proof',
+              'Remote mouse actions must be policy-gated and auditable',
+              'External login, install, or privileged settings require takeover/approval',
+            ],
+          }
+        : {
+            goal: command,
+            successCriteria: ['Visible plan is created', 'User approves before runtime execution', 'PR/evidence is returned after build'],
+          },
       evidence: ['jobId', 'planHash', 'approvalHash', 'pullRequestUrl'],
       userBenefit,
-      truthBoundary: 'This routes to the App Builder. It does not deploy production automatically.',
+      truthBoundary: virtualPc
+        ? 'This creates a governed Builder request for a Virtual PC Agent App. It does not claim a real Windows VM exists until a verified runtime/provider proves it.'
+        : 'This routes to the App Builder. It does not deploy production automatically.',
     };
   }
 
