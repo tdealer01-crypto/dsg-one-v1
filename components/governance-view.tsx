@@ -1,12 +1,12 @@
 'use client';
 
-import React from 'react';
-import { AlertTriangle, Database, FileWarning, Key, Lock, RefreshCcw } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { AlertTriangle, Clipboard, Database, Download, FileWarning, Key, Lock, RefreshCcw, Search } from 'lucide-react';
 
 const policyFields = [
-  { id: 'policy_registry', name: 'Policy registry', state: 'Evidence missing', proof: 'No verified policy rows are connected to this UI yet.' },
-  { id: 'policy_infractions', name: 'Policy infractions', state: 'Not claimed', proof: 'No real 30-day violation ledger has been wired into this screen.' },
-  { id: 'rule_sync', name: 'Rule sync status', state: 'Not connected', proof: 'No sync job evidence or timestamp is available in this view.' },
+  { id: 'policy_registry', name: 'Policy registry', state: 'ต้องผูก evidence source', proof: 'Supabase/API row source สำหรับ policy, rule และ version history', next: 'ใช้หน้า สร้างแอป เพื่อสร้าง proof ก่อน' },
+  { id: 'policy_infractions', name: 'Policy infractions', state: 'ยังไม่เคลมตัวเลข', proof: 'ต้องมี audit rows พร้อม timestamp, actor, rule id, decision และ evidence hash', next: 'ดูหลักฐานที่ต้องเก็บ' },
+  { id: 'rule_sync', name: 'Rule sync status', state: 'รอ sync proof', proof: 'ต้องมี sync job id, status, source hash และ updated_at', next: 'ดาวน์โหลด governance checklist' },
 ];
 
 const requiredEvidence = [
@@ -15,52 +15,97 @@ const requiredEvidence = [
   { label: 'Sync proof', detail: 'Last sync job id, status, source hash, and updated_at proof.' },
 ];
 
+function goTo(hash: string) {
+  window.location.hash = hash;
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
+}
+
 export function GovernanceView() {
+  const [query, setQuery] = useState('');
+  const [copied, setCopied] = useState(false);
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return policyFields;
+    return policyFields.filter((field) => `${field.name} ${field.state} ${field.proof} ${field.next}`.toLowerCase().includes(q));
+  }, [query]);
+
+  const checklist = useMemo(() => [
+    'DSG Governance proof checklist',
+    ...requiredEvidence.map((item) => `- ${item.label}: ${item.detail}`),
+    '',
+    'Rule: do not show policy counts, infraction counts, or green sync state until real evidence exists.',
+  ].join('\n'), []);
+
+  async function copyChecklist() {
+    await navigator.clipboard.writeText(checklist);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  }
+
+  function downloadChecklist() {
+    const blob = new Blob([checklist], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'dsg-governance-checklist.txt';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-100">Governance Policies</h1>
-          <p className="mt-1 text-slate-500">Shows only verified governance evidence. Missing data stays missing; no demo counts are displayed.</p>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-100">กำกับดูแล</h1>
+          <p className="mt-1 text-slate-500">ผู้ใช้เห็นชัดว่าต้องมีหลักฐานอะไร ก่อนระบบจะแสดงตัวเลข policy หรือ claim สีเขียว</p>
         </div>
-        <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-100">No mock metrics</span>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => goTo('executions')} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500">ดูหลักฐาน</button>
+          <button onClick={() => void copyChecklist()} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800"><Clipboard className="h-4 w-4" /> {copied ? 'คัดลอกแล้ว' : 'Copy checklist'}</button>
+          <button onClick={downloadChecklist} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800"><Download className="h-4 w-4" /> Download</button>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-5 text-sm leading-7 text-rose-100">
         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-rose-200">
           <AlertTriangle className="h-4 w-4" /> Truth boundary
         </div>
-        <p className="mt-3">The previous numbers such as active policy count, 30-day infractions, and synced status were unverified UI seed data. They are removed until real policy/audit/sync evidence exists.</p>
+        <p className="mt-3">ไม่แสดง active policy count, 30-day infractions หรือ synced status ถ้ายังไม่มี row/source จริง. ผู้ใช้กด copy/download checklist ไปใช้เก็บหลักฐานได้ทันที.</p>
       </div>
 
-      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {[
-          { label: 'Active Policies', val: 'Evidence missing', icon: Lock },
-          { label: 'Policy Infractions (30d)', val: 'Not claimed', icon: FileWarning, color: 'text-rose-400' },
-          { label: 'Rule Sync Status', val: 'Not connected', icon: RefreshCcw, color: 'text-amber-400' },
+          { label: 'Active Policies', val: 'รอ evidence source', icon: Lock },
+          { label: 'Policy Infractions', val: 'ยังไม่เคลม', icon: FileWarning, color: 'text-rose-400' },
+          { label: 'Rule Sync Status', val: 'รอ sync proof', icon: RefreshCcw, color: 'text-amber-400' },
         ].map((item) => {
           const Icon = item.icon;
           return (
-            <div key={item.label} className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <button key={item.label} onClick={() => goTo('executions')} className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-left transition hover:border-indigo-500/40 hover:bg-slate-800/60">
               <div className="mb-2 flex items-start justify-between text-slate-400">
                 <span className="text-sm font-medium">{item.label}</span>
                 <Icon className={`h-4 w-4 ${item.color || 'text-slate-500'}`} />
               </div>
               <div className="text-xl font-black text-slate-200">{item.val}</div>
-              <p className="mt-2 text-xs leading-5 text-slate-500">Connect real governance rows before showing counts or green status.</p>
-            </div>
+              <p className="mt-2 text-xs leading-5 text-slate-500">กดเพื่อดู evidence map ที่ต้องเก็บก่อนแสดงตัวเลข</p>
+            </button>
           );
         })}
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหา governance proof เช่น policy, sync, audit..." className="w-full rounded-lg border border-slate-800 bg-slate-900 pl-10 pr-4 py-2 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-indigo-500/40" />
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
           <h3 className="font-semibold text-slate-200">Governance evidence fields</h3>
-          <button disabled className="text-sm font-medium text-slate-600">Create Rule disabled</button>
+          <button onClick={() => goTo('chat')} className="text-sm font-bold text-indigo-300 hover:text-indigo-200">สร้าง proof จากงานจริง</button>
         </div>
         <div className="divide-y divide-slate-800">
-          {policyFields.map((field) => (
-            <div key={field.id} className="flex items-center justify-between gap-4 px-6 py-4">
+          {rows.map((field) => (
+            <div key={field.id} className="flex flex-col gap-4 px-6 py-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-700 bg-slate-800">
                   <Key className="h-5 w-5 text-indigo-400" />
@@ -70,7 +115,7 @@ export function GovernanceView() {
                   <p className="mt-1 text-xs leading-5 text-slate-500">{field.proof}</p>
                 </div>
               </div>
-              <span className="rounded border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-amber-100">{field.state}</span>
+              <button onClick={() => goTo(field.id === 'policy_registry' ? 'chat' : 'executions')} className="rounded border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-amber-100 hover:bg-amber-500/20">{field.state}</button>
             </div>
           ))}
         </div>
@@ -82,10 +127,10 @@ export function GovernanceView() {
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {requiredEvidence.map((item) => (
-            <div key={item.label} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <button key={item.label} onClick={() => goTo('executions')} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-left transition hover:border-indigo-500/30">
               <p className="font-semibold text-slate-200">{item.label}</p>
               <p className="mt-2 text-xs leading-5 text-slate-500">{item.detail}</p>
-            </div>
+            </button>
           ))}
         </div>
       </div>
