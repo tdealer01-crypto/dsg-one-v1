@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ExternalLink, GitBranch, Loader2, Play, Rocket, ShieldCheck } from 'lucide-react';
 
 const TOOL_NAME = 'dsg.app_builder.launch_agent_runtime';
+const DEFAULT_COMMAND = 'สร้างแอป PC เสมือนที่มี Windows ต่อเน็ตแล้ว มีจอมอนิเตอร์ในแอป มี remote mouse API ให้ agent จากที่อื่นควบคุมเมาส์ได้ และมี DSG governance ตรวจ invariant ก่อนทุก action พร้อม audit/evidence proof';
 const requestHeaders = {
   'content-type': 'application/json',
   'x-dsg-workspace-id': '00000000-0000-4000-8000-000000000001',
@@ -38,6 +39,7 @@ type BuildOutput = {
 };
 
 const initialBuildSteps: BuildStep[] = [
+  { label: 'Route requirement', status: 'waiting' },
   { label: 'Create governed plan', status: 'waiting' },
   { label: 'Approve execution', status: 'waiting' },
   { label: 'Prepare runtime handoff', status: 'waiting' },
@@ -55,16 +57,39 @@ async function apiPost(path: string, body?: unknown) {
   return json.data;
 }
 
+async function routeCommandRequest(command: string): Promise<RouteResult> {
+  const res = await fetch('/api/dsg/agent-runtime/commands', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ command, userBenefit: 'User gets a governed build job instead of another confirmation question.' }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.ok) throw new Error(json.error?.message || json.error?.code || `HTTP_${res.status}`);
+  return json.data;
+}
+
 function buildGoalPayload(command: string, route: RouteResult) {
   const payload = (route.payload || {}) as Record<string, unknown>;
   const gapGoal = typeof payload.recommendedBuilderGoal === 'string' ? payload.recommendedBuilderGoal : undefined;
   const directGoal = typeof payload.goal === 'string' ? payload.goal : undefined;
   const successCriteria = Array.isArray(payload.successCriteria)
     ? payload.successCriteria.filter((item): item is string => typeof item === 'string')
-    : ['Visible plan is created', 'User approves before runtime execution', 'Pull request evidence is returned'];
+    : [
+        'Virtual PC monitor surface is visible in the app',
+        'Remote mouse API contract exists for external agents',
+        'DSG invariant gate evaluates every remote mouse action before execution',
+        'Every governed action returns audit/evidence output',
+        'Pull request evidence is returned before production deployment',
+      ];
   const constraints = Array.isArray(payload.constraints)
     ? payload.constraints.filter((item): item is string => typeof item === 'string')
-    : ['No production deployment from quick build', 'Use real API responses only', 'Return visible evidence or a clear error'];
+    : [
+        'Do not claim a real Windows VM is provisioned until a verified provider proves it',
+        'Use real API responses only',
+        'Remote mouse actions must be policy-gated and auditable',
+        'External login, install, privileged settings, publish, or destructive actions require approval/takeover',
+        'Return visible evidence or a clear error',
+      ];
 
   return {
     goal: gapGoal || directGoal || command,
@@ -81,7 +106,7 @@ function buildGoalPayload(command: string, route: RouteResult) {
 }
 
 export function AgentCommandCenter() {
-  const [command, setCommand] = useState('Build a customer task tracker with audit evidence');
+  const [command, setCommand] = useState(DEFAULT_COMMAND);
   const [busy, setBusy] = useState(false);
   const [builderBusy, setBuilderBusy] = useState(false);
   const [error, setError] = useState('');
@@ -93,58 +118,61 @@ export function AgentCommandCenter() {
     setBuildSteps((current) => current.map((step, stepIndex) => stepIndex === index ? { ...step, status, detail } : step));
   }
 
-  async function routeCommand() {
-    setBusy(true);
+  function resetRun() {
     setError('');
     setResult(null);
     setBuildOutput(null);
     setBuildSteps(initialBuildSteps);
+  }
+
+  async function routeCommand() {
+    setBusy(true);
+    resetRun();
     try {
-      const res = await fetch('/api/dsg/agent-runtime/commands', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ command, userBenefit: 'User gets a concrete governed action instead of a dead button.' }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error?.message || json.error?.code || `HTTP_${res.status}`);
-      setResult(json.data);
+      markStep(0, 'running');
+      const routed = await routeCommandRequest(command);
+      setResult(routed);
+      markStep(0, 'done', `${routed.intent}/${routed.status}`);
     } catch (err) {
+      markStep(0, 'error', 'Failed here');
       setError(err instanceof Error ? err.message : 'Command routing failed');
     } finally {
       setBusy(false);
     }
   }
 
-  async function runBuilderRequest() {
-    if (!result) return;
+  async function runBuilderRequest(routeOverride?: RouteResult) {
+    const activeRoute = routeOverride || result;
+    if (!activeRoute) return;
     setBuilderBusy(true);
     setError('');
     setBuildOutput(null);
-    setBuildSteps(initialBuildSteps);
     try {
-      markStep(0, 'running');
-      const created = await apiPost('/api/dsg/app-builder/jobs', buildGoalPayload(command, result));
-      const planned = await apiPost(`/api/dsg/app-builder/jobs/${created.id}/plan`);
-      markStep(0, 'done', planned.id || created.id);
+      if (activeRoute.status === 'blocked') throw new Error('COMMAND_BLOCKED_BY_POLICY');
 
       markStep(1, 'running');
-      const approved = await apiPost(`/api/dsg/app-builder/jobs/${planned.id}/approval`, {
-        decision: 'APPROVE',
-        reason: 'User clicked Run Builder Request from Agent Command Center.',
-      });
-      markStep(1, 'done', approved.approvalHash || approved.status);
+      const created = await apiPost('/api/dsg/app-builder/jobs', buildGoalPayload(command, activeRoute));
+      const planned = await apiPost(`/api/dsg/app-builder/jobs/${created.id}/plan`);
+      markStep(1, 'done', planned.id || created.id);
 
       markStep(2, 'running');
-      const handoff = await apiPost(`/api/dsg/app-builder/jobs/${approved.id}/runtime-handoff`);
-      markStep(2, 'done', handoff.runtimeStatus || 'READY');
+      const approved = await apiPost(`/api/dsg/app-builder/jobs/${planned.id}/approval`, {
+        decision: 'APPROVE',
+        reason: 'User clicked Build Now from Agent Command Center.',
+      });
+      markStep(2, 'done', approved.approvalHash || approved.status);
 
       markStep(3, 'running');
+      const handoff = await apiPost(`/api/dsg/app-builder/jobs/${approved.id}/runtime-handoff`);
+      markStep(3, 'done', handoff.runtimeStatus || 'READY');
+
+      markStep(4, 'running');
       const executed = await apiPost(`/api/dsg/app-builder/jobs/${approved.id}/tool-call`, {
         toolName: TOOL_NAME,
         arguments: { mode: 'agent_runtime_fullstack_pr' },
       });
       const output = executed.toolCall?.output || {};
-      markStep(3, 'done', output.pullRequestUrl || executed.job?.status || 'EXECUTED');
+      markStep(4, 'done', output.pullRequestUrl || executed.job?.status || 'EXECUTED');
       setBuildOutput({
         pullRequestUrl: output.pullRequestUrl,
         pullRequestNumber: output.pullRequestNumber,
@@ -161,32 +189,58 @@ export function AgentCommandCenter() {
     }
   }
 
+  async function buildNow() {
+    setBusy(true);
+    resetRun();
+    try {
+      markStep(0, 'running');
+      const routed = await routeCommandRequest(command);
+      setResult(routed);
+      markStep(0, 'done', `${routed.intent}/${routed.status}`);
+      setBusy(false);
+      await runBuilderRequest(routed);
+    } catch (err) {
+      markStep(0, 'error', 'Failed here');
+      setError(err instanceof Error ? err.message : 'Build Now failed');
+      setBusy(false);
+    }
+  }
+
   const canRunBuilder = Boolean(result && result.status !== 'blocked' && (result.intent === 'build_app' || result.intent === 'resolve_capability_gap' || result.status === 'approval_required' || result.status === 'builder_required'));
+  const running = busy || builderBusy;
 
   return (
     <section className="rounded-2xl border border-[#C8A24D] bg-[#071326] p-4 text-[#F5F7FA] shadow-[0_0_36px_rgba(200,162,77,0.18)]">
       <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#E0B95B]">Agent Command Center</p>
-      <h2 className="mt-2 text-xl font-black">Command to Governed Action</h2>
-      <p className="mt-1 text-sm text-[#D7D9DE]">Type what the agent should do. DSG routes it, then lets the user run a governed builder request with visible evidence.</p>
+      <h2 className="mt-2 text-xl font-black">Build Governed Virtual PC App</h2>
+      <p className="mt-1 text-sm text-[#D7D9DE]">Build Now routes the requirement, creates the governed plan, approves execution, prepares runtime handoff, and returns PR evidence.</p>
 
       <textarea
         value={command}
         onChange={(event) => setCommand(event.target.value)}
-        className="mt-4 h-24 w-full rounded-xl border border-[#C8A24D]/50 bg-[#0C2340] p-3 text-sm text-white outline-none"
+        className="mt-4 h-28 w-full rounded-xl border border-[#C8A24D]/50 bg-[#0C2340] p-3 text-sm text-white outline-none"
       />
 
       <div className="mt-3 flex flex-wrap gap-2">
         <button
-          onClick={routeCommand}
-          disabled={busy || builderBusy || !command.trim()}
+          onClick={buildNow}
+          disabled={running || !command.trim()}
           className="inline-flex items-center gap-2 rounded-xl border border-[#C8A24D] bg-[#E0B95B] px-4 py-3 text-sm font-black text-[#071326] disabled:opacity-50"
         >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-          Route Command
+          {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+          Build Now
         </button>
         <button
-          onClick={runBuilderRequest}
-          disabled={!canRunBuilder || builderBusy || busy}
+          onClick={routeCommand}
+          disabled={running || !command.trim()}
+          className="inline-flex items-center gap-2 rounded-xl border border-[#C8A24D] bg-[#0C2340] px-4 py-3 text-sm font-black text-[#E0B95B] disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+          Route Only
+        </button>
+        <button
+          onClick={() => runBuilderRequest()}
+          disabled={!canRunBuilder || running}
           className="inline-flex items-center gap-2 rounded-xl border border-[#C8A24D] bg-[#0C2340] px-4 py-3 text-sm font-black text-[#E0B95B] disabled:opacity-40"
         >
           {builderBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
