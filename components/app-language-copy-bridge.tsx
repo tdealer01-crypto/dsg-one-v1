@@ -3,8 +3,9 @@
 import { useEffect } from 'react';
 
 type Lang = 'th' | 'en';
+type CopyPair = readonly [string, string];
 
-const pairs = [
+const pairs: readonly CopyPair[] = [
   ['Customer evidence monitor', 'ตัวตรวจหลักฐานลูกค้า'],
   ['Goal', 'เป้าหมาย'],
   ['Success criteria', 'เงื่อนไขความสำเร็จ'],
@@ -27,10 +28,10 @@ const pairs = [
   ['Create pull request', 'สร้างคำขอรวมโค้ด'],
   ['Send to runtime', 'ส่งเข้าระบบรัน'],
   ['Approve plan', 'อนุมัติแผน'],
-] as const;
+];
 
-const enToTh = new Map(pairs);
-const thToEn = new Map(pairs.map(([en, th]) => [th, en]));
+const enToTh: ReadonlyMap<string, string> = new Map<string, string>(pairs);
+const thToEn: ReadonlyMap<string, string> = new Map<string, string>(pairs.map(([en, th]) => [th, en]));
 
 function currentLang(): Lang {
   return typeof window !== 'undefined' && window.localStorage.getItem('dsg:language') === 'en' ? 'en' : 'th';
