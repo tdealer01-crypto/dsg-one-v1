@@ -1,12 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Send, Sparkles } from 'lucide-react';
+import { Loader2, Send, Sparkles, Wand2 } from 'lucide-react';
 
 type ChatMessage = {
   id: string;
   role: 'user' | 'agent';
   text: string;
+};
+
+type BuilderDesignDraft = {
+  goal: string;
+  successCriteria: string[];
+  constraints: string[];
+  userFacingSummary: string;
+  targetStack: {
+    frontend: 'nextjs';
+    backend: 'next-api';
+    database: 'supabase-postgres';
+    auth: 'none';
+    deploy: 'vercel';
+  };
+  reviewStatus: 'DESIGN_DRAFT_READY' | 'NEEDS_MORE_DETAIL';
+  truthBoundary: string;
 };
 
 function toApiHistory(messages: ChatMessage[]) {
@@ -19,9 +35,26 @@ function toApiHistory(messages: ChatMessage[]) {
     }));
 }
 
+function draftText(draft: BuilderDesignDraft) {
+  return [
+    `Design draft ready: ${draft.userFacingSummary}`,
+    '',
+    `Goal: ${draft.goal}`,
+    '',
+    'Success criteria:',
+    ...draft.successCriteria.map((item) => `- ${item}`),
+    '',
+    'Constraints:',
+    ...draft.constraints.map((item) => `- ${item}`),
+    '',
+    `Truth boundary: ${draft.truthBoundary}`,
+  ].join('\n');
+}
+
 export function LiveAgentChat() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [draftBusy, setDraftBusy] = useState(false);
   const [error, setError] = useState('');
   const [memoryStatus, setMemoryStatus] = useState('memory pending');
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -77,6 +110,32 @@ export function LiveAgentChat() {
     }
   }
 
+  async function sendDesignDraftToBuildNow() {
+    if (draftBusy) return;
+    const history = toApiHistory(messages);
+    const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.text || input || history.at(-1)?.content || '';
+    setError('');
+    setDraftBusy(true);
+    try {
+      const res = await fetch('/api/dsg/app-builder/design-draft', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: lastUserMessage, history }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error?.message || json.error?.code || `HTTP_${res.status}`);
+      const draft = json.data.draft as BuilderDesignDraft;
+      window.dispatchEvent(new CustomEvent('dsg:set-builder-design-draft', { detail: draft }));
+      setMessages((current) => [...current, makeMessage('agent', draftText(draft))]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'DESIGN_DRAFT_FAILED';
+      setError(message);
+      setMessages((current) => [...current, makeMessage('agent', `สร้าง design draft ไม่สำเร็จ: ${message}`)]);
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+
   return (
     <section className="rounded-2xl border border-[#C8A24D] bg-[#071326] p-4 text-[#F5F7FA] shadow-[0_0_36px_rgba(200,162,77,0.18)]">
       <div className="flex flex-wrap items-center gap-2">
@@ -85,7 +144,7 @@ export function LiveAgentChat() {
         <span className="rounded-full border border-[#C8A24D]/40 px-2 py-0.5 text-[10px] font-black uppercase text-[#D7D9DE]">{memoryStatus}</span>
       </div>
       <h2 className="mt-2 text-xl font-black">Ask the DSG Agent</h2>
-      <p className="mt-1 text-sm text-[#D7D9DE]">This chat calls the server-side AI model with recent history and persistent DSG memory. Memory is context, not proof.</p>
+      <p className="mt-1 text-sm text-[#D7D9DE]">Design with the AI first, then send a reviewed builder draft into Build Now. Memory is context, not proof.</p>
 
       <div className="mt-4 max-h-[320px] space-y-3 overflow-y-auto rounded-xl border border-[#C8A24D]/30 bg-[#0C2340] p-3">
         {messages.map((message) => (
@@ -97,6 +156,7 @@ export function LiveAgentChat() {
           </div>
         ))}
         {busy ? <div className="flex items-center gap-2 text-sm text-[#E0B95B]"><Loader2 className="h-4 w-4 animate-spin" /> Thinking with AI model, chat history, and persistent memory...</div> : null}
+        {draftBusy ? <div className="flex items-center gap-2 text-sm text-[#E0B95B]"><Loader2 className="h-4 w-4 animate-spin" /> Creating builder design draft before Build Now...</div> : null}
       </div>
 
       {error ? <div className="mt-3 rounded-xl border border-[#D9363E] bg-[#D9363E]/15 p-3 text-sm text-[#ffb4b8]">{error}</div> : null}
@@ -106,7 +166,7 @@ export function LiveAgentChat() {
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => { if (event.key === 'Enter') send(); }}
-          placeholder="Ask what to build, what is missing, or how to prove it..."
+          placeholder="Design the app with AI first..."
           className="h-11 min-w-0 flex-1 rounded-xl border border-[#C8A24D]/50 bg-[#0C2340] px-3 text-sm text-white outline-none placeholder:text-[#8aa0bd]"
         />
         <button onClick={send} disabled={busy || !input.trim()} className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#C8A24D] bg-[#E0B95B] px-4 text-sm font-black text-[#071326] disabled:opacity-50">
@@ -114,6 +174,10 @@ export function LiveAgentChat() {
           Send
         </button>
       </div>
+      <button onClick={sendDesignDraftToBuildNow} disabled={draftBusy || busy} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#C8A24D] bg-[#0C2340] px-4 py-3 text-sm font-black text-[#E0B95B] disabled:opacity-50">
+        {draftBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+        Send AI Design Draft to Build Now
+      </button>
     </section>
   );
 }
