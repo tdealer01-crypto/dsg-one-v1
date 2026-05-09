@@ -1,5 +1,6 @@
 import type { AppBuilderJob } from './model';
-import { executeApprovedAppBuilderJob, type AppBuilderRuntimeExecutionResult } from './action-runtime';
+import { type AppBuilderRuntimeExecutionResult } from './action-runtime';
+import { executeApprovedAiFirstAppBuilderJob } from './ai-first-action-runtime';
 import { provisionAppBuilderRuntimeEnvironment, type AppBuilderRuntimeEnvironment } from './environment-provisioner';
 import { createAppBuilderRuntimeHandoff } from './runtime-handoff';
 
@@ -78,7 +79,7 @@ export const APP_BUILDER_BUILD_TOOL_NAME = 'dsg.app_builder.generate_fullstack_p
 export const appBuilderBuildTools: AppBuilderToolDefinition[] = [
   {
     name: APP_BUILDER_AGENT_RUNTIME_TOOL_NAME,
-    description: 'After a gated and approved app-builder plan, provision the required runtime environment and action-layer tool set, call the full-stack build tool, audit the result, and return a user-visible notification payload.',
+    description: 'After a gated and approved app-builder plan, provision the required runtime environment and action-layer tool set, call the AI-first full-stack build tool, audit the result, and return a user-visible notification payload.',
     riskLevel: 'HIGH',
     requiresApproval: true,
     requiredAllowedTools: ['dsg.environment.provision', 'github.branch.create', 'file.write'],
@@ -89,7 +90,7 @@ export const appBuilderBuildTools: AppBuilderToolDefinition[] = [
         mode: {
           type: 'string',
           enum: ['agent_runtime_fullstack_pr'],
-          description: 'Provision environment, expose action-layer tools, generate the full-stack app, and create a GitHub PR.',
+          description: 'Provision environment, expose action-layer tools, generate the full-stack app with AI-first blueprint generation, and create a GitHub PR.',
         },
       },
       required: ['mode'],
@@ -97,7 +98,7 @@ export const appBuilderBuildTools: AppBuilderToolDefinition[] = [
   },
   {
     name: APP_BUILDER_BUILD_TOOL_NAME,
-    description: 'Generate a database-backed full-stack Next.js app from an approved DSG App Builder plan, write files to a GitHub branch, and open a pull request as implementation evidence.',
+    description: 'Generate a database-backed full-stack Next.js app from an approved DSG App Builder plan using AI-first blueprint generation, write files to a GitHub branch, and open a pull request as implementation evidence.',
     riskLevel: 'HIGH',
     requiresApproval: true,
     requiredAllowedTools: ['dsg.environment.provision', 'github.branch.create', 'file.write'],
@@ -182,7 +183,7 @@ function createAuditEvent(input: {
 function createNotification(output: AppBuilderRuntimeExecutionResult): AppBuilderToolNotification {
   return {
     severity: 'info',
-    title: 'App Builder tool finished with PR evidence',
+    title: 'AI-first App Builder tool finished with PR evidence',
     message: `Generated ${output.generatedFiles.length} files on ${output.branchName} and opened PR #${output.pullRequestNumber}.`,
     nextAction: 'Run CI, apply the migration, verify the preview deployment, and only then evaluate deployable or production claims.',
   };
@@ -194,7 +195,7 @@ async function executeFullstackPr(job: AppBuilderJob): Promise<{
 }> {
   const safeJob = runtimeReady(job);
   const environment = await provisionAppBuilderRuntimeEnvironment(safeJob);
-  const output = await executeApprovedAppBuilderJob(safeJob);
+  const output = await executeApprovedAiFirstAppBuilderJob(safeJob);
   return { environment, output };
 }
 
@@ -225,7 +226,7 @@ export async function callAppBuilderBuildTool(job: AppBuilderJob, input: AppBuil
       environmentReady: true,
       actionLayerReady: true,
       auditWritten: true,
-      note: 'The App Builder tool ran after approval, prepared the runtime environment and action-layer tool set, generated the full-stack PR, and produced an audit event plus notification payload. This is not deployment or production proof.',
+      note: 'The App Builder tool ran after approval, prepared the runtime environment and action-layer tool set, attempted AI-first blueprint generation before deterministic fallback, generated the full-stack PR, and produced an audit event plus notification payload. This is not deployment or production proof.',
     },
   };
 }
