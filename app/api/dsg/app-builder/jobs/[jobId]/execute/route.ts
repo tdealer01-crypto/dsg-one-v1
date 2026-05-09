@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server';
 import { executeApprovedAppBuilderJob } from '@/lib/dsg/app-builder/action-runtime';
-import { getDevAppBuilderContext } from '@/lib/dsg/server/app-builder/context';
+import { getAppBuilderRequestContext } from '@/lib/dsg/server/app-builder/context';
 import { getAppBuilderJob, updateAppBuilderJob } from '@/lib/dsg/server/app-builder/repository';
 
 function fail(error: unknown) {
   const code = error instanceof Error ? error.message : 'APP_BUILDER_EXECUTE_FAILED';
-  return NextResponse.json({ ok: false, error: { code, message: code } }, { status: 400 });
+  const status = code.startsWith('DSG_') ? 401 : 400;
+  return NextResponse.json({ ok: false, error: { code, message: code } }, { status });
 }
 
 export async function POST(req: Request, context: { params: Promise<{ jobId: string }> }) {
   try {
     const { jobId } = await context.params;
-    const ctx = getDevAppBuilderContext(req);
+    const ctx = await getAppBuilderRequestContext(req, 'job:control');
     const job = await getAppBuilderJob(ctx, jobId);
 
     if (job.status !== 'READY_FOR_RUNTIME') throw new Error('APP_BUILDER_JOB_NOT_READY_FOR_RUNTIME');
