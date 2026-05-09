@@ -1,14 +1,25 @@
+import { requireVerifiedDsgActor, type DsgPermission, type DsgServerActor } from '@/lib/dsg/server/context';
+
 export type AppBuilderRequestContext = {
   workspaceId: string;
   actorId: string;
+  actorRole: DsgServerActor['role'];
+  permission: DsgPermission;
 };
 
-export function getDevAppBuilderContext(req: Request): AppBuilderRequestContext {
-  const workspaceId = req.headers.get('x-dsg-workspace-id');
-  const actorId = req.headers.get('x-dsg-actor-id');
+export async function getAppBuilderRequestContext(
+  req: Request,
+  permission: DsgPermission,
+): Promise<AppBuilderRequestContext> {
+  const actor = await requireVerifiedDsgActor(req.headers, permission);
+  return {
+    workspaceId: actor.workspaceId,
+    actorId: actor.actorId,
+    actorRole: actor.role,
+    permission,
+  };
+}
 
-  if (!workspaceId) throw new Error('WORKSPACE_ID_REQUIRED');
-  if (!actorId) throw new Error('ACTOR_ID_REQUIRED');
-
-  return { workspaceId, actorId };
+export function getDevAppBuilderContext(): never {
+  throw new Error('APP_BUILDER_DEV_HEADER_CONTEXT_REMOVED');
 }
