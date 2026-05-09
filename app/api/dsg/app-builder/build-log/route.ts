@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { analyzeBuildLog } from '@/lib/dsg/app-builder/agent-runtime/build-log-analyzer';
-import { getDevAppBuilderContext } from '@/lib/dsg/server/app-builder/context';
+import { getAppBuilderRequestContext } from '@/lib/dsg/server/app-builder/context';
 import { recordAppBuilderToolAudit } from '@/lib/dsg/server/app-builder/repository';
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -10,7 +10,8 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function fail(error: unknown) {
   const message = error instanceof Error ? error.message : 'BUILD_LOG_ANALYZE_FAILED';
-  return NextResponse.json({ ok: false, error: { code: message, message } }, { status: 400 });
+  const status = message.startsWith('DSG_') ? 401 : 400;
+  return NextResponse.json({ ok: false, error: { code: message, message } }, { status });
 }
 
 export async function POST(req: Request) {
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
     const log = String(body.log || '');
     const jobId = String(body.jobId || 'build-log-analysis');
     const analysis = analyzeBuildLog(log);
-    const ctx = getDevAppBuilderContext(req);
+    const ctx = await getAppBuilderRequestContext(req, 'evidence:write');
 
     await recordAppBuilderToolAudit({
       ctx,
