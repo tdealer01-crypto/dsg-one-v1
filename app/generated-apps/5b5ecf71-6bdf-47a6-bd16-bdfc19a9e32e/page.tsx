@@ -4,24 +4,24 @@ import React, { useEffect, useState } from 'react';
 
 type Item = { id: string; title: string; completed: boolean; created_at: string };
 
-const APP_ID = "5b5ecf71-6bdf-47a6-bd16-bdfc19a9e32e";
-const APP_TITLE = "DSG App Builder: สร้างแอป PC เสมือนที่มี Windows ต่อเน็ตแล้ว มีจอมอนิเตอร์ในแอป มี remote mouse A";
-const APP_SUMMARY = "สร้างแอป PC เสมือนที่มี Windows ต่อเน็ตแล้ว มีจอมอนิเตอร์ในแอป มี remote mouse API ให้ agent จากที่อื่นควบคุมเมาส์ได้ และมี DSG governance ตรวจ invariant ก่อนทุก action พร้อม audit/evidence proof";
-const PLAN_HASH = "1a4457705129202c73cb0c63b52aaef2350a6c98364351c2aa436693a90bedc6";
-const APPROVAL_HASH = "f6f711c3c49a4ab48b47b9f2d18def23bb2cd8d0d8b16e57a8189c2f14f42bcc";
+const APP_ID = '5b5ecf71-6bdf-47a6-bd16-bdfc19a9e32e';
+const APP_TITLE = 'DSG Generated Governed App';
+const APP_SUMMARY = 'Generated app evidence page with a database-backed item flow, plan hash, approval hash, and DSG claim boundary.';
+const PLAN_HASH = '1a4457705129202c73cb0c63b52aaef2350a6c98364351c2aa436693a90bedc6';
+const APPROVAL_HASH = 'f6f711c3c49a4ab48b47b9f2d18def23bb2cd8d0d8b16e57a8189c2f14f42bcc';
 
 export default function GeneratedDsgAppPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [title, setTitle] = useState('First governed task');
-  const [status, setStatus] = useState('Loading backend evidence…');
+  const [status, setStatus] = useState('Loading backend evidence...');
 
   async function loadItems() {
-    setStatus('Loading backend evidence…');
+    setStatus('Loading backend evidence...');
     const response = await fetch(`/api/generated-apps/${APP_ID}/items`, { cache: 'no-store' });
     const json = await response.json();
     if (!response.ok || !json.ok) throw new Error(json.error?.message || 'GENERATED_APP_BACKEND_FAILED');
     setItems(json.data.items);
-    setStatus('Backend API + database table reachable');
+    setStatus('Backend API and database table reachable');
   }
 
   async function addItem() {
@@ -39,7 +39,10 @@ export default function GeneratedDsgAppPage() {
   }
 
   useEffect(() => {
-    loadItems().catch((error) => setStatus(error instanceof Error ? error.message : 'GENERATED_APP_LOAD_FAILED'));
+    const timer = window.setTimeout(() => {
+      void loadItems().catch((error) => setStatus(error instanceof Error ? error.message : 'GENERATED_APP_LOAD_FAILED'));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (
