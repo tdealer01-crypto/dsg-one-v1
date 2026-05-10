@@ -40,7 +40,7 @@ const requiredTerms = [
   'Governance Vault',
   'Telemetry',
   'Final Approval',
-  '/api/dsg/action-layer',
+  'ACTION_LAYER_INPUT_REQUIRED',
 ];
 
 for (const term of requiredTerms) {
@@ -51,6 +51,9 @@ if (/manus/i.test(all)) throw new Error('action layer must not reference externa
 if (!page.includes('DSG GOVERNANCE')) throw new Error('page must render DSG governance shell');
 if (!page.includes('Live Execution Capacity')) throw new Error('page must render live execution capacity');
 if (!page.includes('Assign Enterprise Task')) throw new Error('page must render command input section');
+if (!api.includes('POST')) throw new Error('action API must expose POST execution route');
+if (!status.includes('GET')) throw new Error('status API must expose GET route');
+if (!timeline.includes('events')) throw new Error('timeline API must expose events');
 if (!orchestrator.includes('command_center')) throw new Error('orchestrator must include command center flow');
 if (!orchestrator.includes('proof_timeline')) throw new Error('orchestrator must include proof timeline flow');
 
