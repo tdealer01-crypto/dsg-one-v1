@@ -9,6 +9,10 @@ const files = [
   'lib/dsg/autonomous-level/artifact-timeline-contract.ts',
   'lib/dsg/autonomous-level/preview-proof-contract.ts',
   'lib/dsg/autonomous-level/parallel-work-gate.ts',
+  'lib/dsg/autonomous-level/provider-contracts.ts',
+  'lib/dsg/autonomous-level/provider-proof-bundle.ts',
+  'skills/dsg-autonomous-execution/SKILL.md',
+  'scripts/dsg-provider-proof-bundle-check.mjs',
 ];
 
 for (const file of files) {
@@ -25,6 +29,10 @@ const requiredTerms = [
   'evaluateArtifactTimelineProof',
   'evaluatePreviewDeploymentProof',
   'evaluateDsgParallelAutonomousWork',
+  'DsgAutonomousProviderBundle',
+  'evaluateDsgProviderProofBundle',
+  'DSG_PROVIDER_PROOF_REQUIRED',
+  'DSG_PROVIDER_PROOF_COMPLETE',
   'PROOF_REQUIRED',
   'DSG_AUTONOMOUS_RUNTIME_PROOF_INCOMPLETE',
 ];
