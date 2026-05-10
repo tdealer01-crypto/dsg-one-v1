@@ -20,9 +20,10 @@ export function executeDsgAction(input: {
   payload?: unknown;
   mode?: DsgActionMode;
 }): DsgActionResult {
+  const payload = input.payload ?? {};
   const allowed = DSG_FLOW_REGISTRY[input.flow]?.intents.includes(input.intent);
   if (!allowed) {
-    const contract = createDsgActionContract({ flow: input.flow, intent: input.intent, payload: input.payload, mode: 'BLOCKED' });
+    const contract = createDsgActionContract({ flow: input.flow, intent: input.intent, payload, mode: 'BLOCKED' });
     return {
       ok: false,
       actionId: contract.actionId,
@@ -30,14 +31,14 @@ export function executeDsgAction(input: {
       intent: input.intent,
       status: 'BLOCKED',
       claim: 'ACTION_LAYER_INTENT_NOT_ALLOWED',
-      proofHash: dsgHash({ input, allowed }),
+      proofHash: dsgHash({ input: { ...input, payload }, allowed }),
       blockedReasons: [`intent ${input.intent} is not allowed for flow ${input.flow}`],
       nextAction: 'Choose an allowed deterministic action intent for this flow.',
       timeline: [],
     };
   }
 
-  return routeDsgAction(createDsgActionContract(input));
+  return routeDsgAction(createDsgActionContract({ flow: input.flow, intent: input.intent, payload, mode: input.mode }));
 }
 
 export function getDsgActionLayerSnapshot(): DsgActionLayerSnapshot {
