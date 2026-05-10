@@ -32,7 +32,7 @@ export default function DsgActionLayerPage() {
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-[#121414] text-[#e2e2e2]">
       <header className="fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b border-[#4d4635] bg-[#121414] px-5 md:px-16">
-        <span className="font-serif text-2xl font-black uppercase tracking-tight text-[#f2ca50] md:text-[32px]">DSG Governance</span>
+        <span className="font-serif text-2xl font-black uppercase tracking-tight text-[#f2ca50] md:text-[32px]">DSG GOVERNANCE</span>
         <div className="flex items-center gap-6 text-[#d0c5af]" aria-label="system actions">
           <span aria-label="notifications">♧</span>
           <span aria-label="settings">⚙</span>
