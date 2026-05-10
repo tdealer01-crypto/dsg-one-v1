@@ -10,6 +10,8 @@ Use this skill for DSG autonomous work where speed is useful but correctness is 
 - If proof is missing, status must be `PROOF_REQUIRED`, `PARTIAL`, or `BLOCKED`.
 - Do not use external platform names as our product claim.
 - User benefit comes first: the output must be usable, testable, and visibly tied to evidence.
+- Empty diagnostic output is not proof of success.
+- A failed evaluator, missing exit code, broken linter, broken test runner, or unknown tool state blocks repair and release.
 
 ## Core deterministic pipeline
 
@@ -67,6 +69,48 @@ Before merge or deploy:
 - route/API smoke proof where relevant
 - auth boundary proof for privileged routes
 - claim downgrade if any proof is missing
+- inherited-blindness guard proof
+- independent verifier proof for repair promotion
+
+## Inherited-blindness guard
+
+Self-repair must not trust a broken evaluator.
+
+Blocked states:
+
+- diagnostic tool missing
+- exit code unknown
+- stdout and stderr both empty
+- command empty
+- non-zero diagnostic exit
+- repair attempted after untrusted diagnostic output
+
+Required behavior:
+
+- stop repair immediately
+- restore or replace the diagnostic toolchain
+- collect independent verifier proof before any release or repair-promotion claim
+- never interpret silence as success
+
+## Independent verifier rule
+
+For repair or release promotion, at least one verifier must differ from the source tool.
+
+Examples:
+
+- source tool: local lint, independent verifier: CI lint
+- source tool: local build, independent verifier: Vercel build
+- source tool: agent repair result, independent verifier: human review or secondary toolchain
+
+The independent verifier must include:
+
+- verifier id
+- target run id
+- source tool
+- independent tool
+- verdict
+- evidence reference
+- observation time
 
 ## DSG 5-lane autonomous runtime work
 
@@ -102,6 +146,8 @@ Required proof:
 - attempt count
 - stop reason
 - passing retry proof or explicit fail-closed proof
+- inherited-blindness gate must pass
+- independent verifier proof must pass
 
 If missing: `PROOF_REQUIRED`.
 
@@ -184,6 +230,10 @@ Stop and report blocked if:
 - merge replay hash differs
 - branch state is unknown
 - a claim would exceed evidence
+- diagnostic output is empty and exit state is unknown
+- linter/test/build runner is broken
+- repair loop lacks independent verifier proof
+- repair loop tries to modify code after untrusted diagnostics
 
 ## Default local verification commands
 
