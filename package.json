@@ -18,7 +18,8 @@
     "dsg:product-ready": "node scripts/dsg-product-ready-check.mjs",
     "dsg:verify": "npm run dsg:claim-gate && npm run dsg:runtime-check && npm run dsg:typecheck && npm run lint",
     "smoke:memory-api": "bash scripts/dsg-memory-api-smoke.sh",
-    "smoke:app-builder-flow-proof": "node scripts/dsg-app-builder-flow-proof-smoke.mjs"
+    "smoke:app-builder-flow-proof": "node scripts/dsg-app-builder-flow-proof-smoke.mjs",
+    "smoke:marketplace-readiness": "node scripts/dsg-marketplace-readiness-check.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.17.0",
