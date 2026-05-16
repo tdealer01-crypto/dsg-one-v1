@@ -19,3 +19,40 @@
   - npm run smoke:first-value-flow
 - If APP_URL is required, use:
   export APP_URL="https://dsg-one-v1.vercel.app"
+
+---
+
+## งานที่ทำไปแล้ว (2026-05-16) — branch `claude/analyze-files-RHRKg` → merged to `main`
+
+### Security fixes
+- **`middleware.ts`** — เขียนใหม่ทั้งหมด: เพิ่ม JWT structural validation ด้วย native `atob`/`JSON.parse` (ห้ามใช้ Supabase library ใน middleware เด็ดขาด เพราะ repo นี้ไม่มี `@supabase/ssr`)
+- **`middleware.ts` matcher** — เปลี่ยนจาก `['/dashboard/:path*']` (route ไม่มีอยู่จริง) เป็น `['/dsg/:path*', '/enterprise/:path*', '/generated-apps/*']` ที่มีอยู่จริง
+
+### ไฟล์ใหม่: Market parity features
+- `app/dsg/templates/page.tsx` + `app/api/dsg/templates/route.ts` — Template gallery (12 templates, search, category filter, Popular badge)
+- `app/dsg/analytics/page.tsx` + `app/api/dsg/analytics/route.ts` — Analytics dashboard (recharts BarChart, toggle 7d/30d/90d)
+- `app/dsg/history/page.tsx` + `app/api/dsg/history/route.ts` — Build history timeline (compare mode, restore, diff stats, pagination)
+- `app/dsg/notifications/page.tsx` + `app/api/dsg/notifications/route.ts` — Notifications feed (filter tabs, mark-read, settings panel)
+
+### ไฟล์ใหม่: UI/UX
+- `app/page.tsx` (updated) — เปลี่ยนจาก bare `redirect('/dsg/action-layer')` เป็น welcome page เต็ม (hero, how-it-works, template chips, recent builds)
+- `app/dsg/layout.tsx` (new) — Left sidebar 220px สำหรับทุก `/dsg/*` pages แบ่ง 3 section: Build / Manage / Insights พร้อม mobile hamburger
+- `components/toast.tsx` — Toast system (success/error/info/warning, auto-dismiss, CSS transition ไม่ใช้ framer-motion)
+- `components/skeleton.tsx` — 5 skeleton variants ใช้ `cn` จาก `@/lib/utils` ได้เลย (ไฟล์มีอยู่แล้วใน repo นี้)
+- `components/onboarding-checklist.tsx` — 5-step onboarding, localStorage-persisted (`dsg_onboarding_*` keys), dismissible
+- `components/empty-state.tsx` — Reusable empty state component
+- `app/layout.tsx` (updated) — เพิ่ม `<ToastProvider>` ครอบ children
+
+### กฎที่ต้องรู้สำหรับ agent ที่จะทำต่อ
+- **ห้ามใช้ `@supabase/ssr` หรือ `@supabase/supabase-js` ใน `middleware.ts`** — repo นี้ไม่มี package เหล่านั้น ให้ใช้ native `atob`/`JSON.parse` สำหรับ JWT validation เท่านั้น
+- **`lucide-react: ^0.553.0`** มีอยู่ใน `package.json` แล้ว ใช้ได้เลย
+- **`recharts: ^3.8.1`** มีอยู่แล้ว ใช้ได้เลย
+- **`lib/utils.ts`** มีอยู่แล้ว — `cn()` ใช้ได้จาก `@/lib/utils`
+- **Vercel deploy** — ไม่มี `vercel.json` ใช้ default settings ของ Vercel (`npm install` อัตโนมัติ)
+- **Build command** — ใช้ `npm run build` หรือ `node scripts/dsg-next-build.mjs` ไม่ใช่ `next build` ตรงๆ
+- **`app/dsg/layout.tsx`** มีอยู่แล้วตั้งแต่ merge นี้ — ถ้าจะเพิ่มหน้าใน `/dsg/*` ไม่ต้องสร้าง layout ใหม่
+
+### งานที่ยังต้องทำ (ยังเป็น mock data)
+- API routes ใหม่ทั้งหมด (templates, analytics, history, notifications) ยังคืน mock JSON — ต้องต่อ Supabase tables จริงก่อน production
+- `components/onboarding-checklist.tsx` ใช้ localStorage เท่านั้น ยังไม่ persist ใน DB
+- `app/page.tsx` welcome page แสดง recent builds แบบ mock — ต้องดึงจาก API จริง
