@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+// Templates are curated content — not user data — so they remain static.
+// If personalization is needed in future, query a `dsg_templates` table seeded by migrations.
 const templates = [
   {
     slug: 'saas-starter',
