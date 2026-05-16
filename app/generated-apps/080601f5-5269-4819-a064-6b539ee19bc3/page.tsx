@@ -13,10 +13,10 @@ const APPROVAL_HASH = "ddfe2b428d1a369becf8a8208ff9855efb939eb273b451ae716909108
 export default function GeneratedDsgAppPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [title, setTitle] = useState('First governed task');
+  // Initialize with loading text so useEffect never sets state synchronously
   const [status, setStatus] = useState('Loading backend evidence…');
 
   async function loadItems() {
-    setStatus('Loading backend evidence…');
     const response = await fetch(`/api/generated-apps/${APP_ID}/items`, { cache: 'no-store' });
     const json = await response.json();
     if (!response.ok || !json.ok) throw new Error(json.error?.message || 'GENERATED_APP_BACKEND_FAILED');

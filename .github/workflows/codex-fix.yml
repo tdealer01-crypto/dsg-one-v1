@@ -1,0 +1,55 @@
+name: Codex Auto-fix
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Task for Codex to fix'
+        required: true
+        default: 'Fix all lint errors and typecheck failures in this repo'
+
+jobs:
+  codex-fix:
+    name: OpenAI Codex auto-fix
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && contains(github.event.label.name, 'codex-fix'))
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Codex CLI
+        run: npm install -g @openai/codex
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Run Codex fix
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          PROMPT="${{ github.event.inputs.prompt || github.event.issue.title }}"
+          codex --approval-mode auto-edit \
+            --model o4-mini \
+            "Read AGENTS.md and CLAUDE.md first. Then: ${PROMPT}"
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "fix(codex): auto-fix via OpenAI Codex"
+            git push origin HEAD:${{ github.ref_name }}
+          fi

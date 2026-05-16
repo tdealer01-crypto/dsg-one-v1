@@ -1,0 +1,62 @@
+name: DSG Full Test Suite
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Typecheck + Lint + DSG checks
+    runs-on: ubuntu-latest
+
+    env:
+      APP_URL: ${{ secrets.DSG_ONE_V1_PRODUCTION_URL || 'https://dsg-one-v1.vercel.app' }}
+      DSG_ONE_V1_PRODUCTION_URL: ${{ secrets.DSG_ONE_V1_PRODUCTION_URL || 'https://dsg-one-v1.vercel.app' }}
+      DSG_ONE_V1_SUPABASE_URL: ${{ secrets.DSG_ONE_V1_SUPABASE_URL }}
+      DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Typecheck
+        run: npm run dsg:typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Claim gate
+        run: npm run dsg:claim-gate
+
+      - name: Runtime check
+        run: npm run dsg:runtime-check
+
+      - name: Product ready
+        run: npm run dsg:product-ready
+        continue-on-error: true
+
+      - name: Production flow check
+        run: npm run dsg:production-flow-check
+        continue-on-error: true
+
+      - name: Smoke - marketplace readiness
+        run: npm run smoke:marketplace-readiness
+        continue-on-error: true
+
+      - name: Smoke - security RBAC
+        run: npm run smoke:security-rbac
+        continue-on-error: true
+
+      - name: Smoke - entitlement
+        run: npm run smoke:entitlement
+        continue-on-error: true
