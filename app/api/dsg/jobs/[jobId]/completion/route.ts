@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
 import { createCompletionReport } from '@/lib/dsg/server/repository';
 import { getBearerToken } from '@/lib/dsg/server/supabase-rpc';
+import { dispatchToControlPlane } from '@/lib/dsg/server/control-plane-webhook';
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
   const actor = await requireVerifiedDsgActor(request.headers, 'replay:verify');
@@ -36,6 +37,15 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
         isDevOrSmokeOnly: body.isDevOrSmokeOnly,
       },
     );
+
+    // Notify control-plane that this job finished (fire-and-forget)
+    dispatchToControlPlane('job.completed', {
+      workspaceId: actor.workspaceId,
+      actorId: actor.actorId,
+      jobId,
+      reportHash: body.reportHash,
+    }).catch(() => {});
+
     return NextResponse.json({ ok: true, data }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
