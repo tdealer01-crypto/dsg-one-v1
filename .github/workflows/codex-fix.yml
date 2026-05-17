@@ -14,6 +14,7 @@ jobs:
   codex-fix:
     name: OpenAI Codex auto-fix
     runs-on: ubuntu-latest
+    environment: "Codex workflow"
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' && contains(github.event.label.name, 'codex-fix'))
