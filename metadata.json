@@ -2,5 +2,6 @@
   "name": "DSG ONE Control Plane",
   "description": "Enterprise AI Runtime Control Plane for Auditability, Control, and Verified Operations",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [],
+  "controlPlaneUrl": "https://tdealer01-crypto-dsg-control-plane.vercel.app"
 }
