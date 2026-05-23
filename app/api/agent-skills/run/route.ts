@@ -10,7 +10,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: { code: 'DSG_AUTH_REQUIRED' } }, { status: 403 });
   }
 
-  const lock = readSkillsLock();
+  const lock = await readSkillsLock();
   return NextResponse.json({
     ok: true,
     data: {
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = runSkillAction({
+  const result = await runSkillAction({
     skillId: body.skillId.trim(),
     goal: body.goal.trim(),
     args: body.args,

@@ -2,8 +2,8 @@ import { prepareGovernedToolRequest } from '../dsg/tools/governed-tools';
 import { getSkillFromLock } from './lock-skill';
 import type { SkillRunRequest, SkillRunResult } from './types';
 
-export function runSkillAction(request: SkillRunRequest): SkillRunResult {
-  const entry = getSkillFromLock(request.skillId);
+export async function runSkillAction(request: SkillRunRequest): Promise<SkillRunResult> {
+  const entry = await getSkillFromLock(request.skillId);
 
   if (!entry) {
     return {

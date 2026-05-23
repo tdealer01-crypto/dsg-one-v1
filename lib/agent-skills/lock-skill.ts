@@ -1,18 +1,19 @@
 import { createHash } from 'crypto';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import type { SkillDraft, SkillLockEntry, SkillsLock, SkillVerificationResult } from './types';
 
-const LOCK_PATH = join(process.cwd(), 'skills-lock.json');
+const DEFAULT_LOCK_PATH = join(process.cwd(), 'skills-lock.json');
 
-export function readSkillsLock(): SkillsLock {
-  if (!existsSync(LOCK_PATH)) {
-    return { version: 1, updatedAt: new Date().toISOString(), skills: {} };
-  }
+export async function readSkillsLock(lockPath = DEFAULT_LOCK_PATH): Promise<SkillsLock> {
   try {
-    return JSON.parse(readFileSync(LOCK_PATH, 'utf-8')) as SkillsLock;
-  } catch {
-    return { version: 1, updatedAt: new Date().toISOString(), skills: {} };
+    const raw = await readFile(lockPath, 'utf-8');
+    return JSON.parse(raw) as SkillsLock;
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'ENOENT') {
+      return { version: 1, updatedAt: new Date().toISOString(), skills: {} };
+    }
+    throw error;
   }
 }
 
@@ -31,22 +32,13 @@ export function buildLockEntry(
   verification: SkillVerificationResult,
   sourceCommit: string | null,
 ): SkillLockEntry {
-  const computedHash = computeSkillHash(draft, sourceCommit);
-
-  const statusMap = {
-    verified: 'verified',
-    needs_review: 'needs_review',
-    needs_approval: 'needs_approval',
-    blocked: 'blocked',
-  } as const;
-
   return {
     source: `${draft.sourceOwner}/${draft.sourceRepo}`,
     sourceType: draft.sourceType,
     sourceUrl: draft.sourceUrl,
     sourceCommit,
-    computedHash,
-    status: statusMap[verification.status],
+    computedHash: computeSkillHash(draft, sourceCommit),
+    status: verification.status,
     riskLevel: draft.riskLevel,
     permissions: draft.permissions,
     registeredAt: new Date().toISOString(),
@@ -54,19 +46,18 @@ export function buildLockEntry(
   };
 }
 
-export function registerSkillToLock(
+export async function registerSkillToLock(
   draft: SkillDraft,
   verification: SkillVerificationResult,
   sourceCommit: string | null,
-): SkillsLock {
-  const lock = readSkillsLock();
+  lockPath = DEFAULT_LOCK_PATH,
+): Promise<SkillsLock> {
+  const lock = await readSkillsLock(lockPath);
   lock.skills[draft.id] = buildLockEntry(draft, verification, sourceCommit);
   lock.updatedAt = new Date().toISOString();
 
-  // Write only in environments where filesystem is writable (dev/CI).
-  // In production serverless, this is a no-op; consume the returned JSON instead.
   try {
-    writeFileSync(LOCK_PATH, JSON.stringify(lock, null, 2) + '\n');
+    await writeFile(lockPath, JSON.stringify(lock, null, 2) + '\n');
   } catch {
     // read-only filesystem (Vercel production) — caller receives lock JSON directly
   }
@@ -74,7 +65,7 @@ export function registerSkillToLock(
   return lock;
 }
 
-export function getSkillFromLock(skillId: string): SkillLockEntry | null {
-  const lock = readSkillsLock();
+export async function getSkillFromLock(skillId: string, lockPath = DEFAULT_LOCK_PATH): Promise<SkillLockEntry | null> {
+  const lock = await readSkillsLock(lockPath);
   return lock.skills[skillId] ?? null;
 }

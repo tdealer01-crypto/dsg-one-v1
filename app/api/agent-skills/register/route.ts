@@ -63,7 +63,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const updatedLock = registerSkillToLock(draft, verification, body.sourceCommit ?? null);
+    const updatedLock = await registerSkillToLock(draft, verification, body.sourceCommit ?? null);
 
     return NextResponse.json({
       ok: true,
