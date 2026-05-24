@@ -63,6 +63,7 @@ export type SkillDraft = {
 export type SkillVerificationResult = {
   status: 'verified' | 'needs_review' | 'needs_approval' | 'blocked';
   reasons: string[];
+  z3ProofHash?: string;
   checks: {
     hasReadme: boolean;
     hasLicense: boolean;
@@ -71,6 +72,7 @@ export type SkillVerificationResult = {
     noExternalWrite: boolean;
     noCodeExecution: boolean;
     riskLevel: SkillRiskLevel;
+    z3Pass?: boolean;
   };
 };
 
@@ -85,6 +87,7 @@ export type SkillLockEntry = {
   permissions: SkillPermissions;
   registeredAt: string;
   description: string;
+  z3ProofHash?: string;
 };
 
 export type SkillsLock = {

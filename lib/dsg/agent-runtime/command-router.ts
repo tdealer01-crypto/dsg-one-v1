@@ -7,6 +7,12 @@ export type AgentCommandIntent =
   | 'create_remote_browser_session'
   | 'inspect_services'
   | 'resolve_capability_gap'
+  | 'run_orchestrator'
+  | 'run_code_evolution'
+  | 'run_test_coverage'
+  | 'run_deploy_monitor'
+  | 'run_browser_research'
+  | 'security_gate_check'
   | 'blocked';
 
 export type AgentCommandInput = {
@@ -29,7 +35,7 @@ export type AgentCommandRoute = {
 
 const blockedPatterns = [
   /steal|exfiltrate|bypass|hack|phishing|malware|spyware/i,
-  /secret key|private key|seed phrase|password dump/i,
+  /secret key|private key|seed phrase|password dump|dump.*password/i,
   /delete production|drop database|wipe data/i,
 ];
 
@@ -147,6 +153,84 @@ export function routeAgentCommand(input: AgentCommandInput): AgentCommandRoute {
       evidence: ['sessionId', 'navigationLog', 'checkpoint', 'artifact'],
       userBenefit,
       truthBoundary: 'Remote browser API contract exists. Real autonomous execution depends on a verified provider adapter.',
+    };
+  }
+
+  if (includesAny(value, ['orchestrate', 'dispatch agents', 'run agents', 'สั่งเอเจนต์', 'จัดการเอเจนต์'])) {
+    return {
+      intent: 'run_orchestrator',
+      status: 'approval_required',
+      actionLabel: 'Run Orchestrator Agent',
+      endpoint: '/api/dsg/agents/orchestrator',
+      method: 'POST',
+      evidence: ['z3ProofHash', 'dispatched', 'blocked'],
+      userBenefit,
+      truthBoundary: 'Orchestrator dispatches sub-agents only. Requires goal_locked. Does not execute code.',
+    };
+  }
+
+  if (includesAny(value, ['evolve code', 'write code', 'fix code', 'เขียนโค้ด', 'แก้โค้ด', 'code evolution'])) {
+    return {
+      intent: 'run_code_evolution',
+      status: 'approval_required',
+      actionLabel: 'Run Code Evolution Agent',
+      endpoint: '/api/dsg/agents/code-evolution',
+      method: 'POST',
+      evidence: ['codebaseStateHash', 'z3ProofHash', 'readyToWrite'],
+      userBenefit,
+      truthBoundary: 'Code Evolution requires approved plan and seeded codebase state. Creates PR evidence only.',
+    };
+  }
+
+  if (includesAny(value, ['add tests', 'coverage', 'test gap', 'เพิ่ม test', 'coverage ต่ำ', 'test coverage'])) {
+    return {
+      intent: 'run_test_coverage',
+      status: 'approval_required',
+      actionLabel: 'Run Test Coverage Agent',
+      endpoint: '/api/dsg/agents/test-coverage',
+      method: 'POST',
+      evidence: ['z3ProofHash', 'coverageIncreased', 'needsMoreTests'],
+      userBenefit,
+      truthBoundary: 'Coverage monotonicity enforced by Z3. Cannot claim full coverage without proof.',
+    };
+  }
+
+  if (includesAny(value, ['deploy', 'monitor deploy', 'vercel', 'ดู deploy', 'deployment'])) {
+    return {
+      intent: 'run_deploy_monitor',
+      status: 'approval_required',
+      actionLabel: 'Run Deploy Monitor Agent',
+      endpoint: '/api/dsg/agents/deploy-monitor',
+      method: 'POST',
+      evidence: ['deploymentStatusHash', 'z3ProofHash', 'canTriggerDeploy'],
+      userBenefit,
+      truthBoundary: 'Deploy Monitor never claims production-ready without deployment proof hash.',
+    };
+  }
+
+  if (includesAny(value, ['research', 'browse', 'browser evidence', 'วิจัย', 'หาข้อมูล', 'browser research'])) {
+    return {
+      intent: 'run_browser_research',
+      status: 'approval_required',
+      actionLabel: 'Run Browser Research Agent',
+      endpoint: '/api/dsg/agents/browser-research',
+      method: 'POST',
+      evidence: ['evidenceHash', 'z3ProofHash', 'content'],
+      userBenefit,
+      truthBoundary: 'All browser results carry SHA256 evidence hashes. No hash = BLOCK.',
+    };
+  }
+
+  if (includesAny(value, ['gate check', 'security check', 'approve action', 'ตรวจ gate', 'security gate'])) {
+    return {
+      intent: 'security_gate_check',
+      status: 'ready',
+      actionLabel: 'Run Security Gate Check',
+      endpoint: '/api/dsg/agents/security-gate',
+      method: 'POST',
+      evidence: ['z3ProofHash', 'decision', 'actionId'],
+      userBenefit,
+      truthBoundary: 'Security Gate evaluates gate decisions only. Does not execute actions.',
     };
   }
 

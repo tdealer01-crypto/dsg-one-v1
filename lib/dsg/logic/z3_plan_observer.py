@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, asdict
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from z3 import Bool, Solver, Implies, And, Not, sat, unsat
+from z3 import Bool, Solver, Implies, And, Not, Or, sat, unsat
 
 
 class GateStatus(str, Enum):
@@ -299,6 +299,217 @@ def result_to_dict(result: Z3PlanObserverResult) -> Dict[str, Any]:
         "z3_check": result.z3_check,
         "summary": result.summary,
         "reasons": [asdict(reason) for reason in result.reasons],
+    }
+
+
+class AgentType(str, Enum):
+    ORCHESTRATOR = "orchestrator"
+    CODE_EVOLUTION = "code-evolution"
+    TEST_COVERAGE = "test-coverage"
+    DEPLOY_MONITOR = "deploy-monitor"
+    BROWSER_RESEARCH = "browser-research"
+    SECURITY_GATE = "security-gate"
+
+
+@dataclass(frozen=True)
+class AgentPlanSnapshot:
+    """Input for per-agent Z3 invariant verification."""
+    agent_type: AgentType
+    job_id: str
+    workspace_id: str
+    goal_locked: bool
+    gate_allow: bool
+    evidence_exists: bool
+    mock_state: bool
+    # Code Evolution specific
+    plan_approved: bool = False
+    writes_code: bool = False
+    is_destructive_write: bool = False
+    destruction_proof: bool = False
+    # Test Coverage specific
+    test_run_complete: bool = False
+    new_coverage_gte_prev: bool = True
+    # Browser Research specific
+    uses_browser_result: bool = False
+    browser_evidence_hash_set: bool = False
+    # Seed Engine specific
+    data_needed: bool = False
+    data_unknown: bool = False
+    search_attempted: bool = False
+
+
+@dataclass
+class AgentInvariantResult:
+    agent_type: str
+    job_id: str
+    status: GateStatus
+    pass_: bool
+    violations: List[GateReason]
+    z3_check: str
+    z3_proof_hash: str
+
+
+def _sha256_hex(data: str) -> str:
+    import hashlib
+    return hashlib.sha256(data.encode()).hexdigest()
+
+
+def verify_agent_invariants(snapshot: AgentPlanSnapshot) -> AgentInvariantResult:
+    """
+    Z3 formal verification of per-agent invariants.
+    Called during SkillGate verify step — skill cannot be locked if this returns BLOCK.
+    """
+    violations: List[GateReason] = []
+    solver = Solver()
+
+    goal_locked = Bool("goal_locked")
+    gate_allow = Bool("gate_allow")
+    evidence_exists = Bool("evidence_exists")
+    mock_state = Bool("mock_state")
+
+    solver.add(goal_locked == snapshot.goal_locked)
+    solver.add(gate_allow == snapshot.gate_allow)
+    solver.add(evidence_exists == snapshot.evidence_exists)
+    solver.add(mock_state == snapshot.mock_state)
+
+    if snapshot.agent_type == AgentType.ORCHESTRATOR:
+        can_dispatch = Bool("orchestrator_can_dispatch")
+        sub_goal = Bool("sub_agent_goal_locked")
+        solver.add(can_dispatch == snapshot.goal_locked)
+        solver.add(sub_goal == snapshot.goal_locked)
+        solver.add(Implies(can_dispatch, goal_locked))
+        solver.add(Implies(can_dispatch, sub_goal))
+        if not snapshot.goal_locked:
+            violations.append(GateReason(
+                code="ORCHESTRATOR_NO_GOAL_LOCK",
+                message="Orchestrator cannot dispatch without a locked goal.",
+            ))
+
+    elif snapshot.agent_type == AgentType.CODE_EVOLUTION:
+        writes_code = Bool("writes_code")
+        plan_approved = Bool("plan_approved")
+        is_destructive = Bool("is_destructive_write")
+        destruction_proof = Bool("destruction_proof")
+        solver.add(writes_code == snapshot.writes_code)
+        solver.add(plan_approved == snapshot.plan_approved)
+        solver.add(is_destructive == snapshot.is_destructive_write)
+        solver.add(destruction_proof == snapshot.destruction_proof)
+        solver.add(Implies(writes_code, plan_approved))
+        solver.add(Implies(And(writes_code, is_destructive), destruction_proof))
+        if snapshot.writes_code and not snapshot.plan_approved:
+            violations.append(GateReason(
+                code="CODE_WRITE_WITHOUT_APPROVED_PLAN",
+                message="Code Evolution agent cannot write code without an approved plan.",
+            ))
+        if snapshot.writes_code and snapshot.is_destructive_write and not snapshot.destruction_proof:
+            violations.append(GateReason(
+                code="DESTRUCTIVE_WRITE_WITHOUT_PROOF",
+                message="Destructive code write requires a destruction proof.",
+            ))
+
+    elif snapshot.agent_type == AgentType.TEST_COVERAGE:
+        test_run = Bool("test_run_complete")
+        coverage_gte = Bool("new_coverage_gte_prev")
+        solver.add(test_run == snapshot.test_run_complete)
+        solver.add(coverage_gte == snapshot.new_coverage_gte_prev)
+        solver.add(Implies(test_run, coverage_gte))
+        if snapshot.test_run_complete and not snapshot.new_coverage_gte_prev:
+            violations.append(GateReason(
+                code="COVERAGE_DECREASED",
+                message="Test coverage must be monotonically non-decreasing.",
+            ))
+
+    elif snapshot.agent_type == AgentType.DEPLOY_MONITOR:
+        triggers_deploy = Bool("triggers_deploy")
+        solver.add(triggers_deploy == (snapshot.gate_allow and snapshot.evidence_exists and not snapshot.mock_state))
+        solver.add(Implies(triggers_deploy, gate_allow))
+        solver.add(Implies(triggers_deploy, evidence_exists))
+        solver.add(Implies(triggers_deploy, Not(mock_state)))
+        if snapshot.mock_state:
+            violations.append(GateReason(
+                code="DEPLOY_IN_MOCK_STATE",
+                message="Deploy Monitor cannot trigger deploy when mock_state is active.",
+            ))
+        if not snapshot.gate_allow:
+            violations.append(GateReason(
+                code="DEPLOY_GATE_NOT_ALLOW",
+                message="Deploy Monitor requires gate_allow before triggering deploy.",
+            ))
+        if not snapshot.evidence_exists:
+            violations.append(GateReason(
+                code="DEPLOY_NO_EVIDENCE",
+                message="Deploy Monitor requires existing evidence before triggering deploy.",
+            ))
+
+    elif snapshot.agent_type == AgentType.BROWSER_RESEARCH:
+        uses_result = Bool("uses_browser_result")
+        hash_set = Bool("browser_evidence_hash_set")
+        solver.add(uses_result == snapshot.uses_browser_result)
+        solver.add(hash_set == snapshot.browser_evidence_hash_set)
+        solver.add(Implies(uses_result, hash_set))
+        if snapshot.uses_browser_result and not snapshot.browser_evidence_hash_set:
+            violations.append(GateReason(
+                code="BROWSER_RESULT_NO_EVIDENCE_HASH",
+                message="Browser Research results must carry a tamper-evident evidence hash.",
+            ))
+
+    elif snapshot.agent_type == AgentType.SECURITY_GATE:
+        action_attempted = Bool("action_attempted")
+        solver.add(action_attempted == (not snapshot.gate_allow))
+        solver.add(Implies(action_attempted, gate_allow))
+        if not snapshot.gate_allow:
+            violations.append(GateReason(
+                code="ACTION_WITHOUT_GATE_ALLOW",
+                message="Security Gate: every action requires gate_allow before execution.",
+            ))
+
+    # Seed Engine invariant applies to all agents
+    if snapshot.data_needed and snapshot.data_unknown and not snapshot.search_attempted:
+        violations.append(GateReason(
+            code="SEED_DATA_NOT_SEARCHED",
+            message="Data is needed but unknown. Agent must search via Seed Engine before proceeding.",
+        ))
+        data_needed = Bool("data_needed")
+        data_unknown = Bool("data_unknown")
+        must_search = Bool("must_search")
+        solver.add(data_needed == True)
+        solver.add(data_unknown == True)
+        solver.add(must_search == True)
+        solver.add(Implies(And(data_needed, data_unknown), must_search))
+
+    z3_result = solver.check()
+    z3_str = "sat" if z3_result == sat else ("unsat" if z3_result == unsat else "unknown")
+
+    if violations:
+        status = GateStatus.BLOCK
+    elif z3_str == "unsat":
+        status = GateStatus.BLOCK
+    else:
+        status = GateStatus.PASS
+
+    proof_input = f"{snapshot.agent_type}:{snapshot.job_id}:{z3_str}:{len(violations)}"
+    proof_hash = f"sha256:{_sha256_hex(proof_input)}"
+
+    return AgentInvariantResult(
+        agent_type=snapshot.agent_type.value,
+        job_id=snapshot.job_id,
+        status=status,
+        pass_=status == GateStatus.PASS,
+        violations=violations,
+        z3_check=z3_str,
+        z3_proof_hash=proof_hash,
+    )
+
+
+def agent_result_to_dict(result: AgentInvariantResult) -> Dict[str, Any]:
+    return {
+        "agent_type": result.agent_type,
+        "job_id": result.job_id,
+        "status": result.status.value,
+        "pass": result.pass_,
+        "z3_check": result.z3_check,
+        "z3_proof_hash": result.z3_proof_hash,
+        "violations": [asdict(v) for v in result.violations],
     }
 
 
