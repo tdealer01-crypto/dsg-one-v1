@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
 import { getDsgSupabaseRpcConfig, readDsgRest, callDsgRpc } from '@/lib/dsg/server/supabase-rpc';
 import {
@@ -7,6 +8,8 @@ import {
   DEFAULT_COMMISSION_RATE_BPS,
 } from '@/lib/dsg/marketplace/template-commission';
 import type { DsgMarketTemplate } from '@/lib/dsg/app-builder/templates/template-registry';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 type TemplateRow = {
   id: string;
@@ -83,9 +86,58 @@ export async function POST(
       commissionRateBps: DEFAULT_COMMISSION_RATE_BPS,
     });
 
-    // Free templates are cleared immediately; paid templates stay PENDING until Stripe webhook
-    const initialStatus = template.price_satang === 0 ? 'CLEARED' : 'PENDING';
+    if (template.price_satang > 0) {
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        line_items: [
+          {
+            price_data: {
+              currency: 'thb',
+              unit_amount: template.price_satang,
+              product_data: { name: template.name },
+            },
+            quantity: 1,
+          },
+        ],
+        metadata: {
+          saleId: sale.saleId,
+          buyerId: actor.actorId,
+          sellerId: template.seller_id,
+        },
+        success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dsg/templates?purchase=success`,
+        cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dsg/templates?purchase=cancelled`,
+      });
 
+      await callDsgRpc(config, 'record_template_sale', {
+        p_sale_id: sale.saleId,
+        p_template_id: sale.templateId,
+        p_seller_id: sale.sellerId,
+        p_buyer_id: sale.buyerId,
+        p_price_satang: sale.priceSatang,
+        p_commission_rate_bps: sale.commissionRateBps,
+        p_platform_fee_satang: sale.platformFeeSatang,
+        p_creator_payout_satang: sale.creatorPayoutSatang,
+        p_status: 'PENDING',
+        p_stripe_checkout_session_id: session.id,
+      });
+
+      return NextResponse.json(
+        {
+          ok: true,
+          data: {
+            saleId: sale.saleId,
+            status: 'PENDING',
+            priceSatang: sale.priceSatang,
+            priceTHB: sale.priceSatang / 100,
+            checkoutRequired: true,
+            checkoutUrl: session.url,
+          },
+        },
+        { status: 201 },
+      );
+    }
+
+    // Free templates: record as CLEARED immediately — no Stripe needed
     await callDsgRpc(config, 'record_template_sale', {
       p_sale_id: sale.saleId,
       p_template_id: sale.templateId,
@@ -95,7 +147,7 @@ export async function POST(
       p_commission_rate_bps: sale.commissionRateBps,
       p_platform_fee_satang: sale.platformFeeSatang,
       p_creator_payout_satang: sale.creatorPayoutSatang,
-      p_status: initialStatus,
+      p_status: 'CLEARED',
     });
 
     return NextResponse.json(
@@ -103,11 +155,10 @@ export async function POST(
         ok: true,
         data: {
           saleId: sale.saleId,
-          status: initialStatus,
-          priceSatang: sale.priceSatang,
-          priceTHB: sale.priceSatang / 100,
-          // In a real integration: stripeCheckoutUrl would be here for paid templates
-          checkoutRequired: template.price_satang > 0,
+          status: 'CLEARED',
+          priceSatang: 0,
+          priceTHB: 0,
+          checkoutRequired: false,
         },
       },
       { status: 201 },

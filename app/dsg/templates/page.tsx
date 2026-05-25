@@ -75,9 +75,9 @@ export default function TemplatesPage() {
       const res = await fetch(`/api/dsg/templates/${template.id}/purchase`, { method: 'POST' });
       const data = await res.json();
       if (data.ok) {
-        if (data.data.checkoutRequired) {
-          // Redirect to Stripe checkout when wired
-          alert(`ชำระเงิน ฿${data.data.priceTHB} — Stripe checkout จะเปิดที่นี่`);
+        if (data.data.checkoutRequired && data.data.checkoutUrl) {
+          window.location.href = data.data.checkoutUrl;
+          return;
         } else {
           alert(`ได้รับ template "${template.name}" แล้ว! ไปที่ App Builder เพื่อใช้งาน`);
         }
