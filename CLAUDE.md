@@ -98,3 +98,34 @@ try {
   return NextResponse.json({ error: String(err) }, { status: 500 });
 }
 ```
+
+## Client stores (`store/`)
+
+All browser-persistent shared state lives in `store/`. Import from the barrel:
+
+```ts
+import { useChecklist, useAppLanguage, checklistStore, languageStore } from '@/store';
+```
+
+### Available hooks
+
+| Hook | Returns | Use when |
+|---|---|---|
+| `useChecklist()` | `{ dismissed, completedSteps, dismiss, restore, completeStep, uncompleteStep, toggleStep }` | onboarding widget หรือ settings page |
+| `useAppLanguage(default?)` | `'th' \| 'en'` | component ที่ต้องรู้ภาษาปัจจุบัน |
+
+### Available stores (raw — ใช้เมื่อเรียกนอก component)
+
+| Store | Key methods |
+|---|---|
+| `checklistStore` | `.getSnapshot()` `.update(patch)` `.subscribe(cb)` |
+| `languageStore` | `.getSnapshot()` `.setLanguage(lang)` `.subscribe(cb)` |
+
+### Rules สำหรับ store ใหม่
+
+- สร้างไฟล์ใน `store/` เสมอ ไม่ใช้ useState + useEffect สำหรับ localStorage
+- export hook convenience ใน `store/useXxx.ts` แล้วเพิ่มใน `store/index.ts`
+- `getSnapshot` ต้องคืน stable reference (cache + freeze)
+- `subscribe` ต้องลงทะเบียน window listener แค่ครั้งเดียว (lazy mount/unmount pattern)
+- ห้าม setState ใน useEffect — ใช้ `useSyncExternalStore` แทน
+
