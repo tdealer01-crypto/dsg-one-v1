@@ -129,3 +129,18 @@ import { useChecklist, useAppLanguage, checklistStore, languageStore } from '@/s
 - `subscribe` ต้องลงทะเบียน window listener แค่ครั้งเดียว (lazy mount/unmount pattern)
 - ห้าม setState ใน useEffect — ใช้ `useSyncExternalStore` แทน
 
+## Production control loop
+
+### Check if production is alive
+GET https://dsg-one-v1.vercel.app/api/agent/status
+
+### Ship from chat (triggers CI → verify)
+Use GitHub MCP tool `mcp__github__create_dispatch_event` or trigger workflow_dispatch on `.github/workflows/ship.yml` with input `reason: "<what you did>"`.
+
+### Full loop
+1. Write code → commit → push to claude/* branch
+2. Open PR or push to main
+3. Vercel auto-deploys
+4. Call GET /api/agent/status to verify deploy is live
+5. If status ok → done. If not → diagnose and fix.
+
