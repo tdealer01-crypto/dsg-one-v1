@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore, useState } from 'react';
 import Link from 'next/link';
 import {
   CheckCircle2,
@@ -70,50 +70,66 @@ const STEPS: Step[] = [
   },
 ];
 
+// Module-level subscriber set + custom event for same-tab localStorage notifications.
+const _subs = new Set<() => void>();
+
+function _lsSubscribe(cb: () => void) {
+  _subs.add(cb);
+  window.addEventListener('storage', cb);
+  return () => {
+    _subs.delete(cb);
+    window.removeEventListener('storage', cb);
+  };
+}
+
+function _lsNotify() {
+  _subs.forEach((fn) => fn());
+}
+
 export function OnboardingChecklist() {
-  const [dismissed, setDismissed] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [completed, setCompleted] = useState<Set<string>>(new Set());
-  const [mounted, setMounted] = useState(false);
 
-  // Read persisted state after mount to avoid SSR mismatch
-  useEffect(() => {
-    setMounted(true);
-    const isDismissed = localStorage.getItem(STORAGE_KEY_DISMISSED) === 'true';
-    setDismissed(isDismissed);
+  // useSyncExternalStore reads localStorage directly on the client and returns the
+  // SSR snapshot on the server. Server snapshot = true so the widget renders null
+  // during SSR (same behaviour as the old `mounted` guard), then re-renders on the
+  // client once hydration completes.
+  const dismissed = useSyncExternalStore(
+    _lsSubscribe,
+    () => localStorage.getItem(STORAGE_KEY_DISMISSED) === 'true',
+    () => true,
+  );
 
-    const raw = localStorage.getItem(STORAGE_KEY_STEPS);
-    const saved: string[] = raw ? JSON.parse(raw) : [];
+  const completedRaw = useSyncExternalStore(
+    _lsSubscribe,
+    () => localStorage.getItem(STORAGE_KEY_STEPS) ?? '[]',
+    () => '[]',
+  );
 
-    // Also auto-complete steps whose storage flags are set
-    const autoCompleted = new Set(saved);
-    for (const step of STEPS) {
-      if (step.storageFlag && localStorage.getItem(step.storageFlag) === 'true') {
-        autoCompleted.add(step.id);
-      }
+  // All hooks called — safe to return early now.
+  if (dismissed) return null;
+
+  const completed: Set<string> = new Set(JSON.parse(completedRaw));
+  for (const step of STEPS) {
+    if (step.storageFlag && localStorage.getItem(step.storageFlag) === 'true') {
+      completed.add(step.id);
     }
-    setCompleted(autoCompleted);
-  }, []);
+  }
 
   function dismiss() {
     localStorage.setItem(STORAGE_KEY_DISMISSED, 'true');
-    setDismissed(true);
+    _lsNotify();
   }
 
   function toggleStep(id: string) {
-    setCompleted((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      localStorage.setItem(STORAGE_KEY_STEPS, JSON.stringify([...next]));
-      return next;
-    });
+    const next = new Set(completed);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    localStorage.setItem(STORAGE_KEY_STEPS, JSON.stringify([...next]));
+    _lsNotify();
   }
-
-  if (!mounted || dismissed) return null;
 
   const total = STEPS.length;
   const done = STEPS.filter((s) => completed.has(s.id)).length;
