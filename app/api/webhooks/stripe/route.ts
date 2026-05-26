@@ -1,8 +1,5 @@
-import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getDsgSupabaseRpcConfig, callDsgRpc } from '@/lib/dsg/server/supabase-rpc';
-
-export const runtime = 'nodejs';
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -11,39 +8,62 @@ function getStripe() {
 }
 
 export async function POST(req: Request) {
-  const signature = req.headers.get('stripe-signature');
-  if (!signature) {
-    return NextResponse.json({ ok: false, error: 'Missing Stripe-Signature header' }, { status: 400 });
-  }
-
-  const rawBody = await req.text();
+  const body = await req.text();
+  const sig = req.headers.get('stripe-signature') ?? '';
 
   let event: Stripe.Event;
   try {
-    event = getStripe().webhooks.constructEvent(rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET ?? '');
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Invalid signature';
-    return NextResponse.json({ ok: false, error: message }, { status: 400 });
+    event = getStripe().webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET ?? '');
+  } catch {
+    return new Response('Invalid signature', { status: 400 });
   }
+
+  const config = getDsgSupabaseRpcConfig();
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
 
-    const paymentIntentId =
-      typeof session.payment_intent === 'string'
-        ? session.payment_intent
-        : session.payment_intent?.id ?? null;
+    if (session.mode === 'subscription') {
+      const keyId = session.metadata?.keyId;
+      const subscriptionId =
+        typeof session.subscription === 'string' ? session.subscription : null;
 
-    if (!paymentIntentId) {
-      return NextResponse.json({ ok: false, error: 'Missing payment_intent on checkout session' }, { status: 400 });
+      if (keyId && subscriptionId) {
+        const customerId =
+          typeof session.customer === 'string' ? session.customer : '';
+        const now = new Date();
+        const nextMonth = new Date(now);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+
+        await callDsgRpc(config, 'activate_mcp_subscription', {
+          p_key_id: keyId,
+          p_stripe_subscription_id: subscriptionId,
+          p_stripe_customer_id: customerId,
+          p_period_start: now.toISOString(),
+          p_period_end: nextMonth.toISOString(),
+        });
+      }
+    } else {
+      await callDsgRpc(config, 'clear_template_sale', {
+        p_stripe_checkout_session_id: session.id,
+        p_stripe_payment_intent_id: String(session.payment_intent ?? ''),
+      });
     }
-
-    const config = getDsgSupabaseRpcConfig();
-    await callDsgRpc(config, 'clear_template_sale', {
-      p_stripe_checkout_session_id: session.id,
-      p_stripe_payment_intent_id: paymentIntentId,
-    });
   }
 
-  return NextResponse.json({ ok: true });
+  if (event.type === 'invoice.paid') {
+    const invoice = event.data.object as Stripe.Invoice;
+    const parent = invoice.parent as { type?: string; subscription_details?: { subscription?: string } } | null;
+    const subscriptionId = parent?.subscription_details?.subscription ?? null;
+
+    if (subscriptionId && invoice.period_start && invoice.period_end) {
+      await callDsgRpc(config, 'renew_mcp_subscription_period', {
+        p_stripe_subscription_id: subscriptionId,
+        p_period_start: new Date(invoice.period_start * 1000).toISOString(),
+        p_period_end: new Date(invoice.period_end * 1000).toISOString(),
+      });
+    }
+  }
+
+  return new Response('ok', { status: 200 });
 }

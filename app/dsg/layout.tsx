@@ -17,6 +17,7 @@ import {
   ArrowLeft,
   Menu,
   X,
+  Key,
 } from 'lucide-react';
 
 const navSections = [
@@ -33,6 +34,7 @@ const navSections = [
     items: [
       { label: 'My Apps', href: '/dsg/action-layer', iconName: 'layoutGrid' },
       { label: 'History', href: '/dsg/history', iconName: 'history' },
+      { label: 'API Keys', href: '/dsg/api-keys', iconName: 'key' },
     ],
   },
   {
@@ -63,6 +65,7 @@ function NavIcon({ name }: { name: string }) {
     case 'cpu':            return <Cpu className={cls} />;
     case 'bell':           return <Bell className={cls} />;
     case 'settings':       return <Settings className={cls} />;
+    case 'key':            return <Key className={cls} />;
     default:               return null;
   }
 }
