@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createDsgAuditPacket } from '@/lib/dsg/marketplace/audit-packet';
+import { validateApiKeyFromHeaders, recordApiKeyUsage } from '@/lib/dsg/mcp/validate-api-key';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,24 @@ function resolveCanonicalBase(reqUrl: URL): string {
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
+
+  // MCP API key path — validate and meter before running the full audit
+  if (req.headers.get('x-dsg-api-key') !== null) {
+    const validation = await validateApiKeyFromHeaders(new Headers(req.headers));
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: { code: 'INVALID_API_KEY' },
+          nextAction: 'Obtain a valid DSG_API_KEY from /dsg/api-keys',
+        },
+        { status: 401 },
+      );
+    }
+    const toolName = url.searchParams.get('tool') ?? 'audit-packet';
+    recordApiKeyUsage(validation.keyId, validation.actorId, toolName).catch(() => {});
+  }
+
   let canonicalBase: string;
 
   try {

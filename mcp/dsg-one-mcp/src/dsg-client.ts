@@ -1,4 +1,11 @@
 const DSG_BASE = process.env.DSG_APP_URL || "https://dsg-one-v1.vercel.app";
+const DSG_API_KEY = process.env.DSG_API_KEY;
+
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (DSG_API_KEY) headers["X-DSG-Api-Key"] = DSG_API_KEY;
+  return headers;
+}
 
 export async function callDsgGate(
   skill: string,
@@ -7,7 +14,7 @@ export async function callDsgGate(
   try {
     const res = await fetch(`${DSG_BASE}/api/dsg/marketplace/audit-packet`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify({
         plugin: "mcp-bridge",
         skill,
@@ -29,7 +36,7 @@ export async function callDsgGate(
 export async function dsgRequest(endpoint: string, options?: RequestInit): Promise<unknown> {
   const res = await fetch(`${DSG_BASE}${endpoint}`, {
     ...options,
-    headers: { "Content-Type": "application/json", ...(options?.headers ?? {}) },
+    headers: { ...authHeaders(), ...(options?.headers ?? {}) },
   });
   if (!res.ok) throw new Error(`DSG API error: ${res.status} ${res.statusText}`);
   return res.json();
