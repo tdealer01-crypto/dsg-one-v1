@@ -7,7 +7,7 @@ Production: `https://dsg-one-v1.vercel.app`
 
 ---
 
-## Test Status (2026-05-25)
+## Test Status (2026-05-26)
 
 ### CI verified — GitHub Actions [`skillgate-ci.yml`](/.github/workflows/skillgate-ci.yml)
 
@@ -63,7 +63,7 @@ needsApprovalDeniedAtRunGate:   true
 
 ## Overall status
 
-Last verified: **2026-05-23 ICT**
+Last verified: **2026-05-26 ICT**
 
 ```text
 System claim: DSG_AUTONOMOUS_LEVEL_COMPLETE
@@ -72,6 +72,7 @@ Passed required lanes: 9/9
 Marketplace readiness: REVIEW
 Audit packet final verdict: BLOCKED
 Production-ready marketplace claim: false
+GraphMap Plugin: DEPLOYED — knowledge graph layer live
 ```
 
 ## Production smoke evidence
@@ -139,6 +140,32 @@ This README does **not** claim marketplace PASS, production-ready status, comple
 /api/dsg/flow-studio/config
 /dsg/autonomous-level
 /api/dsg/autonomous-level/status
+/api/plugins/graphmap/build
+/api/plugins/graphmap/query
+/api/plugins/graphmap/status
+```
+
+## GraphMap Plugin
+
+Knowledge graph layer for AI agents — maps repo files into queryable nodes + edges.
+
+```text
+POST /api/plugins/graphmap/build   — scan repo → build graph → store in Supabase
+POST /api/plugins/graphmap/query   — keyword BFS query → evidence + ALLOW/REVIEW/BLOCK
+GET  /api/plugins/graphmap/status  — EMPTY | READY, nodeCount, edgeCount, isStale
+
+Edge confidence:
+  import / link   → EXTRACTED  (direct parse evidence)
+  co-located      → INFERRED   (same-directory heuristic)
+  unresolved      → AMBIGUOUS
+
+Gate:
+  ALLOW   — ≥3 EXTRACTED evidence + graph age < 24h
+  REVIEW  — any INFERRED, or stale, or < 3 EXTRACTED
+  BLOCK   — no evidence or all AMBIGUOUS
+
+Plugin manifest: plugins/graphmap/plugin.json
+  read_repo: true  |  write_repo: false  |  call_dsg_gate: true
 ```
 
 ## Production verification
@@ -170,4 +197,7 @@ MARKETPLACE_PASS: locked until full enforcement, review, and approval evidence e
 2. Add entitlement or billing provider proof, quota denial tests, and upgrade-path proof.
 3. Add accessibility review notes for keyboard, semantics, contrast, mobile viewport, and status readability.
 4. Add owner approvals and convert only proven gates from REVIEW/BLOCKED to PASS.
+5. GraphMap: add /dsg/graphmap UI page + sidebar nav link.
+6. GraphMap: add LLM-backed query layer on top of keyword BFS.
+7. GraphMap: add video/image scanning (currently text/code only).
 ```
