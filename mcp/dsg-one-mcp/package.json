@@ -1,0 +1,23 @@
+{
+  "name": "dsg-one-mcp",
+  "version": "1.0.0",
+  "description": "MCP Server for DSG ONE V1 — governed marketplace & skills",
+  "type": "module",
+  "bin": { "dsg-one-mcp": "./dist/index.js" },
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "dev": "tsx src/index.ts",
+    "inspector": "npx @anthropic-ai/mcp-inspector node ./dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "express": "^4.21.0",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.3"
+  }
+}
