@@ -21,10 +21,10 @@ declare
   v_template record;
   v_sale record;
 begin
-  select id, seller_id, price_satang, sharing_mode
+  select t.id, t.seller_id, t.price_satang, t.sharing_mode
     into v_template
-  from public.dsg_templates
-  where id = p_template_id
+  from public.dsg_templates as t
+  where t.id = p_template_id
   limit 1;
 
   if not found then
@@ -47,12 +47,12 @@ begin
     return;
   end if;
 
-  select status
+  select s.status
     into v_sale
-  from public.dsg_template_sales
-  where template_id = p_template_id
-    and buyer_id = p_actor_id
-  order by created_at desc
+  from public.dsg_template_sales as s
+  where s.template_id = p_template_id
+    and s.buyer_id = p_actor_id
+  order by s.created_at desc
   limit 1;
 
   if not found then
