@@ -1,0 +1,67 @@
+name: Build DSG OpenClaw APK
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10'
+
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.10
+        working-directory: apps/android
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+        working-directory: apps/android
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsg-openclaw-apk
+          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: DSG OpenClaw ${{ github.ref_name }}
+          files: apps/android/app/build/outputs/apk/debug/app-debug.apk
+          body: |
+            ## DSG OpenClaw — Android APK
+
+            AI agent ครบทุกฟังก์ชัน เชื่อมต่อ 20+ channels ผ่าน DSG governance gate
+
+            ### ติดตั้ง
+            1. ดาวน์โหลด `app-debug.apk` ด้านล่าง
+            2. Android Settings → เปิด "Install unknown apps"
+            3. ติดตั้ง APK
+            4. ทำตาม Setup Wizard (ติดตั้ง Termux + รัน setup script)
+
+            ### Requirements
+            - Android 12+ (API 31)
+            - [Termux](https://f-droid.org/packages/com.termux/) จาก F-Droid
+            - [Termux:Boot](https://f-droid.org/packages/com.termux.boot/) (auto-start)
+
+            ### Channels รองรับ
+            WhatsApp · Telegram · Discord · Line · Signal · Matrix · Slack · Teams · IRC · Google Chat · Feishu · Zalo · QQ · iMessage · Mattermost · Nextcloud Talk + เพิ่มเติม
