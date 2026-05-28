@@ -18,7 +18,7 @@ async function gate(
     body: JSON.stringify({ session_id: sessionId, action }),
   })
   if (!res.ok) throw new Error(`DSG gate error: ${res.status}`)
-  return res.json()
+  return res.json() as Promise<{ decision: string; stamp: string }>
 }
 
 export type Provider = 'claude' | 'gemini'
@@ -44,30 +44,16 @@ export async function runWithGate(
   const { decision, stamp } = await gate(sessionId, `chat:${provider}`)
 
   if (decision === 'BLOCK') {
-    return {
-      reply: `❌ Action blocked by DSG governance. [${stamp}]`,
-      decision,
-      stamp,
-      toolsUsed: [],
-    }
+    return { reply: `❌ Action blocked by DSG governance. [${stamp}]`, decision, stamp, toolsUsed: [] }
   }
 
-  // Non-Claude providers: simple single-turn (no tool use)
   if (provider === 'gemini') {
-    const reply = await callGemini(message, history)
+    const reply = await callGemini(message)
     return { reply, decision, stamp, toolsUsed: [] }
   }
 
-  // Claude: full agentic loop with tool use
-  const reply = await agenticLoop(sessionId, message, history, stamp)
-  return { reply: reply.text, decision, stamp, toolsUsed: reply.toolsUsed }
-}
-
-// --- Agentic loop (Claude tool use) ---
-
-interface LoopResult {
-  text: string
-  toolsUsed: string[]
+  const { text, toolsUsed } = await agenticLoop(sessionId, message, history, stamp)
+  return { reply: text, decision, stamp, toolsUsed }
 }
 
 async function agenticLoop(
@@ -75,41 +61,29 @@ async function agenticLoop(
   message: string,
   history: ChatMessage[],
   dsgStamp: string
-): Promise<LoopResult> {
+): Promise<{ text: string; toolsUsed: string[] }> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const toolsUsed: string[] = []
 
-  type AnthropicMsg = Anthropic.MessageParam
-  const messages: AnthropicMsg[] = [
-    ...history.map((m) => ({ role: m.role, content: m.content })),
+  const messages: Anthropic.MessageParam[] = [
+    ...history.map((m) => ({ role: m.role, content: m.content } as Anthropic.MessageParam)),
     { role: 'user', content: message },
   ]
 
-  // Max 10 tool-call rounds to prevent runaway loops
   for (let round = 0; round < 10; round++) {
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
-      tools: TOOL_DEFINITIONS as Anthropic.Tool[],
+      tools: TOOL_DEFINITIONS,
       messages,
-      system: [
-        'You are a powerful AI agent with access to web search, browser control,',
-        'code execution, shell commands, and MCP tools.',
-        'Use tools proactively to complete tasks. Be concise in final answers.',
-        `DSG governance stamp: ${dsgStamp}`,
-      ].join(' '),
+      system: `You are a powerful AI agent with tools: web search, browser, code execution, shell commands, and MCP. Use them proactively to complete tasks. DSG stamp: ${dsgStamp}`,
     })
 
-    // Done — return final text
     if (response.stop_reason === 'end_turn') {
-      const textBlock = response.content.find((b) => b.type === 'text')
-      return {
-        text: textBlock?.type === 'text' ? textBlock.text : '(no response)',
-        toolsUsed,
-      }
+      const block = response.content.find((b) => b.type === 'text')
+      return { text: block?.type === 'text' ? block.text : '(no response)', toolsUsed }
     }
 
-    // Tool use round
     if (response.stop_reason === 'tool_use') {
       messages.push({ role: 'assistant', content: response.content })
 
@@ -117,53 +91,33 @@ async function agenticLoop(
 
       for (const block of response.content) {
         if (block.type !== 'tool_use') continue
-
         toolsUsed.push(block.name)
 
-        // Gate each tool call individually
         const gateRes = await gate(sessionId, `tool:${block.name}`).catch(
           () => ({ decision: 'ALLOW', stamp: dsgStamp })
         )
 
-        let toolOutput: string
-        if (gateRes.decision === 'BLOCK') {
-          toolOutput = `❌ Tool '${block.name}' blocked by DSG gate.`
-        } else {
-          toolOutput = await executeTool(
-            block.name,
-            block.input as Record<string, unknown>
-          ).catch((e: Error) => `[tool error] ${e.message}`)
-        }
+        const toolOutput = gateRes.decision === 'BLOCK'
+          ? `❌ Tool '${block.name}' blocked by DSG gate.`
+          : await executeTool(block.name, block.input as Record<string, unknown>)
+              .catch((e: Error) => `[tool error] ${e.message}`)
 
-        toolResults.push({
-          type: 'tool_result',
-          tool_use_id: block.id,
-          content: toolOutput,
-        })
+        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: toolOutput })
       }
 
       messages.push({ role: 'user', content: toolResults })
       continue
     }
 
-    // Unexpected stop reason
     break
   }
 
-  return { text: '(agent loop ended without response)', toolsUsed }
+  return { text: '(agent loop completed)', toolsUsed }
 }
 
-// --- Gemini (simple, no tool use) ---
-
-async function callGemini(
-  message: string,
-  _history: ChatMessage[]
-): Promise<string> {
+async function callGemini(message: string): Promise<string> {
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY! })
-  const res = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
-    contents: message,
-  })
+  const res = await ai.models.generateContent({ model: 'gemini-2.0-flash', contents: message })
   return res.text ?? ''
 }
