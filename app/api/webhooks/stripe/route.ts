@@ -53,8 +53,10 @@ export async function POST(req: Request) {
 
   if (event.type === 'invoice.paid') {
     const invoice = event.data.object as Stripe.Invoice;
-    const parent = invoice.parent as { type?: string; subscription_details?: { subscription?: string } } | null;
-    const subscriptionId = parent?.subscription_details?.subscription ?? null;
+    const subRaw = invoice.parent?.subscription_details?.subscription;
+    const subscriptionId = subRaw
+      ? (typeof subRaw === 'string' ? subRaw : subRaw.id)
+      : null;
 
     if (subscriptionId && invoice.period_start && invoice.period_end) {
       await callDsgRpc(config, 'renew_mcp_subscription_period', {
