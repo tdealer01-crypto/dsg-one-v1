@@ -40,7 +40,27 @@ export default function ApiKeysPage() {
     }
   }
 
-  useEffect(() => { fetchKeys(); }, []);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadInitialKeys() {
+      try {
+        const res = await fetch('/api/dsg/mcp/keys');
+        if (!res.ok) throw new Error(await res.text());
+        const { data } = await res.json() as { data: KeyRow[] };
+        if (!cancelled) setKeys(data ?? []);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load keys');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadInitialKeys();
+    return () => { cancelled = true; };
+  }, []);
 
   async function handleGenerate() {
     setGenerating(true);
@@ -87,7 +107,7 @@ export default function ApiKeysPage() {
       });
       if (!res.ok) throw new Error(await res.text());
       const { data } = await res.json() as { data: { checkoutUrl: string } };
-      window.location.href = data.checkoutUrl;
+      window.location.assign(data.checkoutUrl);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to start checkout');
       setSubscribing(null);
