@@ -8,6 +8,7 @@ import {
 describe('DSG AIMO service registry', () => {
   it('uses one registry and derives distinct deterministic service tokens from one root key', () => {
     const env = {
+      NODE_ENV: 'test',
       DSG_AIMO_SERVICE_REGISTRY: JSON.stringify({
         simulationUrl: 'https://simulation.example.test',
         cinemaUrl: 'https://cinema.example.test',
@@ -33,6 +34,7 @@ describe('DSG AIMO service registry', () => {
 
   it('keeps service-specific legacy keys as explicit overrides', () => {
     const env = {
+      NODE_ENV: 'test',
       DSG_AIMO_SERVICE_REGISTRY: JSON.stringify({
         simulationUrl: 'https://simulation.example.test',
         cinemaUrl: 'https://cinema.example.test',
@@ -49,6 +51,7 @@ describe('DSG AIMO service registry', () => {
 
   it('supports the legacy URL configuration while migration is in progress', () => {
     const config = getAimoServiceConfig({
+      NODE_ENV: 'test',
       DSG_AGI_SIMULATION_URL: 'https://legacy-sim.example.test',
       DSG_CINEMA_PROOF_URL: 'https://legacy-cinema.example.test',
       DSG_AGI_SIMULATION_API_KEY: 'legacy-sim-key',
@@ -63,7 +66,7 @@ describe('DSG AIMO service registry', () => {
   });
 
   it('reports missing internal configuration without exposing secret values', () => {
-    const readiness = getAimoServiceReadiness({} as NodeJS.ProcessEnv);
+    const readiness = getAimoServiceReadiness({ NODE_ENV: 'test' } as NodeJS.ProcessEnv);
     expect(readiness.ready).toBe(false);
     expect(readiness.missing).toEqual([
       'simulationUrl',
