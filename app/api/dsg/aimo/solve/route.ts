@@ -1,22 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runAimoHarness } from '@/lib/dsg/aimo/harness';
-import { validateApiKeyFromHeaders, recordApiKeyUsage } from '@/lib/dsg/mcp/validate-api-key';
+import {
+  validateApiKeyFromHeaders,
+  recordApiKeyUsage,
+} from '@/lib/dsg/mcp/validate-api-key';
+import { isAimoControlPlaneTokenAuthorized } from '@/lib/dsg/aimo/service-registry';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
-    const validation = await validateApiKeyFromHeaders(new Headers(req.headers));
-    if (!validation.valid) {
-      return NextResponse.json(
-        {
-          ok: false,
-          verdict: 'BLOCKED',
-          error: 'INVALID_API_KEY',
-          nextAction: 'Provide a valid X-DSG-Api-Key before running competition compute.',
-        },
-        { status: 401 },
-      );
+    const internalAuthorized = isAimoControlPlaneTokenAuthorized(
+      req.headers.get('x-dsg-internal-key') ?? undefined,
+    );
+
+    let validation:
+      | Awaited<ReturnType<typeof validateApiKeyFromHeaders>>
+      | undefined;
+
+    if (!internalAuthorized) {
+      validation = await validateApiKeyFromHeaders(new Headers(req.headers));
+      if (!validation.valid) {
+        return NextResponse.json(
+          {
+            ok: false,
+            verdict: 'BLOCKED',
+            error: 'INVALID_API_KEY',
+            nextAction:
+              'Provide a valid X-DSG-Api-Key or call through the authenticated DSG Control Plane MCP gateway.',
+          },
+          { status: 401 },
+        );
+      }
     }
 
     const body = await req.json();
@@ -32,19 +47,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    try {
-      await recordApiKeyUsage(validation.keyId, validation.actorId, 'aimo-solve');
-    } catch (error) {
-      return NextResponse.json(
-        {
-          ok: false,
-          verdict: 'BLOCKED',
-          error: 'USAGE_METER_FAILED',
-          detail: error instanceof Error ? error.message : String(error),
-          nextAction: 'Restore DSG API-key metering before running competition compute.',
-        },
-        { status: 503 },
-      );
+    // External API-key requests are metered here. Internal Control Plane requests
+    // are authenticated and metered at the upstream gateway to avoid double billing.
+    if (!internalAuthorized && validation?.valid) {
+      try {
+        await recordApiKeyUsage(validation.keyId, validation.actorId, 'aimo-solve');
+      } catch (error) {
+        return NextResponse.json(
+          {
+            ok: false,
+            verdict: 'BLOCKED',
+            error: 'USAGE_METER_FAILED',
+            detail: error instanceof Error ? error.message : String(error),
+            nextAction: 'Restore DSG API-key metering before running competition compute.',
+          },
+          { status: 503 },
+        );
+      }
     }
 
     const receipt = await runAimoHarness({
@@ -86,7 +105,11 @@ export async function POST(req: NextRequest) {
           : { mode: 'off' },
     });
 
-    return NextResponse.json({ ok: receipt.verdict === 'PASS', data: receipt });
+    return NextResponse.json({
+      ok: receipt.verdict === 'PASS',
+      authMode: internalAuthorized ? 'control-plane-internal' : 'api-key',
+      data: receipt,
+    });
   } catch (error) {
     return NextResponse.json(
       {
@@ -108,8 +131,9 @@ export async function GET() {
     searchEngine: 'DSG AGI Simulation via /v1/aimo/solve-shard',
     strategyProvider: 'NVIDIA Ising NIM optional; live output is advisory only',
     verifier: 'DSG Cinema Proof Agent structured certificate endpoint',
-    authentication: 'POST requires a valid X-DSG-Api-Key and fail-closed usage metering.',
+    authentication:
+      'POST accepts a metered X-DSG-Api-Key or a derived DSG Control Plane internal token. Raw DSG_AIMO_ROOT_KEY is never sent on the wire.',
     truthBoundary:
-      'No natural-language answer is accepted on trust. Final PASS requires a structured verifier response. Live NVIDIA NIM output is not claimed byte-deterministic; pin it for full replay. Competition compute is unavailable when authentication or metering fails.',
+      'No natural-language answer is accepted on trust. Final PASS requires a structured verifier response. Live NVIDIA NIM output is not claimed byte-deterministic; pin it for full replay. Competition compute is unavailable when authentication or downstream verification fails.',
   });
 }

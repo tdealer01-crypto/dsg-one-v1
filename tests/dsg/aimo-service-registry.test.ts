@@ -3,6 +3,7 @@ import {
   deriveAimoServiceToken,
   getAimoServiceConfig,
   getAimoServiceReadiness,
+  isAimoControlPlaneTokenAuthorized,
 } from '../../lib/dsg/aimo/service-registry';
 
 describe('DSG AIMO service registry', () => {
@@ -30,6 +31,25 @@ describe('DSG AIMO service registry', () => {
     );
     expect(config.simulationApiKey).not.toBe(config.cinemaApiKey);
     expect(config.simulationApiKey).not.toContain('root-secret-for-test');
+  });
+
+  it('derives and validates a distinct control-plane token without exposing the root key', () => {
+    const env = {
+      NODE_ENV: 'test',
+      DSG_AIMO_ROOT_KEY: 'root-secret-for-test',
+    } as NodeJS.ProcessEnv;
+    const token = deriveAimoServiceToken('root-secret-for-test', 'control-plane');
+
+    expect(token).not.toContain('root-secret-for-test');
+    expect(token).not.toBe(
+      deriveAimoServiceToken('root-secret-for-test', 'simulation'),
+    );
+    expect(token).not.toBe(
+      deriveAimoServiceToken('root-secret-for-test', 'cinema'),
+    );
+    expect(isAimoControlPlaneTokenAuthorized(token, env)).toBe(true);
+    expect(isAimoControlPlaneTokenAuthorized('wrong-token', env)).toBe(false);
+    expect(isAimoControlPlaneTokenAuthorized(undefined, env)).toBe(false);
   });
 
   it('keeps service-specific legacy keys as explicit overrides', () => {
