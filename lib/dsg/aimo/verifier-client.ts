@@ -1,4 +1,5 @@
 import { sha256Json } from '@/lib/dsg/runtime/hash';
+import { getAimoServiceConfig } from './service-registry';
 import type {
   AimoCandidate,
   AimoVerificationRequest,
@@ -19,8 +20,12 @@ function verifierUrl(endpoint: string): URL {
     throw new Error(`verification endpoint is not allowlisted: ${endpoint}`);
   }
 
-  const base = process.env.DSG_CINEMA_PROOF_URL;
-  if (!base) throw new Error('DSG_CINEMA_PROOF_URL is not configured');
+  const base = getAimoServiceConfig().cinemaUrl;
+  if (!base) {
+    throw new Error(
+      'AIMO Cinema URL is not configured. Set DSG_AIMO_SERVICE_REGISTRY or legacy DSG_CINEMA_PROOF_URL.',
+    );
+  }
 
   const url = new URL(endpoint, base);
   const baseUrl = new URL(base);
@@ -28,7 +33,7 @@ function verifierUrl(endpoint: string): URL {
     throw new Error('verification endpoint escaped the configured verifier origin');
   }
   if (process.env.NODE_ENV === 'production' && url.protocol !== 'https:') {
-    throw new Error('DSG_CINEMA_PROOF_URL must use HTTPS in production');
+    throw new Error('AIMO Cinema URL must use HTTPS in production');
   }
   return url;
 }
@@ -108,8 +113,9 @@ export async function verifyAimoCandidate(
   }
 
   try {
+    const config = getAimoServiceConfig();
     const url = verifierUrl(request.endpoint);
-    const apiKey = process.env.DSG_CINEMA_PROOF_API_KEY;
+    const apiKey = config.cinemaApiKey;
 
     const response = await fetch(url, {
       method: 'POST',

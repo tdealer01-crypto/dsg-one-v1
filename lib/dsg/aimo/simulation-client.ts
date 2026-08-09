@@ -1,5 +1,6 @@
 import { sha256Json } from '@/lib/dsg/runtime/hash';
 import { materializeCandidate, normalizeAimoProblem } from './deterministic';
+import { getAimoServiceConfig } from './service-registry';
 import type {
   AimoCandidateInput,
   AimoProblemInput,
@@ -27,12 +28,16 @@ export interface SolveSimulationShardInput {
 }
 
 function simulationUrl(): URL {
-  const base = process.env.DSG_AGI_SIMULATION_URL;
-  if (!base) throw new Error('DSG_AGI_SIMULATION_URL is not configured');
+  const base = getAimoServiceConfig().simulationUrl;
+  if (!base) {
+    throw new Error(
+      'AIMO simulation URL is not configured. Set DSG_AIMO_SERVICE_REGISTRY or legacy DSG_AGI_SIMULATION_URL.',
+    );
+  }
 
   const url = new URL('/v1/aimo/solve-shard', base);
   if (process.env.NODE_ENV === 'production' && url.protocol !== 'https:') {
-    throw new Error('DSG_AGI_SIMULATION_URL must use HTTPS in production');
+    throw new Error('AIMO simulation URL must use HTTPS in production');
   }
   return url;
 }
@@ -41,8 +46,9 @@ export async function solveSimulationShard(
   input: SolveSimulationShardInput,
 ): Promise<AimoShardResult> {
   try {
+    const config = getAimoServiceConfig();
     const url = simulationUrl();
-    const apiKey = process.env.DSG_AGI_SIMULATION_API_KEY;
+    const apiKey = config.simulationApiKey;
     const normalized = normalizeAimoProblem(input.problem);
 
     const response = await fetch(url, {

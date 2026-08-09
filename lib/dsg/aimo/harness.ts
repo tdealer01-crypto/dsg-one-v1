@@ -11,6 +11,7 @@ import {
   getNvidiaIsingStrategy,
   type NvidiaIsingStrategyConfig,
 } from './nvidia-ising';
+import { getAimoServiceConfig } from './service-registry';
 import { solveSimulationShard } from './simulation-client';
 import { verifyAimoCandidate } from './verifier-client';
 import type {
@@ -42,9 +43,7 @@ export interface RunAimoHarnessInput {
 }
 
 function getMaxParallelism(): number {
-  const raw = Number(process.env.DSG_AIMO_MAX_PARALLELISM ?? 16);
-  if (!Number.isInteger(raw) || raw < 1) return 16;
-  return Math.min(raw, 64);
+  return getAimoServiceConfig().maxParallelism;
 }
 
 export async function runAimoHarness(
