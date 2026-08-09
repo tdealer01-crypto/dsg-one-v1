@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getAimoServiceReadiness } from '@/lib/dsg/aimo/service-registry';
 
 // ERROR_HANDLER_EXEMPT: MCP JSON-RPC protocol requires structured error responses
 export const dynamic = 'force-dynamic';
@@ -67,6 +68,36 @@ const TOOLS = [
     description: 'Get the current DSG autonomous-level gate status — shows which capability tiers are unlocked.',
     inputSchema: { type: 'object', properties: {} },
   },
+  {
+    name: 'aimo_status',
+    description: 'Return non-secret readiness for the DSG AIMO MCP gateway, deterministic search service, and Cinema proof verifier.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'solve_aimo',
+    description: 'Run the governed DSG AIMO pipeline: deterministic sharding -> AGI QUBO/Ising search -> Cinema proof/Z3 verification -> deterministic receipt.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        problem: {
+          type: 'object',
+          properties: {
+            problemId: { type: 'string' },
+            statement: { type: 'string', description: 'The mathematical problem statement.' },
+            domain: { type: 'string' },
+            constraints: { type: 'object' },
+          },
+          required: ['statement'],
+        },
+        shardCount: { type: 'number' },
+        parallelism: { type: 'number' },
+        maxCandidatesPerShard: { type: 'number' },
+        requireAllShards: { type: 'boolean' },
+        nvidiaIsing: { type: 'object' },
+      },
+      required: ['problem'],
+    },
+  },
 ];
 
 function getBaseUrl(): string {
@@ -94,6 +125,8 @@ async function callTool(
   const base = getBaseUrl();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (authHeader) headers['Authorization'] = authHeader;
+  const dsgApiKey = incomingRequest.headers.get('x-dsg-api-key');
+  if (dsgApiKey) headers['X-DSG-Api-Key'] = dsgApiKey;
   const cookie = incomingRequest.headers.get('cookie');
   if (cookie) headers['Cookie'] = cookie;
 
@@ -148,6 +181,40 @@ async function callTool(
       const res = await fetch(`${base}/api/dsg/autonomous-level/status`, { headers });
       return res.json();
     }
+    case 'aimo_status': {
+      try {
+        return {
+          ok: true,
+          service: 'dsg-aimo-mcp-gateway',
+          ...getAimoServiceReadiness(),
+          userConfiguration: ['MCP_URL', 'DSG_API_KEY'],
+          truthBoundary:
+            'Readiness only confirms service configuration. Mathematical PASS still requires the deterministic search and Cinema proof gates.',
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          service: 'dsg-aimo-mcp-gateway',
+          ready: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+    case 'solve_aimo': {
+      const res = await fetch(`${base}/api/dsg/aimo/solve`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          problem: toolInput.problem,
+          shardCount: toolInput.shardCount,
+          parallelism: toolInput.parallelism,
+          maxCandidatesPerShard: toolInput.maxCandidatesPerShard,
+          requireAllShards: toolInput.requireAllShards,
+          nvidiaIsing: toolInput.nvidiaIsing,
+        }),
+      });
+      return res.json();
+    }
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }
@@ -170,7 +237,7 @@ export async function POST(request: Request) {
         result: {
           protocolVersion: '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'dsg-one-v1-mcp', version: '1.0.0' },
+          serverInfo: { name: 'dsg-one-v1-mcp', version: '1.1.0' },
         },
       });
     }
@@ -197,5 +264,5 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ name: 'dsg-one-v1-mcp', version: '1.0.0', tools: TOOLS.length });
+  return NextResponse.json({ name: 'dsg-one-v1-mcp', version: '1.1.0', tools: TOOLS.length });
 }
