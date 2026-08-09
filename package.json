@@ -27,7 +27,9 @@
     "smoke:security-rbac": "node scripts/dsg-security-rbac-check.mjs",
     "smoke:entitlement": "node scripts/dsg-entitlement-check.mjs",
     "smoke:audit-packet": "node scripts/dsg-audit-packet-check.mjs",
-    "smoke:first-value-flow": "node scripts/dsg-first-value-flow-smoke.mjs"
+    "smoke:first-value-flow": "node scripts/dsg-first-value-flow-smoke.mjs",
+    "dsg:aimo-check": "vitest run tests/dsg/aimo-harness.test.ts",
+    "smoke:aimo-sealed": "node scripts/dsg-aimo-sealed-smoke.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.17.0",
