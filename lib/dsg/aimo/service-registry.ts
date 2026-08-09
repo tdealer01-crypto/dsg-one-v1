@@ -1,6 +1,6 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
-type AimoServiceName = 'simulation' | 'cinema';
+type AimoServiceName = 'simulation' | 'cinema' | 'control-plane';
 
 interface AimoRegistryDocument {
   simulationUrl?: string;
@@ -79,6 +79,21 @@ export function deriveAimoServiceToken(
     .update(`dsg-aimo-v1:${service}`)
     .digest('hex');
   return `dsg_aimo_${digest}`;
+}
+
+export function isAimoControlPlaneTokenAuthorized(
+  provided: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const rootKey = optional(env.DSG_AIMO_ROOT_KEY);
+  const token = optional(provided);
+  if (!rootKey || !token) return false;
+
+  const expected = deriveAimoServiceToken(rootKey, 'control-plane');
+  const actualBytes = Buffer.from(token);
+  const expectedBytes = Buffer.from(expected);
+  if (actualBytes.length !== expectedBytes.length) return false;
+  return timingSafeEqual(actualBytes, expectedBytes);
 }
 
 export function getAimoServiceConfig(
