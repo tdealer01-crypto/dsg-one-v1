@@ -1,6 +1,11 @@
 import { sha256Json } from '@/lib/dsg/runtime/hash';
+import {
+  requestEncodingProof,
+  isProofAcceptable,
+  type EncodingProofResponse,
+} from '../runtime/encoding-proof-client';
 import { materializeCandidate, normalizeAimoProblem } from './deterministic';
-import { getAimoServiceConfig } from './service-registry';
+import { getAimoServiceConfig, getEncodingProofEndpoint } from './service-registry';
 import type {
   AimoCandidateInput,
   AimoProblemInput,
@@ -51,6 +56,56 @@ export async function solveSimulationShard(
     const apiKey = config.simulationApiKey;
     const normalized = normalizeAimoProblem(input.problem);
 
+    // Request encoding proof from control plane before solver invocation
+    let encodingProofId: string | undefined;
+    try {
+      const proofEndpoint = getEncodingProofEndpoint();
+      const encoding = normalized.constraints?.aimoEncoding;
+      if (encoding) {
+        const proofRequest = await requestEncodingProof(
+          {
+            problemId: normalized.problemId,
+            encodingType: encoding.kind,
+            encoding,
+            nonce: sha256Json({ timestamp: Date.now(), shardId: input.shard.shardId }),
+            idempotencyKey: sha256Json({
+              problemHash: input.shard.problemHash,
+              encoding,
+            }),
+          },
+          {
+            controlPlaneUrl: proofEndpoint.url.origin,
+            apiKey: proofEndpoint.apiKey,
+            timeoutMs: 5000,
+            cacheEnabled: true,
+            cacheTtlSeconds: 1800,
+          },
+        );
+
+        if (isProofAcceptable(proofRequest)) {
+          encodingProofId = proofRequest.proofId;
+        } else {
+          return {
+            shard: input.shard,
+            ok: false,
+            searchComplete: false,
+            candidates: [],
+            error: `encoding proof failed: ${proofRequest.status} - ${proofRequest.error || 'unknown'}`,
+          };
+        }
+      }
+    } catch (proofError) {
+      const message =
+        proofError instanceof Error ? proofError.message : String(proofError);
+      return {
+        shard: input.shard,
+        ok: false,
+        searchComplete: false,
+        candidates: [],
+        error: `encoding proof request failed: ${message}`,
+      };
+    }
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -64,6 +119,7 @@ export async function solveSimulationShard(
         problemHash: input.shard.problemHash,
         shard: input.shard,
         maxCandidates: input.maxCandidates,
+        ...(encodingProofId ? { encodingProofId } : {}),
         strategyHint: input.strategyHint
           ? {
               provider: input.strategyHint.provider,
