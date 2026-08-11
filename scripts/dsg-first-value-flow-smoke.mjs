@@ -15,7 +15,7 @@ function resolveBaseUrl() {
   const rawBaseUrl = process.env.APP_URL || process.env.DSG_ONE_V1_PRODUCTION_URL;
   if (!rawBaseUrl) {
     failSummary(['APP_URL or DSG_ONE_V1_PRODUCTION_URL is required'], {
-      nextAction: 'Set APP_URL="https://dsg-one-v1.vercel.app" or DSG_ONE_V1_PRODUCTION_URL before running this production smoke.',
+      nextAction: 'Set APP_URL="https://dsg-one-v1-aimo.onrender.com" or DSG_ONE_V1_PRODUCTION_URL before running this production smoke.',
     });
   }
 
