@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const appUrl = process.env.APP_URL || 'https://dsg-one-v1.vercel.app';
+const appUrl = process.env.APP_URL || 'https://dsg-one-v1-aimo.onrender.com';
 const endpoint = `${appUrl.replace(/\/$/, '')}/api/dsg/app-builder/proof`;
 
 const response = await fetch(endpoint, { method: 'GET' });
