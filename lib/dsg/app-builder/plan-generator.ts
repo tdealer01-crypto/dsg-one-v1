@@ -11,6 +11,7 @@ export function createAppBuilderProposedPlan(input: {
   const needsData = input.goal.targetStack.database !== 'none';
   const needsAuth = input.goal.targetStack.auth !== 'none';
   const needsDeploy = input.goal.targetStack.deploy !== 'none';
+  const deploymentProvider = input.goal.targetStack.deploy || 'none';
 
   const steps: AppBuilderPlanStep[] = [
     {
@@ -90,14 +91,14 @@ export function createAppBuilderProposedPlan(input: {
   if (needsDeploy) {
     steps.push({
       id: 'deploy-preview-plan',
-      title: 'Plan preview deployment',
-      description: 'Prepare preview deployment only after Step 16 runtime approval.',
+      title: `Plan ${deploymentProvider} deployment`,
+      description: `Prepare the ${deploymentProvider} deployment handoff after runtime approval. This step creates a plan only; deployment status and production proof must be collected separately.`,
       phase: 'DEPLOY',
       riskLevel: 'HIGH',
       requiresApproval: true,
       allowedPaths: ['app/**', 'components/**', 'lib/**', 'docs/**', 'package.json'],
       allowedCommands: [],
-      requiredSecrets: ['VERCEL_TOKEN', 'VERCEL_ORG_ID', 'VERCEL_PROJECT_ID'],
+      requiredSecrets: [],
       expectedEvidence: ['deployment-plan'],
     });
   }
