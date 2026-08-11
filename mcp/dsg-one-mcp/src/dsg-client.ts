@@ -1,4 +1,4 @@
-const DSG_BASE = process.env.DSG_APP_URL || "https://dsg-one-v1.vercel.app";
+const DSG_BASE = (process.env.DSG_APP_URL || "https://dsg-one-v1-aimo.onrender.com").replace(/\/+$/, "");
 const DSG_API_KEY = process.env.DSG_API_KEY;
 
 function authHeaders(): Record<string, string> {

@@ -10,10 +10,7 @@ const warnings = [
   ['DSG_BUILDER_GITHUB_OWNER'],
   ['DSG_BUILDER_GITHUB_REPO'],
   ['DSG_BUILDER_BASE_BRANCH'],
-  ['APP_URL'],
-  ['VERCEL_TOKEN'],
-  ['VERCEL_ORG_ID'],
-  ['VERCEL_PROJECT_ID'],
+  ['NEXT_PUBLIC_APP_URL', 'APP_URL'],
 ];
 
 function present(name) {

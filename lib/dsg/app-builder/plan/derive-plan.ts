@@ -77,14 +77,14 @@ export function derivePlanFromPrd(prd: DsgAppBuilderPrd): DsgPlanDraft {
     },
     {
       id: 'deployment_proof',
-      label: 'Create deployment proof after preview deploy',
+      label: 'Verify deployment proof after Render auto-deploy',
       type: 'deploy',
       risk: 'HIGH',
       wave: 3,
       dependsOn: ['run_build'],
       reads: [],
       writes: [],
-      requiredSecrets: ['VERCEL_TOKEN'],
+      requiredSecrets: [],
       approved: false,
     },
   ];

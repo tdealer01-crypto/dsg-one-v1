@@ -27,7 +27,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     agent: 'deploy-monitor',
-    description: 'Watches Vercel. Triggers deploy only after gate_allow + evidence + no mock_state.',
-    truthBoundary: 'Never claims production-ready without deployment proof hash.',
+    description: 'Verifies deployment evidence for the configured deployment URL. A deploy action is eligible only after gate_allow + evidence + no mock_state.',
+    truthBoundary: 'Provider status alone is not production proof. Never claims production-ready without deployment evidence and proof hash.',
   });
 }

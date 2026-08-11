@@ -10,7 +10,7 @@ const fallbackModels = (process.env.OPENROUTER_FALLBACK_MODELS || '')
 const models = [...new Set([model, ...fallbackModels])];
 
 if (!apiKey) {
-  console.error('BLOCK: OPENROUTER_API_KEY is required. Add it locally or in Vercel; do not paste it into chat.');
+  console.error('BLOCK: OPENROUTER_API_KEY is required. Add it locally or to the Render service environment; do not commit it to the repository.');
   process.exit(1);
 }
 
@@ -35,7 +35,7 @@ for (const candidate of models) {
       headers: {
         authorization: `Bearer ${apiKey}`,
         'content-type': 'application/json',
-        'http-referer': process.env.OPENROUTER_SITE_URL || 'https://dsg-one-v1.vercel.app',
+        'http-referer': process.env.OPENROUTER_SITE_URL || process.env.APP_URL || 'https://dsg-one-v1-aimo.onrender.com',
         'x-title': process.env.OPENROUTER_APP_TITLE || 'DSG One App Builder',
       },
       body: JSON.stringify({

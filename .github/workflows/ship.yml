@@ -11,6 +11,8 @@ on:
 jobs:
   ship:
     runs-on: ubuntu-latest
+    env:
+      DSG_PRODUCTION_URL: 'https://dsg-one-v1-aimo.onrender.com'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,7 +39,7 @@ jobs:
       - name: Verify production status
         id: status
         run: |
-          RESPONSE=$(curl -s https://dsg-one-v1.vercel.app/api/agent/status)
+          RESPONSE=$(curl --fail-with-body --silent --show-error "$DSG_PRODUCTION_URL/api/agent/status")
           echo "response=$RESPONSE"
           echo "STATUS_RESPONSE=$RESPONSE" >> "$GITHUB_ENV"
           echo "$RESPONSE"
@@ -51,4 +53,5 @@ jobs:
           echo "| **Reason** | ${{ github.event.inputs.reason }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| **Commit SHA** | ${{ github.sha }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| **Test result** | passed |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Production URL** | \`$DSG_PRODUCTION_URL\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| **Status endpoint response** | \`$STATUS_RESPONSE\` |" >> "$GITHUB_STEP_SUMMARY"

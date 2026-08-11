@@ -1,6 +1,6 @@
 # CLAUDE.md — DSG One v1 Agent Rules
 
-Read `AGENTS.md` first — especially the middleware critical rule.
+Read `AGENTS.md` first — especially the middleware critical rule and the Framer + Render production boundary.
 
 ## Tech stack
 
@@ -33,12 +33,14 @@ if (Date.now() / 1000 > exp) { /* expired */ }
 - Create Supabase migration files under `supabase/migrations/`
 
 **Blocked:**
-- Do not commit secrets, tokens, API keys, Supabase keys, Vercel tokens, or Claude credentials
+- Do not commit secrets, tokens, API keys, Supabase keys, provider deployment tokens, or Claude credentials
 - Do not push directly to `main` without explicit user approval or instruction
-- Do not claim production-ready without live HTTP evidence
+- Do not claim production-ready without live HTTP evidence plus provider deployment/commit evidence
 - Do not auto-merge pull requests
 - Do not import `@supabase/ssr` anywhere in this repo
 - Do not add Supabase library calls to `middleware.ts`
+- Do not reintroduce Vercel as a production fallback while the production runtime is on Render
+- Do not put server secrets, Stripe webhooks, Z3/Ising execution, or privileged runtime actions into Framer client code
 
 ## Required PR evidence
 
@@ -131,16 +133,22 @@ import { useChecklist, useAppLanguage, checklistStore, languageStore } from '@/s
 
 ## Production control loop
 
+### Current hosting boundary
+- Public presentation layer: Framer
+- DSG application/runtime/API: Render service `dsg-one-v1-aimo`
+- Production runtime origin: `https://dsg-one-v1-aimo.onrender.com`
+
 ### Check if production is alive
-GET https://dsg-one-v1.vercel.app/api/agent/status
+GET https://dsg-one-v1-aimo.onrender.com/api/agent/status
 
 ### Ship from chat (triggers CI → verify)
 Use GitHub MCP tool `mcp__github__create_dispatch_event` or trigger workflow_dispatch on `.github/workflows/ship.yml` with input `reason: "<what you did>"`.
 
 ### Full loop
 1. Write code → commit → push to claude/* branch
-2. Open PR or push to main
-3. Vercel auto-deploys
-4. Call GET /api/agent/status to verify deploy is live
-5. If status ok → done. If not → diagnose and fix.
+2. Open PR; merge only after required verification and approval policy are satisfied
+3. Render auto-deploys the configured `main` branch
+4. Verify the Render deployment corresponds to the intended commit
+5. Call GET /api/agent/status on the Render origin
+6. Treat a reachable URL as availability evidence only; claim production verification only after deployment/commit and production-flow proof are attached
 

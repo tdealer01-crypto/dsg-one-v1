@@ -11,7 +11,7 @@ type DesignDraft = {
     backend: 'next-api';
     database: 'supabase-postgres';
     auth: 'none';
-    deploy: 'vercel';
+    deploy: 'render';
   };
   reviewStatus: 'DESIGN_DRAFT_READY' | 'NEEDS_MORE_DETAIL';
   truthBoundary: string;
@@ -71,7 +71,7 @@ function fallbackDraft(message: string): DesignDraft {
     userFacingSummary: virtualPc
       ? 'Build a governed Virtual PC Agent Console with monitor surface, remote mouse API, invariant gate, and audit evidence.'
       : compact(message || 'Build a governed DSG app from the discussed requirement.', 260),
-    targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'supabase-postgres', auth: 'none', deploy: 'vercel' },
+    targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'supabase-postgres', auth: 'none', deploy: 'render' },
     reviewStatus: 'DESIGN_DRAFT_READY',
     truthBoundary: 'This is an AI design draft for Build Now. It is not implementation, PR evidence, deployment proof, or production verification.',
   };

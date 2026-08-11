@@ -18,7 +18,12 @@
   - npm run smoke:audit-packet
   - npm run smoke:first-value-flow
 - If APP_URL is required, use:
-  export APP_URL="https://dsg-one-v1.vercel.app"
+  export APP_URL="https://dsg-one-v1-aimo.onrender.com"
+- Production hosting boundary:
+  - Framer = public website / marketing / docs / public presentation.
+  - Render = DSG ONE application runtime, APIs, protected `/dsg/*`, MCP, auth-dependent flows, Z3/Ising, webhooks, audit/evidence execution.
+  - Do not put server secrets or privileged execution logic in Framer client code.
+  - Do not reintroduce a Vercel production fallback while Vercel is outside the production dependency path.
 
 ---
 
@@ -95,7 +100,8 @@ POST /api/plugins/graphmap/query
 - **`lucide-react: ^0.553.0`** มีอยู่ใน `package.json` แล้ว ใช้ได้เลย
 - **`recharts: ^3.8.1`** มีอยู่แล้ว ใช้ได้เลย
 - **`lib/utils.ts`** มีอยู่แล้ว — `cn()` ใช้ได้จาก `@/lib/utils`
-- **Vercel deploy** — ไม่มี `vercel.json` ใช้ default settings ของ Vercel (`npm install` อัตโนมัติ)
+- **Render deploy** — current production runtime is `dsg-one-v1-aimo` and auto-deploys from GitHub `main`; verify the exact Render deployment/commit before claiming production proof.
+- **Framer public site** — use as the public presentation layer only until authenticated cross-origin flows are deliberately designed and tested.
 - **Build command** — ใช้ `npm run build` หรือ `node scripts/dsg-next-build.mjs` ไม่ใช่ `next build` ตรงๆ
 - **`app/dsg/layout.tsx`** มีอยู่แล้วตั้งแต่ merge นี้ — ถ้าจะเพิ่มหน้าใน `/dsg/*` ไม่ต้องสร้าง layout ใหม่
 

@@ -12,6 +12,7 @@ Use this skill for DSG autonomous work where speed is useful but correctness is 
 - User benefit comes first: the output must be usable, testable, and visibly tied to evidence.
 - Empty diagnostic output is not proof of success.
 - A failed evaluator, missing exit code, broken linter, broken test runner, or unknown tool state blocks repair and release.
+- Framer is the public presentation layer; privileged DSG runtime/API/proof execution stays server-side on Render or other governed backend services.
 
 ## Core deterministic pipeline
 
@@ -99,7 +100,7 @@ For repair or release promotion, at least one verifier must differ from the sour
 Examples:
 
 - source tool: local lint, independent verifier: CI lint
-- source tool: local build, independent verifier: Vercel build
+- source tool: local build, independent verifier: Render deployment/build evidence for the exact commit
 - source tool: agent repair result, independent verifier: human review or secondary toolchain
 
 The independent verifier must include:
@@ -190,6 +191,7 @@ Required proof:
 
 - deployment URL
 - provider status
+- exact commit or deployment reference
 - route status list
 - body hash or screenshot ref
 - proof hash
@@ -248,7 +250,7 @@ npm run build:termux
 ## Default production smoke commands
 
 ```bash
-BASE="https://dsg-one-v1.vercel.app"
+BASE="https://dsg-one-v1-aimo.onrender.com"
 
 for p in /dsg/autonomous-level /api/dsg/autonomous-level/status /dsg/flow-studio /api/dsg/flow-studio/config; do
   code=$(curl -L -s -o /tmp/dsg-skill-check.html -w "%{http_code}" "$BASE$p")
