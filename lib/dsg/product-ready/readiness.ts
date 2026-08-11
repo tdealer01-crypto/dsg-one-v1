@@ -62,16 +62,9 @@ export function assessProductReadiness(env: NodeJS.ProcessEnv = process.env): Pr
     },
     {
       id: 'app-url',
-      label: 'Canonical APP_URL is configured',
-      status: present(env.APP_URL) ? 'PASS' : 'WARN',
-      evidence: 'APP_URL',
-      requiredForProduction: false,
-    },
-    {
-      id: 'vercel-proof',
-      label: 'Optional Vercel deployment proof variables exist',
-      status: present(env.VERCEL_TOKEN) && present(env.VERCEL_ORG_ID) && present(env.VERCEL_PROJECT_ID) ? 'PASS' : 'WARN',
-      evidence: 'VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID',
+      label: 'Canonical application URL is configured',
+      status: present(env.NEXT_PUBLIC_APP_URL) || present(env.APP_URL) ? 'PASS' : 'WARN',
+      evidence: 'NEXT_PUBLIC_APP_URL or APP_URL',
       requiredForProduction: false,
     },
   ];
