@@ -4,6 +4,7 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL = 'openrouter/free';
 const DEFAULT_MAX_TOKENS = 2048;
 const DEFAULT_TEMPERATURE = 0.2;
+const DEFAULT_SITE_URL = 'https://dsg-one-v1-aimo.onrender.com';
 
 function splitModels(value?: string): string[] {
   return (value || '')
@@ -59,7 +60,7 @@ export async function callOpenRouter(input: OpenRouterCallInput): Promise<OpenRo
         headers: {
           authorization: `Bearer ${apiKey}`,
           'content-type': 'application/json',
-          'http-referer': process.env.OPENROUTER_SITE_URL || 'https://dsg-one-v1.vercel.app',
+          'http-referer': process.env.OPENROUTER_SITE_URL || process.env.APP_URL || DEFAULT_SITE_URL,
           'x-title': process.env.OPENROUTER_APP_TITLE || 'DSG One App Builder',
         },
         body: JSON.stringify({
