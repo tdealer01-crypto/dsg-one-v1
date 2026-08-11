@@ -269,7 +269,7 @@ export default function ApiKeysPage() {
       "command": "node",
       "args": ["/path/to/mcp/dsg-one-mcp/dist/index.js"],
       "env": {
-        "DSG_APP_URL": "https://dsg-one-v1.vercel.app",
+        "DSG_APP_URL": "https://dsg-one-v1-aimo.onrender.com",
         "DSG_API_KEY": "<your-key>"
       }
     }
