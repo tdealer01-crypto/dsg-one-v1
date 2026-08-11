@@ -28,6 +28,11 @@ jobs:
     env:
       NEXT_TELEMETRY_DISABLED: '1'
       DSG_DISABLE_WEBPACK_CACHE: 'true'
+      APP_URL: 'https://dsg-one-v1-aimo.onrender.com'
+      NEXT_PUBLIC_APP_URL: 'https://dsg-one-v1-aimo.onrender.com'
+      DSG_ONE_V1_SUPABASE_URL: ${{ secrets.DSG_ONE_V1_SUPABASE_URL || secrets.SUPABASE_URL }}
+      DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
