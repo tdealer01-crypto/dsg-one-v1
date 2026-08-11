@@ -101,11 +101,13 @@ const TOOLS = [
 ];
 
 function getBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ??
-    process.env.APP_URL ??
-    'https://dsg-one-v1.vercel.app'
-  );
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL;
+  if (!configuredBaseUrl) {
+    throw new Error(
+      'DSG app URL is not configured. Set NEXT_PUBLIC_APP_URL or APP_URL; refusing legacy Vercel fallback.',
+    );
+  }
+  return configuredBaseUrl.replace(/\/+$/, '');
 }
 
 function getAuthHeader(incomingRequest: Request): string | null {
