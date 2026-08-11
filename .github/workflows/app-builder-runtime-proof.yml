@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      PROD_HOST: dsg-one-v1.vercel.app
+      PROD_HOST: dsg-one-v1-aimo.onrender.com
       WORKSPACE_ID: runtime-proof-workspace
       ACTOR_ID: github-actions-runtime-proof
     steps:
@@ -45,7 +45,7 @@ jobs:
                 goal: 'Runtime proof: launch App Builder agent runtime and create implementation evidence.',
                 successCriteria: ['job created', 'plan generated', 'approval recorded', 'handoff returned', 'runtime tool executed', 'manifest created', 'PR created', 'audit evidence returned'],
                 constraints: ['no action before approval', 'no production claim without proof'],
-                targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'supabase-postgres', auth: 'none', deploy: 'vercel' }
+                targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'supabase-postgres', auth: 'none', deploy: 'render' }
               });
               proof.jobId = job.id;
               await post('plan', `/api/dsg/app-builder/jobs/${job.id}/plan`);
@@ -73,6 +73,7 @@ jobs:
               `- Manifest path: ${proof.manifestPath || 'missing'}`,
               `- Pull request URL: ${proof.pullRequestUrl || 'missing'}`,
               `- Audit refs: ${proof.auditRefs}`,
+              `- Runtime host: ${base}`,
               `- Error: ${proof.error || 'none'}`,
               '',
               proof.status === 'passed' ? 'Claim remains IMPLEMENTED_UNVERIFIED until CI/deploy proof passes.' : 'Runtime proof did not complete.'
