@@ -55,7 +55,8 @@ jobs:
           # Only scan user plugin files (.plugin.js, .plugin.ts), exclude system infrastructure
           FOUND_BANNED=0
           for pattern in "${BANNED_PATTERNS[@]}"; do
-            if find dsg-plugins -type f \( -name "*.plugin.js" -o -name "*.plugin.ts" \) -exec grep -l "$pattern" {} \; 2>/dev/null; then
+            matches=$(find dsg-plugins -type f \( -name "*.plugin.js" -o -name "*.plugin.ts" \) -exec grep -c "$pattern" {} \; 2>/dev/null | grep -v '^0$' | wc -l)
+            if [ $matches -gt 0 ]; then
               echo "❌ Banned API detected in user plugin: $pattern"
               FOUND_BANNED=1
             fi
