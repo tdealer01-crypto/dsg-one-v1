@@ -29,7 +29,15 @@ jobs:
         run: npm ci
 
       - name: Validate plugin code
-        run: npm run validate:plugins
+        run: |
+          npm run validate:plugins 2>&1 | tee plugin-validation.log
+          echo "Checking for validation errors..."
+          if grep -q "FAILED\|ERROR" plugin-validation.log; then
+            echo "❌ Plugin validation failed"
+            exit 1
+          else
+            echo "✅ Plugin validation passed"
+          fi
 
       - name: Check for banned APIs
         run: |
