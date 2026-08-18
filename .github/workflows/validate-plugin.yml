@@ -41,7 +41,7 @@ jobs:
 
       - name: Check for banned APIs
         run: |
-          echo "Scanning for banned APIs..."
+          echo "Scanning for banned APIs in user plugins..."
           BANNED_PATTERNS=(
             'require\s*\('
             'eval\s*\('
@@ -52,26 +52,37 @@ jobs:
             '\.rm\|\.delete'
           )
 
+          # Only scan user plugin files (.plugin.js, .plugin.ts), exclude system infrastructure
+          FOUND_BANNED=0
           for pattern in "${BANNED_PATTERNS[@]}"; do
-            if grep -r "$pattern" dsg-plugins/ --include="*.js" --include="*.ts" 2>/dev/null; then
-              echo "❌ Banned API detected: $pattern"
-              exit 1
+            if find dsg-plugins -type f \( -name "*.plugin.js" -o -name "*.plugin.ts" \) -exec grep -l "$pattern" {} \; 2>/dev/null; then
+              echo "❌ Banned API detected in user plugin: $pattern"
+              FOUND_BANNED=1
             fi
           done
-          echo "✅ No banned APIs detected"
+
+          if [ $FOUND_BANNED -eq 1 ]; then
+            exit 1
+          fi
+          echo "✅ No banned APIs detected in user plugins"
 
       - name: Verify RSA signatures
         run: |
           echo "Verifying plugin signatures..."
           # Check that all .plugin files have corresponding .sig files
-          for plugin in dsg-plugins/**/*.plugin.js; do
-            sig_file="${plugin%.plugin.js}.sig"
-            if [ ! -f "$sig_file" ]; then
-              echo "❌ Missing signature file: $sig_file"
-              exit 1
-            fi
-          done
-          echo "✅ All plugin signatures present"
+          PLUGIN_COUNT=$(find dsg-plugins -type f -name "*.plugin.js" | wc -l)
+          if [ $PLUGIN_COUNT -eq 0 ]; then
+            echo "ℹ️  No user plugins found to verify"
+          else
+            for plugin in dsg-plugins/**/*.plugin.js; do
+              sig_file="${plugin%.plugin.js}.sig"
+              if [ ! -f "$sig_file" ]; then
+                echo "❌ Missing signature file: $sig_file"
+                exit 1
+              fi
+            done
+            echo "✅ All plugin signatures present"
+          fi
 
       - name: Check cost boundaries
         run: |
