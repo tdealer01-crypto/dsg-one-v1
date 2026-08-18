@@ -29,7 +29,9 @@
     "smoke:audit-packet": "node scripts/dsg-audit-packet-check.mjs",
     "smoke:first-value-flow": "node scripts/dsg-first-value-flow-smoke.mjs",
     "dsg:aimo-check": "vitest run tests/dsg/aimo-harness.test.ts",
-    "smoke:aimo-sealed": "node scripts/dsg-aimo-sealed-smoke.mjs"
+    "smoke:aimo-sealed": "node scripts/dsg-aimo-sealed-smoke.mjs",
+    "validate:plugins": "node scripts/dsg-validate-plugins.mjs",
+    "security:scan": "npm audit --production || true"
   },
   "dependencies": {
     "@google/genai": "^1.17.0",
