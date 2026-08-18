@@ -36,6 +36,7 @@
   "dependencies": {
     "@google/genai": "^1.17.0",
     "@hookform/resolvers": "^5.2.1",
+    "@supabase/supabase-js": "^2.43.0",
     "autoprefixer": "^10.4.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -49,7 +50,8 @@
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
     "stripe": "^22.1.1",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "vm2": "^3.9.20"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.11",
