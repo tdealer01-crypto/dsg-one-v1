@@ -123,7 +123,16 @@ function validateAllPlugins() {
   log('║  DSG Plugin Validation                             ║');
   log('╚════════════════════════════════════════════════════╝', colors.blue);
 
-  const pluginPattern = /\.(js|ts)$/;
+  // Only scan for user-submitted plugin files (.plugin.ts or .plugin.js)
+  // Exclude system infrastructure files like plugin-executor.ts, migrations, etc.
+  const pluginPattern = /\.plugin\.(js|ts)$/;
+  const excludeDirs = new Set([
+    'node_modules',
+    'migrations',
+    'trinity-mcp',
+    '.git',
+    '__pycache__',
+  ]);
 
   // Find all plugin files
   const files = [];
@@ -132,11 +141,12 @@ function validateAllPlugins() {
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        walkDir(fullPath);
+        if (!excludeDirs.has(entry.name)) {
+          walkDir(fullPath);
+        }
       } else if (
         entry.isFile() &&
-        pluginPattern.test(entry.name) &&
-        !entry.name.includes('node_modules')
+        pluginPattern.test(entry.name)
       ) {
         files.push(fullPath);
       }
