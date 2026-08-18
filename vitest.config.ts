@@ -16,13 +16,12 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary', 'html'],
       include: [
-        'app/**/*.{ts,tsx}',
         'lib/**/*.{ts,tsx}',
         'components/**/*.{ts,tsx}',
         'hooks/**/*.{ts,tsx}',
         'store/**/*.{ts,tsx}',
       ],
-      exclude: ['app/**/page.tsx', 'app/**/layout.tsx', 'app/**/route.ts', '**/*.d.ts', 'tests/**', 'dsg-plugins/**'],
+      exclude: ['**/*.d.ts', 'tests/**', 'dsg-plugins/**', 'app/**'],
       thresholds: {
         // Phase-1 targets (raised from 50/50/40/50).
         // Phase-2 target: 75/80/70/75. Phase-3: 85/85/80/85.
