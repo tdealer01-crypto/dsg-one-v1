@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'dsg-plugins/**'
+      - 'scripts/dsg-validate-plugins.mjs'
       - '.github/workflows/validate-plugin.yml'
   pull_request:
     paths:
       - 'dsg-plugins/**'
+      - 'scripts/dsg-validate-plugins.mjs'
 
 jobs:
   validate-plugin:
