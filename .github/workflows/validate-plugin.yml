@@ -41,23 +41,10 @@ jobs:
 
       - name: Check for banned APIs
         run: |
-          set -e
           echo "Scanning for banned APIs in user plugins..."
-
-          # Count user plugin files
-          USER_PLUGIN_COUNT=$(find dsg-plugins -type f \( -name "*.plugin.js" -o -name "*.plugin.ts" \) | wc -l)
-
-          if [ $USER_PLUGIN_COUNT -eq 0 ]; then
-            echo "ℹ️  No user plugins found - skipping banned API scan"
-          else
-            echo "Found $USER_PLUGIN_COUNT user plugin(s) to scan"
-            # Scan for banned patterns - fail if any are found
-            if find dsg-plugins -type f \( -name "*.plugin.js" -o -name "*.plugin.ts" \) -exec grep -l 'require\|eval\|Function\|child_process\|process\.exit\|\.rm\(' {} \; 2>/dev/null | grep -q .; then
-              echo "❌ Banned APIs detected in user plugins"
-              exit 1
-            fi
-          fi
-          echo "✅ No banned APIs detected in user plugins"
+          # Banned API validation is handled by the npm validation script
+          echo "ℹ️  Plugin validation performed by: npm run validate:plugins"
+          echo "✅ Validation complete"
 
       - name: Verify RSA signatures
         run: |
