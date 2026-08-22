@@ -31,7 +31,7 @@
     "dsg:aimo-check": "vitest run tests/dsg/aimo-harness.test.ts",
     "smoke:aimo-sealed": "node scripts/dsg-aimo-sealed-smoke.mjs",
     "validate:plugins": "node scripts/dsg-validate-plugins.mjs",
-    "security:scan": "npm audit --production || true"
+    "security:scan": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
     "@google/genai": "^1.17.0",
