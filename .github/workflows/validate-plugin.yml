@@ -10,6 +10,11 @@ on:
     paths:
       - 'dsg-plugins/**'
       - 'scripts/dsg-validate-plugins.mjs'
+      - '.github/workflows/validate-plugin.yml'
+
+permissions:
+  contents: read
+  issues: write
 
 jobs:
   validate-plugin:
@@ -29,94 +34,76 @@ jobs:
         run: npm ci
 
       - name: Validate plugin code
+        shell: bash
         run: |
+          set -o pipefail
           npm run validate:plugins 2>&1 | tee plugin-validation.log
-          echo "Checking for validation errors..."
-          if grep -q "FAILED\|ERROR" plugin-validation.log; then
-            echo "❌ Plugin validation failed"
-            exit 1
-          else
-            echo "✅ Plugin validation passed"
-          fi
 
       - name: Check for banned APIs
         run: |
           echo "Scanning for banned APIs in user plugins..."
-          # Banned API validation is handled by the npm validation script
-          echo "ℹ️  Plugin validation performed by: npm run validate:plugins"
-          echo "✅ Validation complete"
+          echo "Plugin validation performed by: npm run validate:plugins"
+          echo "Validation complete"
 
       - name: Verify RSA signatures
+        shell: bash
         run: |
           echo "Verifying plugin signatures..."
-          # Check that all .plugin files have corresponding .sig files
-          PLUGIN_COUNT=$(find dsg-plugins -type f -name "*.plugin.js" | wc -l)
-          if [ $PLUGIN_COUNT -eq 0 ]; then
-            echo "ℹ️  No user plugins found to verify"
+          mapfile -t plugins < <(find dsg-plugins -type f -name '*.plugin.js' -print)
+          if [ ${#plugins[@]} -eq 0 ]; then
+            echo "No user plugins found to verify"
           else
-            for plugin in dsg-plugins/**/*.plugin.js; do
+            for plugin in "${plugins[@]}"; do
               sig_file="${plugin%.plugin.js}.sig"
               if [ ! -f "$sig_file" ]; then
-                echo "❌ Missing signature file: $sig_file"
+                echo "Missing signature file: $sig_file"
                 exit 1
               fi
             done
-            echo "✅ All plugin signatures present"
+            echo "All plugin signatures present"
           fi
 
       - name: Check cost boundaries
         run: |
           echo "Verifying cost configurations..."
-          # Ensure cost_usd is between $0.01 and $1.00
-          if grep -r "cost_usd.*[0-9]\+\.[0-9]\{2\}" dsg-plugins/ --include="*.ts" --include="*.js" | grep -v '[0]\.[0][0-9]\|[0]\.[1-9]\|[1]\.[0]\|1\.0[0]'; then
-            echo "Note: Found cost configurations"
-          fi
-          echo "✅ Cost boundaries check passed"
+          echo "Cost boundaries are enforced by the validator/runtime contract"
 
       - name: Lint TypeScript
-        if: always()
-        run: |
-          npx tsc --noEmit --skipLibCheck dsg-plugins/ || true
-          echo "✅ TypeScript check complete"
+        run: npx tsc --noEmit --skipLibCheck
 
       - name: Run security scan
-        if: always()
-        run: |
-          echo "Running security checks..."
-          npm run security:scan 2>&1 || true
-          echo "✅ Security scan complete"
+        run: npm run security:scan
 
       - name: Generate validation report
-        if: always()
+        if: success()
+        shell: bash
         run: |
-          cat > plugin-validation-report.md << 'EOF'
-          # Plugin Validation Report
-
-          Generated: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
-          Commit: ${{ github.sha }}
-
-          ## Checks Performed
-          - [x] Code validation
-          - [x] Banned API scan
-          - [x] RSA signature verification
-          - [x] Cost boundary validation
-          - [x] TypeScript compilation
-          - [x] Security scanning
-
-          ## Status: ✅ PASSED
-
-          All plugin validations completed successfully.
-          EOF
+          {
+            echo '# Plugin Validation Report'
+            echo
+            echo "Generated: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "Commit: $GITHUB_SHA"
+            echo
+            echo '## Checks Performed'
+            echo '- [x] Code validation'
+            echo '- [x] Banned API scan'
+            echo '- [x] RSA signature verification'
+            echo '- [x] Cost boundary validation'
+            echo '- [x] TypeScript compilation'
+            echo '- [x] Security scanning'
+            echo
+            echo '## Status: PASSED'
+          } > plugin-validation-report.md
           cat plugin-validation-report.md
 
       - name: Comment on PR
-        if: github.event_name == 'pull_request'
+        if: success() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const report = fs.readFileSync('plugin-validation-report.md', 'utf8');
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -131,4 +118,5 @@ jobs:
           path: |
             plugin-validation.log
             plugin-validation-report.md
+          if-no-files-found: ignore
           retention-days: 30
