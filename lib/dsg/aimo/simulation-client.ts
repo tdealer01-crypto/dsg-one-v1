@@ -2,7 +2,7 @@ import { sha256Json } from '@/lib/dsg/runtime/hash';
 import {
   requestEncodingProof,
   isProofAcceptable,
-  type EncodingProofResponse,
+  type EncodingProofRequest,
 } from '../runtime/encoding-proof-client';
 import { materializeCandidate, normalizeAimoProblem } from './deterministic';
 import { getAimoServiceConfig, getEncodingProofEndpoint } from './service-registry';
@@ -47,6 +47,21 @@ function simulationUrl(): URL {
   return url;
 }
 
+function isEncodingProofEncoding(
+  value: unknown,
+): value is EncodingProofRequest['encoding'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  const kind = candidate.kind;
+  const variableCount = candidate.variableCount;
+  return (
+    (kind === 'qubo-v1' || kind === 'ising-v1') &&
+    typeof variableCount === 'number' &&
+    Number.isInteger(variableCount) &&
+    variableCount >= 0
+  );
+}
+
 export async function solveSimulationShard(
   input: SolveSimulationShardInput,
 ): Promise<AimoShardResult> {
@@ -56,43 +71,53 @@ export async function solveSimulationShard(
     const apiKey = config.simulationApiKey;
     const normalized = normalizeAimoProblem(input.problem);
 
-    // Request encoding proof from control plane before solver invocation
+    // Fail closed unless the normalized problem contains a structurally valid
+    // encoding that can be independently proved by the control plane.
     let encodingProofId: string | undefined;
     try {
       const proofEndpoint = getEncodingProofEndpoint();
-      const encoding = normalized.constraints?.aimoEncoding;
-      if (encoding) {
-        const proofRequest = await requestEncodingProof(
-          {
-            problemId: normalized.problemId,
-            encodingType: encoding.kind,
-            encoding,
-            nonce: sha256Json({ timestamp: Date.now(), shardId: input.shard.shardId }),
-            idempotencyKey: sha256Json({
-              problemHash: input.shard.problemHash,
-              encoding,
-            }),
-          },
-          {
-            controlPlaneUrl: proofEndpoint.url.origin,
-            apiKey: proofEndpoint.apiKey,
-            timeoutMs: 5000,
-            cacheEnabled: true,
-            cacheTtlSeconds: 1800,
-          },
-        );
+      const rawEncoding = normalized.constraints?.aimoEncoding;
+      if (!isEncodingProofEncoding(rawEncoding)) {
+        return {
+          shard: input.shard,
+          ok: false,
+          searchComplete: false,
+          candidates: [],
+          error: 'encoding proof blocked: normalized problem has no valid aimoEncoding',
+        };
+      }
 
-        if (isProofAcceptable(proofRequest)) {
-          encodingProofId = proofRequest.proofId;
-        } else {
-          return {
-            shard: input.shard,
-            ok: false,
-            searchComplete: false,
-            candidates: [],
-            error: `encoding proof failed: ${proofRequest.status} - ${proofRequest.error || 'unknown'}`,
-          };
-        }
+      const encoding = rawEncoding;
+      const proofRequest = await requestEncodingProof(
+        {
+          problemId: normalized.problemId,
+          encodingType: encoding.kind,
+          encoding,
+          nonce: sha256Json({ timestamp: Date.now(), shardId: input.shard.shardId }),
+          idempotencyKey: sha256Json({
+            problemHash: input.shard.problemHash,
+            encoding,
+          }),
+        },
+        {
+          controlPlaneUrl: proofEndpoint.url.origin,
+          apiKey: proofEndpoint.apiKey,
+          timeoutMs: 5000,
+          cacheEnabled: true,
+          cacheTtlSeconds: 1800,
+        },
+      );
+
+      if (isProofAcceptable(proofRequest) && proofRequest.proofId) {
+        encodingProofId = proofRequest.proofId;
+      } else {
+        return {
+          shard: input.shard,
+          ok: false,
+          searchComplete: false,
+          candidates: [],
+          error: `encoding proof failed: ${proofRequest.status} - ${proofRequest.error || 'missing proofId'}`,
+        };
       }
     } catch (proofError) {
       const message =
