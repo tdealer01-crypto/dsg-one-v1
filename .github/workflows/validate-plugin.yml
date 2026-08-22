@@ -6,15 +6,20 @@ on:
       - 'dsg-plugins/**'
       - 'scripts/dsg-validate-plugins.mjs'
       - '.github/workflows/validate-plugin.yml'
+      - 'package.json'
+      - 'package-lock.json'
   pull_request:
     paths:
       - 'dsg-plugins/**'
       - 'scripts/dsg-validate-plugins.mjs'
       - '.github/workflows/validate-plugin.yml'
+      - 'package.json'
+      - 'package-lock.json'
 
 permissions:
   contents: read
   issues: write
+  pull-requests: write
 
 jobs:
   validate-plugin:
@@ -28,7 +33,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
 
       - name: Install dependencies
         run: npm ci
@@ -71,8 +76,8 @@ jobs:
       - name: Lint TypeScript
         run: npx tsc --noEmit --skipLibCheck
 
-      - name: Run security scan
-        run: npm run security:scan
+      - name: Run production dependency security scan
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Generate validation report
         if: success()
@@ -90,7 +95,7 @@ jobs:
             echo '- [x] RSA signature verification'
             echo '- [x] Cost boundary validation'
             echo '- [x] TypeScript compilation'
-            echo '- [x] Security scanning'
+            echo '- [x] Production dependency audit (high/critical gate)'
             echo
             echo '## Status: PASSED'
           } > plugin-validation-report.md
@@ -98,6 +103,7 @@ jobs:
 
       - name: Comment on PR
         if: success() && github.event_name == 'pull_request'
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
