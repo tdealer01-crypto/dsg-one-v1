@@ -1,0 +1,66 @@
+name: Live AIMO Authority Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tests/live/aimo-live-authority-chain.test.ts'
+      - '.github/workflows/live-aimo-authority-proof.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  live-proof:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      NODE_ENV: production
+      DSG_LIVE_E2E: '1'
+      DSG_CONTROL_PLANE_URL: ${{ vars.DSG_CONTROL_PLANE_URL || 'https://dsg-control-plane.azurewebsites.net' }}
+      DSG_CONTROL_PLANE_API_KEY: ${{ secrets.DSG_CONTROL_PLANE_API_KEY }}
+      DSG_AGI_SIMULATION_URL: ${{ vars.DSG_AGI_SIMULATION_URL }}
+      DSG_AGI_SIMULATION_API_KEY: ${{ secrets.DSG_AGI_SIMULATION_API_KEY }}
+      DSG_CINEMA_PROOF_URL: ${{ vars.DSG_CINEMA_PROOF_URL || 'https://dsg-cinema-production.nicetree-a005fe99.westus3.azurecontainerapps.io' }}
+      DSG_CINEMA_PROOF_API_KEY: ${{ secrets.DSG_CINEMA_PROOF_API_KEY }}
+      DSG_AIMO_ROOT_KEY: ${{ secrets.DSG_AIMO_ROOT_KEY }}
+
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Validate live bindings without exposing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "${DSG_CONTROL_PLANE_URL:-}" ]] || missing+=(DSG_CONTROL_PLANE_URL)
+          [[ -n "${DSG_CONTROL_PLANE_API_KEY:-}" ]] || missing+=(DSG_CONTROL_PLANE_API_KEY)
+          [[ -n "${DSG_AGI_SIMULATION_URL:-}" ]] || missing+=(DSG_AGI_SIMULATION_URL)
+          if [[ -z "${DSG_AGI_SIMULATION_API_KEY:-}" && -z "${DSG_AIMO_ROOT_KEY:-}" ]]; then
+            missing+=(DSG_AGI_SIMULATION_API_KEY_or_DSG_AIMO_ROOT_KEY)
+          fi
+          [[ -n "${DSG_CINEMA_PROOF_URL:-}" ]] || missing+=(DSG_CINEMA_PROOF_URL)
+          if [[ -z "${DSG_CINEMA_PROOF_API_KEY:-}" && -z "${DSG_AIMO_ROOT_KEY:-}" ]]; then
+            missing+=(DSG_CINEMA_PROOF_API_KEY_or_DSG_AIMO_ROOT_KEY)
+          fi
+          if (( ${#missing[@]} > 0 )); then
+            printf 'LIVE_PROOF_BINDING=BLOCK missing=%s\n' "$(IFS=,; echo "${missing[*]}")"
+            exit 2
+          fi
+          echo 'LIVE_PROOF_BINDING=PASS required bindings are present'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Execute live Control Plane -> Simulation -> Cinema proof
+        run: npx vitest run tests/live/aimo-live-authority-chain.test.ts --reporter=verbose
