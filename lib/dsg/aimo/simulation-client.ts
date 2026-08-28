@@ -1,4 +1,5 @@
 import { sha256Json } from '@/lib/dsg/runtime/hash';
+import { requestEncodingProofForShard } from '@/lib/dsg/runtime/encoding-proof-client';
 import { materializeCandidate, normalizeAimoProblem } from './deterministic';
 import { getAimoServiceConfig } from './service-registry';
 import type {
@@ -15,6 +16,9 @@ interface SimulationResponse {
   searchComplete?: boolean;
   searchedAssignments?: number;
   encodingHash?: string;
+  encodingProofId?: string;
+  encodingProofHash?: string;
+  encodingProofAuthority?: 'DSG_CONTROL_PLANE';
   candidates?: AimoCandidateInput[];
   replayHash?: string;
   error?: string;
@@ -51,6 +55,17 @@ export async function solveSimulationShard(
     const apiKey = config.simulationApiKey;
     const normalized = normalizeAimoProblem(input.problem);
 
+    const encodingProof = await requestEncodingProofForShard({
+      problem: normalized,
+      problemHash: input.shard.problemHash,
+      shardId: input.shard.shardId,
+      config: {
+        controlPlaneUrl: config.controlPlaneUrl,
+        apiKey: config.controlPlaneApiKey,
+        timeoutMs: 8_000,
+      },
+    });
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -64,6 +79,7 @@ export async function solveSimulationShard(
         problemHash: input.shard.problemHash,
         shard: input.shard,
         maxCandidates: input.maxCandidates,
+        encodingProofId: encodingProof.proofId,
         strategyHint: input.strategyHint
           ? {
               provider: input.strategyHint.provider,
@@ -98,6 +114,22 @@ export async function solveSimulationShard(
       };
     }
 
+    if (
+      body.encodingProofId !== encodingProof.proofId ||
+      body.encodingProofHash !== encodingProof.proofHash ||
+      body.encodingProofAuthority !== 'DSG_CONTROL_PLANE'
+    ) {
+      return {
+        shard: input.shard,
+        ok: false,
+        status: 'BLOCKED',
+        searchComplete: false,
+        searchedAssignments: body.searchedAssignments,
+        candidates: [],
+        error: 'simulation response did not preserve the authoritative encoding-proof binding',
+      };
+    }
+
     const bounded = body.candidates.slice(0, input.maxCandidates);
     const candidates = bounded.map((candidate) =>
       materializeCandidate(candidate, input.shard),
@@ -114,11 +146,16 @@ export async function solveSimulationShard(
           : undefined,
       encodingHash:
         typeof body.encodingHash === 'string' ? body.encodingHash : undefined,
+      encodingProofId: body.encodingProofId,
+      encodingProofHash: body.encodingProofHash,
+      encodingProofAuthority: body.encodingProofAuthority,
       candidates,
       replayHash:
         body.replayHash ??
         sha256Json({
           shard: input.shard,
+          encodingProofId: body.encodingProofId,
+          encodingProofHash: body.encodingProofHash,
           candidates: candidates.map((item) => item.candidateHash),
         }),
     };
