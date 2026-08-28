@@ -5,6 +5,7 @@ type AimoServiceName = 'simulation' | 'cinema' | 'control-plane';
 interface AimoRegistryDocument {
   simulationUrl?: string;
   cinemaUrl?: string;
+  controlPlaneUrl?: string;
   maxParallelism?: number;
 }
 
@@ -12,8 +13,15 @@ export interface AimoServiceConfig {
   mode: 'registry' | 'legacy';
   simulationUrl?: string;
   cinemaUrl?: string;
+  controlPlaneUrl?: string;
   simulationApiKey?: string;
   cinemaApiKey?: string;
+  /**
+   * Canonical DSG API key for /api/dsg/v1/* routes. This is deliberately not
+   * derived from DSG_AIMO_ROOT_KEY because Control Plane API auth resolves its
+   * own persisted API-key store.
+   */
+  controlPlaneApiKey?: string;
   maxParallelism: number;
   rootKeyConfigured: boolean;
 }
@@ -23,6 +31,7 @@ export interface AimoServiceReadiness {
   mode: 'registry' | 'legacy';
   simulationConfigured: boolean;
   cinemaConfigured: boolean;
+  controlPlaneConfigured: boolean;
   internalAuthConfigured: boolean;
   maxParallelism: number;
   missing: string[];
@@ -57,6 +66,10 @@ function parseRegistry(raw: string | undefined): AimoRegistryDocument | undefine
     cinemaUrl:
       typeof candidate.cinemaUrl === 'string'
         ? optional(candidate.cinemaUrl)
+        : undefined,
+    controlPlaneUrl:
+      typeof candidate.controlPlaneUrl === 'string'
+        ? optional(candidate.controlPlaneUrl)
         : undefined,
     maxParallelism:
       typeof candidate.maxParallelism === 'number'
@@ -105,6 +118,8 @@ export function getAimoServiceConfig(
   const simulationUrl =
     registry?.simulationUrl ?? optional(env.DSG_AGI_SIMULATION_URL);
   const cinemaUrl = registry?.cinemaUrl ?? optional(env.DSG_CINEMA_PROOF_URL);
+  const controlPlaneUrl =
+    registry?.controlPlaneUrl ?? optional(env.DSG_CONTROL_PLANE_URL);
 
   const simulationApiKey =
     optional(env.DSG_AGI_SIMULATION_API_KEY) ??
@@ -112,6 +127,7 @@ export function getAimoServiceConfig(
   const cinemaApiKey =
     optional(env.DSG_CINEMA_PROOF_API_KEY) ??
     (rootKey ? deriveAimoServiceToken(rootKey, 'cinema') : undefined);
+  const controlPlaneApiKey = optional(env.DSG_CONTROL_PLANE_API_KEY);
 
   const maxParallelism = normalizeParallelism(
     registry?.maxParallelism ?? env.DSG_AIMO_MAX_PARALLELISM,
@@ -121,8 +137,10 @@ export function getAimoServiceConfig(
     mode: registry ? 'registry' : 'legacy',
     simulationUrl,
     cinemaUrl,
+    controlPlaneUrl,
     simulationApiKey,
     cinemaApiKey,
+    controlPlaneApiKey,
     maxParallelism,
     rootKeyConfigured: Boolean(rootKey),
   };
@@ -136,16 +154,23 @@ export function getAimoServiceReadiness(
 
   if (!config.simulationUrl) missing.push('simulationUrl');
   if (!config.cinemaUrl) missing.push('cinemaUrl');
+  if (!config.controlPlaneUrl) missing.push('controlPlaneUrl');
   if (!config.simulationApiKey) missing.push('simulationAuth');
   if (!config.cinemaApiKey) missing.push('cinemaAuth');
+  if (!config.controlPlaneApiKey) missing.push('controlPlaneAuth');
 
   return {
     ready: missing.length === 0,
     mode: config.mode,
     simulationConfigured: Boolean(config.simulationUrl),
     cinemaConfigured: Boolean(config.cinemaUrl),
+    controlPlaneConfigured: Boolean(
+      config.controlPlaneUrl && config.controlPlaneApiKey,
+    ),
     internalAuthConfigured: Boolean(
-      config.simulationApiKey && config.cinemaApiKey,
+      config.simulationApiKey &&
+        config.cinemaApiKey &&
+        config.controlPlaneApiKey,
     ),
     maxParallelism: config.maxParallelism,
     missing,
