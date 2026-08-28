@@ -73,6 +73,9 @@ export interface AimoShardResult {
   searchComplete: boolean;
   searchedAssignments?: number;
   encodingHash?: string;
+  encodingProofId?: string;
+  encodingProofHash?: string;
+  encodingProofAuthority?: 'DSG_CONTROL_PLANE';
   candidates: AimoCandidate[];
   replayHash?: string;
   error?: string;
