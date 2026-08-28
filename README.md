@@ -1,9 +1,13 @@
 # DSG ONE V1 — Autonomous Governed Runtime
+> [!IMPORTANT]
+> **Production platform authority — Azure only.** Vercel (retired), Render, Railway, AWS, and Google Cloud are retired for DSG production; legacy URLs, checks, and statuses are not deployment or health evidence.
+> Runtime secrets belong in Azure Key Vault and are resolved by the Azure service Managed Identity. GitHub OIDC may bootstrap or rotate them; `.env.example` is documentation only. Any unresolved Key Vault reference is `BLOCK`.
+> Canonical secret-manager contract: [Control Plane Azure Key Vault operations](https://github.com/tdealer01-crypto/tdealer01-crypto-dsg-control-plane/blob/main/docs/ops/azure-runtime-env-sync.md).
 
 DSG ONE V1 is a governed app-builder and autonomous runtime control plane.  
 Includes **DSG SkillGate** — open-source GitHub skill discovery, inspection, verification, lock, and governed-run pipeline.
 
-Production: `https://dsg-one-v1.vercel.app`
+Production authority: Azure only. Resolve the current hostname from the latest governed deployment receipt; no live hostname is asserted by this README.
 
 ---
 
@@ -193,7 +197,7 @@ Agent autonomous use (rules in AGENTS.md):
 ## Production verification
 
 ```bash
-export APP_URL="https://dsg-one-v1.vercel.app"
+export APP_URL="https://<dsg-one-azure-app>.azurewebsites.net"
 
 npm run smoke:first-value-flow
 npm run smoke:audit-packet
@@ -216,7 +220,7 @@ MARKETPLACE_PASS: locked until full enforcement, review, and approval evidence e
 
 ```text
 1. Apply Supabase migrations on production DB (000001–000003).
-2. Register https://dsg-one-v1.vercel.app/api/webhooks/stripe in Stripe dashboard
+2. Register https://<dsg-one-azure-app>.azurewebsites.net/api/webhooks/stripe in Stripe dashboard
    → event: checkout.session.completed
 3. Add server-side RBAC enforcement tests and cross-org denial tests.
 4. Add entitlement or billing provider proof, quota denial tests, and upgrade-path proof.
@@ -234,10 +238,10 @@ cd mcp/dsg-one-mcp
 npm install && npm run build
 
 # stdio transport (Claude Desktop, Cursor)
-DSG_APP_URL=https://dsg-one-v1.vercel.app node ./dist/index.js
+DSG_APP_URL=https://<dsg-one-azure-app>.azurewebsites.net node ./dist/index.js
 
 # HTTP/SSE transport (port 3001)
-DSG_APP_URL=https://dsg-one-v1.vercel.app node ./dist/index.js --http
+DSG_APP_URL=https://<dsg-one-azure-app>.azurewebsites.net node ./dist/index.js --http
 ```
 
 Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
@@ -247,7 +251,7 @@ Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_conf
     "dsg-one": {
       "command": "node",
       "args": ["/path/to/mcp/dsg-one-mcp/dist/index.js"],
-      "env": { "DSG_APP_URL": "https://dsg-one-v1.vercel.app" }
+      "env": { "DSG_APP_URL": "https://<dsg-one-azure-app>.azurewebsites.net" }
     }
   }
 }
