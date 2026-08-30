@@ -13,6 +13,11 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# The exact Git commit is non-secret build provenance. It is baked into the
+# server image so the live readiness response can prove which source is running.
+ARG DSG_BUILD_SOURCE_SHA
+ENV DSG_BUILD_SOURCE_SHA=$DSG_BUILD_SOURCE_SHA
+
 # NEXT_PUBLIC_* values are compiled into the Next.js client bundle at build time.
 # These are public configuration values, not secrets.
 ARG NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL
@@ -37,6 +42,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=8080
+ARG DSG_BUILD_SOURCE_SHA
+ENV DSG_BUILD_SOURCE_SHA=$DSG_BUILD_SOURCE_SHA
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
