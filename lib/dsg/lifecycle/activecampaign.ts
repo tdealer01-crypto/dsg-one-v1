@@ -14,6 +14,8 @@ export const DSG_LIFECYCLE_EVENTS = [
 
 export type DsgLifecycleEvent = (typeof DSG_LIFECYCLE_EVENTS)[number];
 
+type LifecycleEnv = Readonly<Record<string, string | undefined>>;
+
 export type LifecycleEmitResult =
   | { ok: true; delivered: true; provider: 'activecampaign' }
   | { ok: true; delivered: false; provider: 'activecampaign'; reason: 'NOT_CONFIGURED' }
@@ -27,7 +29,7 @@ export async function emitLifecycleEvent(input: {
   event: DsgLifecycleEvent;
   email: string;
   data?: Record<string, string | number | boolean | null | undefined>;
-  env?: NodeJS.ProcessEnv;
+  env?: LifecycleEnv;
 }): Promise<LifecycleEmitResult> {
   if (!isAllowedEvent(input.event)) {
     return { ok: false, delivered: false, provider: 'activecampaign', reason: 'EVENT_NOT_ALLOWED' };
@@ -38,7 +40,7 @@ export async function emitLifecycleEvent(input: {
     return { ok: false, delivered: false, provider: 'activecampaign', reason: 'EMAIL_REQUIRED' };
   }
 
-  const env = input.env ?? process.env;
+  const env: LifecycleEnv = input.env ?? process.env;
   const actid = env.ACTIVECAMPAIGN_ACTID?.trim();
   const key = env.ACTIVECAMPAIGN_EVENT_KEY?.trim();
   if (!actid || !key) {
