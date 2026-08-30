@@ -213,15 +213,27 @@ jobs:
           }
           trap rollback ERR
 
+          # /dsg/verify is intentionally protected by middleware. An anonymous
+          # production probe must prove the auth boundary (307 to /login), not
+          # demand a public 200 response from the protected page.
           for attempt in $(seq 1 48); do
             VERIFY_HTTP=$(curl --silent --show-error --max-time 20 \
+              --dump-header "$RUNNER_TEMP/verify.headers" \
               --output "$RUNNER_TEMP/verify.html" \
               --write-out '%{http_code}' "$APP_URL/dsg/verify" || true)
-            if [[ "$VERIFY_HTTP" == "200" ]] && grep -q 'Verify one AI action' "$RUNNER_TEMP/verify.html"; then
+            VERIFY_LOCATION=$(awk 'tolower($1) == "location:" {print $2}' \
+              "$RUNNER_TEMP/verify.headers" | tr -d '\r' | tail -n 1)
+            LOGIN_HTTP=$(curl --silent --show-error --max-time 20 \
+              --output "$RUNNER_TEMP/login.html" \
+              --write-out '%{http_code}' "$APP_URL/login" || true)
+
+            if [[ "$VERIFY_HTTP" == "307" ]] \
+              && [[ "$VERIFY_LOCATION" == "/login?next=%2Fdsg%2Fverify" ]] \
+              && [[ "$LOGIN_HTTP" == "200" ]]; then
               break
             fi
             if [[ "$attempt" == "48" ]]; then
-              echo "BLOCK: /dsg/verify did not become ready; HTTP=$VERIFY_HTTP" >&2
+              echo "BLOCK: protected verify auth boundary was not ready; verify_http=$VERIFY_HTTP location=$VERIFY_LOCATION login_http=$LOGIN_HTTP" >&2
               exit 1
             fi
             sleep 5
