@@ -6,11 +6,12 @@ on:
       source_sha:
         description: Exact dsg-one-v1 commit SHA to build and deploy
         required: true
-        default: 42e5f69542387c34f1ea2b2ad35601a441ce4b6f
   push:
     branches: [main]
     paths:
       - '.github/workflows/deploy-dsg-one-production.yml'
+      - 'Dockerfile'
+      - 'app/api/agent/status/route.ts'
 
 permissions:
   contents: read
@@ -22,12 +23,12 @@ concurrency:
 
 jobs:
   deploy:
-    name: Build exact SHA, deploy, and prove First Value
+    name: Build exact SHA, deploy, and prove runtime identity
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 45
     env:
-      SOURCE_SHA: ${{ github.event.inputs.source_sha || '42e5f69542387c34f1ea2b2ad35601a441ce4b6f' }}
+      SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || github.sha }}
       AZURE_CLIENT_ID: bd54ab6e-5f92-48c8-8f8d-0c114ef938da
       AZURE_TENANT_ID: cbc618d5-9aa3-46b5-ae64-d07794603a7a
       AZURE_SUBSCRIPTION_ID: dcf13c0d-0d9f-4f81-aa89-c6b50aaef839
@@ -76,7 +77,7 @@ jobs:
           set -euo pipefail
           npm ci
           npm run dsg:typecheck
-          npx vitest run tests/dsg/activecampaign-lifecycle.test.ts
+          npx vitest run tests/dsg/agent-status.test.ts tests/dsg/activecampaign-lifecycle.test.ts
 
       - name: Azure login with GitHub OIDC
         uses: azure/login@v2
@@ -85,7 +86,7 @@ jobs:
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build immutable image in ACR
+      - name: Build locked image in ACR
         id: image
         shell: bash
         run: |
@@ -123,13 +124,14 @@ jobs:
           echo "::add-mask::$PUBLIC_KEY"
 
           SHORT_SHA="${SOURCE_SHA:0:12}"
-          IMAGE_TAG="prod-$SHORT_SHA"
+          IMAGE_TAG="prod-${SHORT_SHA}-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           IMAGE_REF="$ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_TAG"
 
           az acr build \
             --registry "$ACR_NAME" \
             --image "$IMAGE_NAME:$IMAGE_TAG" \
             --file Dockerfile \
+            --build-arg "DSG_BUILD_SOURCE_SHA=$SOURCE_SHA" \
             --build-arg "NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL=$PUBLIC_URL" \
             --build-arg "NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY=$PUBLIC_KEY" \
             .
@@ -139,6 +141,14 @@ jobs:
             --image "$IMAGE_NAME:$IMAGE_TAG" \
             --query digest --output tsv)
           test -n "$IMAGE_DIGEST"
+
+          # The run-specific tag is never reused. Lock it after push so its
+          # digest cannot be replaced by a later build.
+          az acr repository update \
+            --name "$ACR_NAME" \
+            --image "$IMAGE_NAME:$IMAGE_TAG" \
+            --write-enabled false \
+            --output none
 
           echo "tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
           echo "ref=$IMAGE_REF" >> "$GITHUB_OUTPUT"
@@ -182,7 +192,11 @@ jobs:
           az webapp config appsettings set \
             --resource-group "$RESOURCE_GROUP" \
             --name "$WEBAPP_NAME" \
-            --settings WEBSITES_PORT=8080 PORT=8080 \
+            --settings \
+              WEBSITES_PORT=8080 \
+              PORT=8080 \
+              "DSG_DEPLOYED_SOURCE_SHA=$SOURCE_SHA" \
+              "DSG_DEPLOYED_IMAGE_DIGEST=${{ steps.image.outputs.digest }}" \
             --output none
 
           az webapp config container set \
@@ -194,7 +208,7 @@ jobs:
           az webapp restart --resource-group "$RESOURCE_GROUP" --name "$WEBAPP_NAME"
           echo 'started=true' >> "$GITHUB_OUTPUT"
 
-      - name: Prove deployed revision and First Value API flow
+      - name: Prove runtime identity, fail-closed control, and lifecycle delivery
         id: proof
         shell: bash
         run: |
@@ -211,30 +225,56 @@ jobs:
               az webapp restart --resource-group "$RESOURCE_GROUP" --name "$WEBAPP_NAME" || true
             fi
           }
+          rollback_on_signal() {
+            rollback
+            exit 1
+          }
           trap rollback ERR
+          trap rollback_on_signal TERM INT
 
-          # /dsg/verify is intentionally protected by middleware. An anonymous
-          # production probe must prove the auth boundary (307 to /login), not
-          # demand a public 200 response from the protected page.
-          for attempt in $(seq 1 48); do
-            VERIFY_HTTP=$(curl --silent --show-error --max-time 20 \
+          # Leave a bounded rollback window inside the job timeout. The status
+          # endpoint must be served by the new image and prove real DB access.
+          DEADLINE=$((SECONDS + 720))
+          while true; do
+            VERIFY_HTTP=$(curl --silent --show-error --max-time 10 \
               --dump-header "$RUNNER_TEMP/verify.headers" \
               --output "$RUNNER_TEMP/verify.html" \
               --write-out '%{http_code}' "$APP_URL/dsg/verify" || true)
             VERIFY_LOCATION=$(awk 'tolower($1) == "location:" {print $2}' \
               "$RUNNER_TEMP/verify.headers" | tr -d '\r' | tail -n 1)
-            LOGIN_HTTP=$(curl --silent --show-error --max-time 20 \
-              --output "$RUNNER_TEMP/login.html" \
-              --write-out '%{http_code}' "$APP_URL/login" || true)
+            LOGIN_HTTP=000
+            STATUS_HTTP=000
 
             if [[ "$VERIFY_HTTP" == "307" ]] \
-              && [[ "$VERIFY_LOCATION" == "/login?next=%2Fdsg%2Fverify" ]] \
-              && [[ "$LOGIN_HTTP" == "200" ]]; then
+              && [[ "$VERIFY_LOCATION" == "/login?next=%2Fdsg%2Fverify" ]]; then
+              LOGIN_HTTP=$(curl --silent --show-error --max-time 10 \
+                --output "$RUNNER_TEMP/login.html" \
+                --write-out '%{http_code}' "$APP_URL/login" || true)
+              STATUS_HTTP=$(curl --silent --show-error --max-time 10 \
+                --output "$RUNNER_TEMP/status.json" \
+                --write-out '%{http_code}' "$APP_URL/api/agent/status" || true)
+            fi
+
+            if [[ "$LOGIN_HTTP" == "200" ]] && [[ "$STATUS_HTTP" == "200" ]] \
+              && jq -e \
+                --arg sha "$SOURCE_SHA" \
+                --arg digest "${{ steps.image.outputs.digest }}" '
+                  .ok == true and
+                  .version == $sha and
+                  .deployment.buildSourceSha == $sha and
+                  .deployment.expectedSourceSha == $sha and
+                  .deployment.imageDigest == $digest and
+                  .deployment.sourceBound == true and
+                  .deployment.digestBound == true and
+                  .checks.db == true and
+                  .readiness.deploymentIdentityOk == true
+                ' "$RUNNER_TEMP/status.json" >/dev/null; then
               break
             fi
-            if [[ "$attempt" == "48" ]]; then
-              echo "BLOCK: protected verify auth boundary was not ready; verify_http=$VERIFY_HTTP location=$VERIFY_LOCATION login_http=$LOGIN_HTTP" >&2
-              exit 1
+
+            if (( SECONDS >= DEADLINE )); then
+              echo "BLOCK: runtime identity/readiness was not proven; verify_http=$VERIFY_HTTP location=$VERIFY_LOCATION login_http=$LOGIN_HTTP status_http=$STATUS_HTTP" >&2
+              false
             fi
             sleep 5
           done
@@ -245,6 +285,12 @@ jobs:
             --request POST "$APP_URL/api/dsg/lifecycle/event" \
             --header 'Content-Type: application/json' \
             --data '{"event":"verification_started","email":"t.dealer01@dsg.pics","data":{"surface":"production_first_value_canary"}}')
+          test "$START_HTTP" = "200"
+          jq -e '
+            .ok == true and
+            .delivery.ok == true and
+            (.delivery.delivered == true or .delivery.reason == "ALREADY_DELIVERED")
+          ' "$RUNNER_TEMP/started.json" >/dev/null
 
           PROOF_HTTP=$(curl --silent --show-error --max-time 30 \
             --output "$RUNNER_TEMP/proof.json" \
@@ -252,14 +298,19 @@ jobs:
             --request POST "$APP_URL/api/dsg/app-builder/proof" \
             --header 'Content-Type: application/json' \
             --data '{"goal":"Verify one production AI action through the governed DSG First Value canary.","email":"t.dealer01@dsg.pics"}')
-
-          test "$START_HTTP" = "200"
           test "$PROOF_HTTP" = "200"
           jq -e '
             .ok == true and
-            (.proofHash | type == "string" and length > 20) and
-            (.runtimeGate.status | type == "string") and
-            .claimBoundary.productionReadyClaim == false
+            .status == "PASS" and
+            .proofKind == "APP_BUILDER_FLOW_FAIL_CLOSED_PROOF" and
+            (.proofHash | type == "string" and length == 64) and
+            .runtimeGate.status == "BLOCKED" and
+            .assertions.runtimeGateBlocksWithoutExecutor == true and
+            .assertions.runtimeDidNotStart == true and
+            .claimBoundary.claimStatus == "APP_BUILDER_FLOW_PROOF_FAIL_CLOSED" and
+            .claimBoundary.productionReadyClaim == false and
+            .lifecycle.ok == true and
+            (.lifecycle.delivered == true or .lifecycle.reason == "ALREADY_DELIVERED")
           ' "$RUNNER_TEMP/proof.json" >/dev/null
 
           PROOF_HASH=$(jq -r '.proofHash' "$RUNNER_TEMP/proof.json")
@@ -274,6 +325,11 @@ jobs:
               --header 'Content-Type: application/json' \
               --data @-)
           test "$VIEW_HTTP" = "200"
+          jq -e '
+            .ok == true and
+            .delivery.ok == true and
+            (.delivery.delivered == true or .delivery.reason == "ALREADY_DELIVERED")
+          ' "$RUNNER_TEMP/viewed.json" >/dev/null
 
           LIVE_FX=$(az webapp config show \
             --resource-group "$RESOURCE_GROUP" \
@@ -281,7 +337,17 @@ jobs:
             --query linuxFxVersion --output tsv)
           test "${LIVE_FX#DOCKER|}" = "${{ steps.image.outputs.ref }}"
 
-          LIFECYCLE_DELIVERED=$(jq -r '.lifecycle.delivered // false' "$RUNNER_TEMP/proof.json")
+          LIVE_DIGEST=$(az acr repository show \
+            --name "$ACR_NAME" \
+            --image "$IMAGE_NAME:${{ steps.image.outputs.tag }}" \
+            --query digest --output tsv)
+          WRITE_ENABLED=$(az acr repository show \
+            --name "$ACR_NAME" \
+            --image "$IMAGE_NAME:${{ steps.image.outputs.tag }}" \
+            --query changeableAttributes.writeEnabled --output tsv)
+          test "$LIVE_DIGEST" = "${{ steps.image.outputs.digest }}"
+          test "$WRITE_ENABLED" = "false"
+
           RUNTIME_GATE=$(jq -r '.runtimeGate.status' "$RUNNER_TEMP/proof.json")
           CLAIM_STATUS=$(jq -r '.claimBoundary.claimStatus' "$RUNNER_TEMP/proof.json")
 
@@ -294,23 +360,60 @@ jobs:
             --arg url "$APP_URL" \
             --arg image "${{ steps.image.outputs.ref }}" \
             --arg digest "${{ steps.image.outputs.digest }}" \
-            --arg proof_hash "$PROOF_HASH" \
-            --arg runtime_gate "$RUNTIME_GATE" \
-            --arg claim_status "$CLAIM_STATUS" \
-            --argjson lifecycle_delivered "$LIFECYCLE_DELIVERED" \
-            '{
+            --arg verify_location "$VERIFY_LOCATION" \
+            --argjson verify_http "$VERIFY_HTTP" \
+            --argjson login_http "$LOGIN_HTTP" \
+            --argjson status_http "$STATUS_HTTP" \
+            --argjson lifecycle_started_http "$START_HTTP" \
+            --argjson proof_http "$PROOF_HTTP" \
+            --argjson proof_viewed_http "$VIEW_HTTP" \
+            --slurpfile status "$RUNNER_TEMP/status.json" \
+            --slurpfile proof "$RUNNER_TEMP/proof.json" \
+            --slurpfile started "$RUNNER_TEMP/started.json" \
+            --slurpfile viewed "$RUNNER_TEMP/viewed.json" '
+            {
               observed_at:$observed_at,
               repository:$repository,
               source_sha:$source_sha,
               workflow_sha:$workflow_sha,
-              azure:{app:$app,url:$url,image:$image,digest:$digest},
-              probes:{verify_page_http:200,lifecycle_started_http:200,proof_http:200,proof_viewed_http:200},
-              first_value:{proof_hash:$proof_hash,runtime_gate:$runtime_gate,claim_status:$claim_status,lifecycle_delivered:$lifecycle_delivered},
-              truth_boundary:{health_200_alone_is_not_e2e:true,production_ready_claim:false}
+              azure:{app:$app,url:$url,image:$image,digest:$digest,tag_locked:true},
+              probes:{
+                verify_page_http:$verify_http,
+                verify_redirect_location:$verify_location,
+                login_page_http:$login_http,
+                agent_status_http:$status_http,
+                lifecycle_started_http:$lifecycle_started_http,
+                proof_http:$proof_http,
+                proof_viewed_http:$proof_viewed_http
+              },
+              deployment_identity:$status[0].deployment,
+              readiness:{db:$status[0].checks.db,deployment_identity:$status[0].readiness.deploymentIdentityOk},
+              negative_control:{
+                status:"PASS",
+                proof_hash:$proof[0].proofHash,
+                proof_kind:$proof[0].proofKind,
+                runtime_gate:$proof[0].runtimeGate.status,
+                claim_status:$proof[0].claimBoundary.claimStatus,
+                runtime_did_not_start:$proof[0].assertions.runtimeDidNotStart
+              },
+              first_value_delivery:{
+                lifecycle_satisfied:true,
+                verification_started:$started[0].delivery,
+                proof_created:$proof[0].lifecycle,
+                proof_viewed:$viewed[0].delivery
+              },
+              truth_boundary:{
+                health_200_alone_is_not_e2e:true,
+                negative_control_is_not_positive_runtime_execution:true,
+                governed_candidate_chain_verified:false,
+                production_ready_claim:false
+              }
             }' > production-evidence.json
 
-          echo "lifecycle_delivered=$LIFECYCLE_DELIVERED" >> "$GITHUB_OUTPUT"
-          trap - ERR
+          echo 'lifecycle_satisfied=true' >> "$GITHUB_OUTPUT"
+          echo "runtime_gate=$RUNTIME_GATE" >> "$GITHUB_OUTPUT"
+          echo "claim_status=$CLAIM_STATUS" >> "$GITHUB_OUTPUT"
+          trap - ERR TERM INT
 
       - name: Upload immutable deployment evidence
         uses: actions/upload-artifact@v4
@@ -324,12 +427,17 @@ jobs:
         shell: bash
         run: |
           {
-            echo '## DSG ONE governed Azure deployment'
+            echo '## DSG ONE Azure deployment truth'
             echo
             printf -- '- source SHA: `%s`\n' "$SOURCE_SHA"
             printf -- '- image: `%s`\n' "${{ steps.image.outputs.ref }}"
             printf -- '- digest: `%s`\n' "${{ steps.image.outputs.digest }}"
-            echo "- /dsg/verify + proof flow: PASS"
-            printf -- '- ActiveCampaign lifecycle delivered: `%s`\n' "${{ steps.proof.outputs.lifecycle_delivered }}"
+            echo '- exact runtime identity + DB readiness: `PASS`'
+            printf -- '- fail-closed negative control: `PASS` (`%s`, `%s`)\n' \
+              "${{ steps.proof.outputs.runtime_gate }}" \
+              "${{ steps.proof.outputs.claim_status }}"
+            printf -- '- ActiveCampaign lifecycle satisfied: `%s`\n' \
+              "${{ steps.proof.outputs.lifecycle_satisfied }}"
+            echo '- governed candidate/Cinema/Control Plane/Monitoring chain: `NOT_EVALUATED`'
             echo '- productionReadyClaim: `false`'
           } >> "$GITHUB_STEP_SUMMARY"
