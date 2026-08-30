@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type ProofResponse = {
   ok: boolean;
@@ -29,6 +29,32 @@ export default function VerifyOneActionPage() {
   const [proof, setProof] = useState<ProofResponse | null>(null);
   const [viewRecorded, setViewRecorded] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!proof?.proofHash || !email || viewRecorded) return;
+
+    let cancelled = false;
+    void fetch('/api/dsg/lifecycle/event', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        event: 'proof_viewed',
+        email,
+        data: {
+          proof_hash: proof.proofHash,
+          runtime_gate: proof.runtimeGate?.status ?? 'UNKNOWN',
+        },
+      }),
+    })
+      .catch(() => null)
+      .finally(() => {
+        if (!cancelled) setViewRecorded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [email, proof, viewRecorded]);
 
   async function runVerification() {
     setLoading(true);
@@ -60,23 +86,6 @@ export default function VerifyOneActionPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  async function recordProofViewed() {
-    if (!proof?.proofHash || !email || viewRecorded) return;
-    await fetch('/api/dsg/lifecycle/event', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        event: 'proof_viewed',
-        email,
-        data: {
-          proof_hash: proof.proofHash,
-          runtime_gate: proof.runtimeGate?.status ?? 'UNKNOWN',
-        },
-      }),
-    }).catch(() => null);
-    setViewRecorded(true);
   }
 
   const failures = proof?.runtimeGate?.failures ?? [];
@@ -121,7 +130,7 @@ export default function VerifyOneActionPage() {
         {error ? <p className="mt-5 rounded-2xl border border-rose-400/30 bg-rose-400/10 p-4 text-rose-100">{error}</p> : null}
 
         {proof?.proofHash ? (
-          <section className="mt-8 rounded-3xl border border-cyan-300/20 bg-cyan-300/[0.05] p-6" onMouseEnter={recordProofViewed}>
+          <section className="mt-8 rounded-3xl border border-cyan-300/20 bg-cyan-300/[0.05] p-6">
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full border border-white/15 px-3 py-1 font-mono text-xs">PROOF CREATED</span>
               <span className="rounded-full border border-white/15 px-3 py-1 font-mono text-xs">Runtime gate: {proof.runtimeGate?.status ?? 'UNKNOWN'}</span>
@@ -146,7 +155,7 @@ export default function VerifyOneActionPage() {
             ) : null}
 
             <p className="mt-6 text-sm text-slate-300">
-              {viewRecorded ? 'Proof viewed event recorded for lifecycle routing.' : 'Open this receipt to record proof_viewed.'}
+              {viewRecorded ? 'Proof viewed event recorded for lifecycle routing.' : 'Recording proof_viewed…'}
             </p>
           </section>
         ) : null}
