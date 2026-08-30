@@ -106,6 +106,19 @@ jobs:
             --name "$WEBAPP_NAME" \
             --output json --only-show-errors)
 
+          PREVIOUS_SOURCE_SHA=$(SETTINGS="$SETTINGS" node --input-type=module <<'NODE'
+          const rows = JSON.parse(process.env.SETTINGS);
+          process.stdout.write(rows.find((x) => x.name === 'DSG_DEPLOYED_SOURCE_SHA')?.value ?? '');
+          NODE
+          )
+          PREVIOUS_IMAGE_DIGEST=$(SETTINGS="$SETTINGS" node --input-type=module <<'NODE'
+          const rows = JSON.parse(process.env.SETTINGS);
+          process.stdout.write(rows.find((x) => x.name === 'DSG_DEPLOYED_IMAGE_DIGEST')?.value ?? '');
+          NODE
+          )
+          echo "previous_source_sha=$PREVIOUS_SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "previous_image_digest=$PREVIOUS_IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+
           PUBLIC_URL=$(SETTINGS="$SETTINGS" node --input-type=module <<'NODE'
           const rows = JSON.parse(process.env.SETTINGS);
           process.stdout.write(rows.find((x) => x.name === 'NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL')?.value ?? '');
@@ -215,7 +228,35 @@ jobs:
           set -euo pipefail
           rollback() {
             if [[ "${{ steps.deploy.outputs.started }}" == "true" ]]; then
-              echo 'Readiness failed; restoring previous immutable image.' >&2
+              echo 'Readiness failed; restoring previous image and deployment identity.' >&2
+              PREVIOUS_SOURCE_SHA="${{ steps.image.outputs.previous_source_sha }}"
+              PREVIOUS_IMAGE_DIGEST="${{ steps.image.outputs.previous_image_digest }}"
+              RESTORE_SETTINGS=()
+              DELETE_SETTINGS=()
+              if [[ -n "$PREVIOUS_SOURCE_SHA" ]]; then
+                RESTORE_SETTINGS+=("DSG_DEPLOYED_SOURCE_SHA=$PREVIOUS_SOURCE_SHA")
+              else
+                DELETE_SETTINGS+=(DSG_DEPLOYED_SOURCE_SHA)
+              fi
+              if [[ -n "$PREVIOUS_IMAGE_DIGEST" ]]; then
+                RESTORE_SETTINGS+=("DSG_DEPLOYED_IMAGE_DIGEST=$PREVIOUS_IMAGE_DIGEST")
+              else
+                DELETE_SETTINGS+=(DSG_DEPLOYED_IMAGE_DIGEST)
+              fi
+              if (( ${#RESTORE_SETTINGS[@]} > 0 )); then
+                az webapp config appsettings set \
+                  --resource-group "$RESOURCE_GROUP" \
+                  --name "$WEBAPP_NAME" \
+                  --settings "${RESTORE_SETTINGS[@]}" \
+                  --output none || true
+              fi
+              if (( ${#DELETE_SETTINGS[@]} > 0 )); then
+                az webapp config appsettings delete \
+                  --resource-group "$RESOURCE_GROUP" \
+                  --name "$WEBAPP_NAME" \
+                  --setting-names "${DELETE_SETTINGS[@]}" \
+                  --output none || true
+              fi
               az webapp config container set \
                 --resource-group "$RESOURCE_GROUP" \
                 --name "$WEBAPP_NAME" \
