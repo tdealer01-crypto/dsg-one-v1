@@ -1,0 +1,240 @@
+name: Deploy DSG ONE Production Azure
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact dsg-one-v1 commit SHA to build and deploy
+        required: true
+        default: 572b2658e2490b088a996d9feeebb1ea30d5c406
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/deploy-dsg-one-production.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: dsg-one-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build exact SHA, deploy, and prove First Value
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+    env:
+      SOURCE_SHA: ${{ github.event.inputs.source_sha || '572b2658e2490b088a996d9feeebb1ea30d5c406' }}
+      AZURE_CLIENT_ID: bd54ab6e-5f92-48c8-8f8d-0c114ef938da
+      AZURE_TENANT_ID: cbc618d5-9aa3-46b5-ae64-d07794603a7a
+      AZURE_SUBSCRIPTION_ID: dcf13c0d-0d9f-4f81-aa89-c6b50aaef839
+      RESOURCE_GROUP: rg-t.dealer01-0468
+      WEBAPP_NAME: dsg-one-v1
+      ACR_NAME: dsgcp50aaef839
+      IMAGE_NAME: dsg-one-v1
+      APP_URL: https://dsg-one-v1.azurewebsites.net
+
+    steps:
+      - name: Validate exact source authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo 'BLOCK: source_sha must be a full 40-character commit SHA.' >&2
+            exit 1
+          }
+
+      - name: Checkout exact source SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+
+      - name: Require source SHA on main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main || {
+            echo 'BLOCK: requested source SHA is not reachable from main.' >&2
+            exit 1
+          }
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Pre-deploy hard gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run dsg:typecheck
+          npx vitest run tests/dsg/activecampaign-lifecycle.test.ts
+
+      - name: Azure login with GitHub OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build immutable image in ACR
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
+          CURRENT_FX=$(az webapp config show             --resource-group "$RESOURCE_GROUP"             --name "$WEBAPP_NAME"             --query linuxFxVersion --output tsv)
+          CURRENT_IMAGE="${CURRENT_FX#DOCKER|}"
+          test -n "$CURRENT_IMAGE"
+          echo "previous_image=$CURRENT_IMAGE" >> "$GITHUB_OUTPUT"
+
+          SETTINGS=$(az webapp config appsettings list             --resource-group "$RESOURCE_GROUP"             --name "$WEBAPP_NAME"             --output json --only-show-errors)
+
+          PUBLIC_URL=$(SETTINGS="$SETTINGS" node --input-type=module <<'NODE'
+          const rows = JSON.parse(process.env.SETTINGS);
+          process.stdout.write(rows.find((x) => x.name === 'NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL')?.value ?? '');
+          NODE
+          )
+          PUBLIC_KEY=$(SETTINGS="$SETTINGS" node --input-type=module <<'NODE'
+          const rows = JSON.parse(process.env.SETTINGS);
+          process.stdout.write(rows.find((x) => x.name === 'NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY')?.value ?? '');
+          NODE
+          )
+          test -n "$PUBLIC_URL" && test -n "$PUBLIC_KEY" || {
+            echo 'BLOCK: required public Supabase build settings are absent.' >&2
+            exit 1
+          }
+          echo "::add-mask::$PUBLIC_URL"
+          echo "::add-mask::$PUBLIC_KEY"
+
+          SHORT_SHA="${SOURCE_SHA:0:12}"
+          IMAGE_TAG="prod-$SHORT_SHA"
+          IMAGE_REF="$ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_TAG"
+
+          az acr build             --registry "$ACR_NAME"             --image "$IMAGE_NAME:$IMAGE_TAG"             --file Dockerfile             --build-arg "NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL=$PUBLIC_URL"             --build-arg "NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY=$PUBLIC_KEY"             .
+
+          IMAGE_DIGEST=$(az acr repository show             --name "$ACR_NAME"             --image "$IMAGE_NAME:$IMAGE_TAG"             --query digest --output tsv)
+          test -n "$IMAGE_DIGEST"
+
+          echo "tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          echo "ref=$IMAGE_REF" >> "$GITHUB_OUTPUT"
+          echo "digest=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy through App Service Managed Identity
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_ID=$(az webapp show             --resource-group "$RESOURCE_GROUP"             --name "$WEBAPP_NAME"             --query id --output tsv)
+          PRINCIPAL_ID=$(az webapp identity show             --resource-group "$RESOURCE_GROUP"             --name "$WEBAPP_NAME"             --query principalId --output tsv)
+          ACR_ID=$(az acr show --name "$ACR_NAME" --query id --output tsv)
+          test -n "$APP_ID" && test -n "$PRINCIPAL_ID" && test -n "$ACR_ID"
+
+          HAS_PULL=$(az role assignment list             --assignee-object-id "$PRINCIPAL_ID"             --scope "$ACR_ID"             --query "[?roleDefinitionName=='AcrPull'] | length(@)"             --output tsv)
+          if [[ "$HAS_PULL" == "0" ]]; then
+            az role assignment create               --assignee-object-id "$PRINCIPAL_ID"               --assignee-principal-type ServicePrincipal               --role AcrPull               --scope "$ACR_ID"               --output none
+          fi
+
+          az resource update             --ids "$APP_ID/config/web"             --set properties.acrUseManagedIdentityCreds=true             --output none
+
+          az webapp config appsettings set             --resource-group "$RESOURCE_GROUP"             --name "$WEBAPP_NAME"             --settings WEBSITES_PORT=8080 PORT=8080             --output none
+
+          az webapp config container set             --resource-group "$RESOURCE_GROUP"             --name "$WEBAPP_NAME"             --docker-custom-image-name "${{ steps.image.outputs.ref }}"             --docker-registry-server-url "https://$ACR_NAME.azurecr.io"             --output none
+          az webapp restart --resource-group "$RESOURCE_GROUP" --name "$WEBAPP_NAME"
+          echo 'started=true' >> "$GITHUB_OUTPUT"
+
+      - name: Prove deployed revision and First Value API flow
+        id: proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          rollback() {
+            if [[ "${{ steps.deploy.outputs.started }}" == "true" ]]; then
+              echo 'Readiness failed; restoring previous immutable image.' >&2
+              az webapp config container set                 --resource-group "$RESOURCE_GROUP"                 --name "$WEBAPP_NAME"                 --docker-custom-image-name "${{ steps.image.outputs.previous_image }}"                 --docker-registry-server-url "https://$ACR_NAME.azurecr.io"                 --output none || true
+              az webapp restart --resource-group "$RESOURCE_GROUP" --name "$WEBAPP_NAME" || true
+            fi
+          }
+          trap rollback ERR
+
+          for attempt in $(seq 1 48); do
+            VERIFY_HTTP=$(curl --silent --show-error --max-time 20               --output "$RUNNER_TEMP/verify.html"               --write-out '%{http_code}' "$APP_URL/dsg/verify" || true)
+            if [[ "$VERIFY_HTTP" == "200" ]] && grep -q 'Verify one AI action' "$RUNNER_TEMP/verify.html"; then
+              break
+            fi
+            if [[ "$attempt" == "48" ]]; then
+              echo "BLOCK: /dsg/verify did not become ready; HTTP=$VERIFY_HTTP" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+
+          START_HTTP=$(curl --silent --show-error --max-time 20             --output "$RUNNER_TEMP/started.json"             --write-out '%{http_code}'             --request POST "$APP_URL/api/dsg/lifecycle/event"             --header 'Content-Type: application/json'             --data '{"event":"verification_started","email":"t.dealer01@dsg.pics","data":{"surface":"production_first_value_canary"}}')
+
+          PROOF_HTTP=$(curl --silent --show-error --max-time 30             --output "$RUNNER_TEMP/proof.json"             --write-out '%{http_code}'             --request POST "$APP_URL/api/dsg/app-builder/proof"             --header 'Content-Type: application/json'             --data '{"goal":"Verify one production AI action through the governed DSG First Value canary.","email":"t.dealer01@dsg.pics"}')
+
+          test "$START_HTTP" = "200"
+          test "$PROOF_HTTP" = "200"
+          jq -e '
+            .ok == true and
+            (.proofHash | type == "string" and length > 20) and
+            (.runtimeGate.status | type == "string") and
+            .claimBoundary.productionReadyClaim == false
+          ' "$RUNNER_TEMP/proof.json" >/dev/null
+
+          PROOF_HASH=$(jq -r '.proofHash' "$RUNNER_TEMP/proof.json")
+          VIEW_HTTP=$(jq -n             --arg email 't.dealer01@dsg.pics'             --arg hash "$PROOF_HASH"             '{event:"proof_viewed",email:$email,data:{proof_hash:$hash,surface:"production_first_value_canary"}}' |
+            curl --silent --show-error --max-time 20               --output "$RUNNER_TEMP/viewed.json"               --write-out '%{http_code}'               --request POST "$APP_URL/api/dsg/lifecycle/event"               --header 'Content-Type: application/json'               --data @-)
+          test "$VIEW_HTTP" = "200"
+
+          LIVE_FX=$(az webapp config show             --resource-group "$RESOURCE_GROUP"             --name "$WEBAPP_NAME"             --query linuxFxVersion --output tsv)
+          test "${LIVE_FX#DOCKER|}" = "${{ steps.image.outputs.ref }}"
+
+          LIFECYCLE_DELIVERED=$(jq -r '.lifecycle.delivered // false' "$RUNNER_TEMP/proof.json")
+          RUNTIME_GATE=$(jq -r '.runtimeGate.status' "$RUNNER_TEMP/proof.json")
+          CLAIM_STATUS=$(jq -r '.claimBoundary.claimStatus' "$RUNNER_TEMP/proof.json")
+
+          jq -n             --arg observed_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"             --arg repository "${{ github.repository }}"             --arg source_sha "$SOURCE_SHA"             --arg workflow_sha "${{ github.sha }}"             --arg app "$WEBAPP_NAME"             --arg url "$APP_URL"             --arg image "${{ steps.image.outputs.ref }}"             --arg digest "${{ steps.image.outputs.digest }}"             --arg proof_hash "$PROOF_HASH"             --arg runtime_gate "$RUNTIME_GATE"             --arg claim_status "$CLAIM_STATUS"             --argjson lifecycle_delivered "$LIFECYCLE_DELIVERED"             '{
+              observed_at:$observed_at,
+              repository:$repository,
+              source_sha:$source_sha,
+              workflow_sha:$workflow_sha,
+              azure:{app:$app,url:$url,image:$image,digest:$digest},
+              probes:{verify_page_http:200,lifecycle_started_http:200,proof_http:200,proof_viewed_http:200},
+              first_value:{proof_hash:$proof_hash,runtime_gate:$runtime_gate,claim_status:$claim_status,lifecycle_delivered:$lifecycle_delivered},
+              truth_boundary:{health_200_alone_is_not_e2e:true,production_ready_claim:false}
+            }' > production-evidence.json
+
+          echo "lifecycle_delivered=$LIFECYCLE_DELIVERED" >> "$GITHUB_OUTPUT"
+          trap - ERR
+
+      - name: Upload immutable deployment evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsg-one-production-evidence-${{ env.SOURCE_SHA }}
+          path: production-evidence.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Deployment truth summary
+        shell: bash
+        run: |
+          {
+            echo '## DSG ONE governed Azure deployment'
+            echo
+            echo "- source SHA: `$SOURCE_SHA`"
+            echo "- image: `${{ steps.image.outputs.ref }}`"
+            echo "- digest: `${{ steps.image.outputs.digest }}`"
+            echo "- /dsg/verify + proof flow: PASS"
+            echo "- ActiveCampaign lifecycle delivered: `${{ steps.proof.outputs.lifecycle_delivered }}`"
+            echo "- productionReadyClaim: `false`"
+          } >> "$GITHUB_STEP_SUMMARY"
