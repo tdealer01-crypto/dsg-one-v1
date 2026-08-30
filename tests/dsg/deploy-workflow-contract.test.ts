@@ -35,6 +35,15 @@ describe('DSG ONE governed Azure deployment workflow', () => {
     expect(workflow).not.toContain('probes:{verify_page_http:200');
   });
 
+  it('restores the previous image and deployment identity on rollback', () => {
+    expect(workflow).toContain('previous_source_sha=$PREVIOUS_SOURCE_SHA');
+    expect(workflow).toContain('previous_image_digest=$PREVIOUS_IMAGE_DIGEST');
+    expect(workflow).toContain('RESTORE_SETTINGS+=("DSG_DEPLOYED_SOURCE_SHA=$PREVIOUS_SOURCE_SHA")');
+    expect(workflow).toContain('RESTORE_SETTINGS+=("DSG_DEPLOYED_IMAGE_DIGEST=$PREVIOUS_IMAGE_DIGEST")');
+    expect(workflow).toContain('--setting-names "${DELETE_SETTINGS[@]}"');
+    expect(workflow).toContain('steps.image.outputs.previous_image');
+  });
+
   it('requires real or idempotently completed ActiveCampaign delivery', () => {
     expect(workflow).toContain(
       '.delivery.delivered == true or .delivery.reason == "ALREADY_DELIVERED"',
