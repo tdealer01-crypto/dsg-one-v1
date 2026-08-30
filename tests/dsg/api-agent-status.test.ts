@@ -1,73 +1,83 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// We import the GET handler directly — no network calls needed.
 import { GET } from '../../app/api/agent/status/route';
+
+function configureDatabase() {
+  vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://example.supabase.co');
+  vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'service-role-key');
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })));
+}
 
 describe('GET /api/agent/status', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
-  it('returns 200 with ok:true and required fields', async () => {
-    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', 'abc123');
-    vi.stubEnv('VERCEL_ENV', 'production');
+  it('returns 200 only after a real database check succeeds', async () => {
+    configureDatabase();
 
     const response = await GET();
     expect(response.status).toBe(200);
 
     const body = await response.json();
-    expect(body.ok).toBe(true);
-    expect(body.repo).toBe('dsg-one-v1');
-    expect(body.version).toBe('abc123');
-    expect(body.env).toBe('production');
+    expect(body).toMatchObject({
+      ok: true,
+      repo: 'dsg-one-v1',
+      version: 'local',
+      checks: { process: true, db: true },
+      readiness: {
+        database: { ok: true, status: 200 },
+        deploymentIdentityOk: true,
+      },
+    });
+    expect(typeof body.env).toBe('string');
     expect(typeof body.ts).toBe('string');
-    expect(body.checks).toBeDefined();
-    expect(typeof body.checks).toBe('object');
   });
 
-  it('version falls back to "local" when VERCEL_GIT_COMMIT_SHA is not set', async () => {
-    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '');
-    // Ensure VERCEL_GIT_COMMIT_SHA is truly absent
-    const originalEnv = process.env.VERCEL_GIT_COMMIT_SHA;
-    delete process.env.VERCEL_GIT_COMMIT_SHA;
-
+  it('fails closed when database configuration is absent', async () => {
     const response = await GET();
     const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.ok).toBe(false);
     expect(body.version).toBe('local');
-
-    // Restore
-    if (originalEnv !== undefined) process.env.VERCEL_GIT_COMMIT_SHA = originalEnv;
+    expect(body.checks.db).toBe(false);
+    expect(body.readiness.database).toEqual({
+      ok: false,
+      status: null,
+      reason: 'NOT_CONFIGURED',
+    });
   });
 
-  it('env falls back to "local" when VERCEL_ENV is not set', async () => {
-    const originalEnv = process.env.VERCEL_ENV;
-    delete process.env.VERCEL_ENV;
+  it('uses NODE_ENV outside Azure instead of legacy Vercel variables', async () => {
+    configureDatabase();
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', 'abc123');
 
     const response = await GET();
     const body = await response.json();
-    expect(body.env).toBe('local');
 
-    // Restore
-    if (originalEnv !== undefined) process.env.VERCEL_ENV = originalEnv;
+    expect(body.env).toBe(process.env.NODE_ENV ?? 'local');
+    expect(body.version).toBe('local');
   });
 
-  it('ts field is a valid ISO 8601 timestamp', async () => {
+  it('returns a valid ISO 8601 observation timestamp', async () => {
+    configureDatabase();
+
     const response = await GET();
     const body = await response.json();
-    const date = new Date(body.ts);
-    expect(Number.isNaN(date.getTime())).toBe(false);
+
+    expect(Number.isNaN(new Date(body.ts).getTime())).toBe(false);
   });
 
-  it('checks field contains db key', async () => {
-    const response = await GET();
-    const body = await response.json();
-    expect(body.checks).toHaveProperty('db');
-  });
+  it('returns a consistent repo name regardless of runtime configuration', async () => {
+    configureDatabase();
+    vi.stubEnv('WEBSITE_SITE_NAME', '');
 
-  it('returns consistent repo name regardless of env', async () => {
-    vi.stubEnv('VERCEL_ENV', 'preview');
     const response = await GET();
     const body = await response.json();
+
     expect(body.repo).toBe('dsg-one-v1');
   });
 });
