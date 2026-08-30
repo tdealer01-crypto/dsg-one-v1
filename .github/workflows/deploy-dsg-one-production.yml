@@ -231,10 +231,10 @@ jobs:
           {
             echo '## DSG ONE governed Azure deployment'
             echo
-            echo "- source SHA: `$SOURCE_SHA`"
-            echo "- image: `${{ steps.image.outputs.ref }}`"
-            echo "- digest: `${{ steps.image.outputs.digest }}`"
+            printf -- '- source SHA: `%s`\n' "$SOURCE_SHA"
+            printf -- '- image: `%s`\n' "${{ steps.image.outputs.ref }}"
+            printf -- '- digest: `%s`\n' "${{ steps.image.outputs.digest }}"
             echo "- /dsg/verify + proof flow: PASS"
-            echo "- ActiveCampaign lifecycle delivered: `${{ steps.proof.outputs.lifecycle_delivered }}`"
-            echo "- productionReadyClaim: `false`"
+            printf -- '- ActiveCampaign lifecycle delivered: `%s`\n' "${{ steps.proof.outputs.lifecycle_delivered }}"
+            echo '- productionReadyClaim: `false`'
           } >> "$GITHUB_STEP_SUMMARY"
