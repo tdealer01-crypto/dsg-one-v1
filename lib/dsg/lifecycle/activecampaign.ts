@@ -18,11 +18,21 @@ type LifecycleEnv = Readonly<Record<string, string | undefined>>;
 
 export type LifecycleEmitResult =
   | { ok: true; delivered: true; provider: 'activecampaign' }
-  | { ok: true; delivered: false; provider: 'activecampaign'; reason: 'NOT_CONFIGURED' }
+  | { ok: true; delivered: false; provider: 'activecampaign'; reason: 'NOT_CONFIGURED' | 'CONTACT_NOT_FOUND' | 'ALREADY_DELIVERED' }
   | { ok: false; delivered: false; provider: 'activecampaign'; reason: string };
+
+const TAG_ENV_BY_EVENT: Partial<Record<DsgLifecycleEvent, string>> = {
+  verification_started: 'ACTIVECAMPAIGN_TAG_VERIFICATION_STARTED_ID',
+  proof_created: 'ACTIVECAMPAIGN_TAG_PROOF_CREATED_ID',
+  proof_viewed: 'ACTIVECAMPAIGN_TAG_PROOF_VIEWED_ID',
+};
 
 function isAllowedEvent(value: string): value is DsgLifecycleEvent {
   return (DSG_LIFECYCLE_EVENTS as readonly string[]).includes(value);
+}
+
+function activeCampaignApiBase(raw: string): string {
+  return raw.trim().replace(/\/+$/, '').replace(/\/api\/3$/i, '');
 }
 
 export async function emitLifecycleEvent(input: {
@@ -41,44 +51,76 @@ export async function emitLifecycleEvent(input: {
   }
 
   const env: LifecycleEnv = input.env ?? process.env;
-  const actid = env.ACTIVECAMPAIGN_ACTID?.trim();
-  const key = env.ACTIVECAMPAIGN_EVENT_KEY?.trim();
-  if (!actid || !key) {
+  const apiUrl = env.ACTIVECAMPAIGN_API_URL?.trim();
+  const apiToken = env.ACTIVECAMPAIGN_API_TOKEN?.trim();
+  const tagEnvName = TAG_ENV_BY_EVENT[input.event];
+  const tagId = tagEnvName ? env[tagEnvName]?.trim() : undefined;
+  if (!apiUrl || !apiToken || !tagEnvName || !tagId) {
     return { ok: true, delivered: false, provider: 'activecampaign', reason: 'NOT_CONFIGURED' };
   }
 
-  const safeData = Object.fromEntries(
-    Object.entries(input.data ?? {}).filter(([, value]) => value !== undefined),
-  );
-
-  const body = new URLSearchParams({
-    actid,
-    key,
-    event: input.event,
-    eventdata: JSON.stringify(safeData),
-    visit: JSON.stringify({ email }),
-  });
+  const base = activeCampaignApiBase(apiUrl);
+  const headers = {
+    'Api-Token': apiToken,
+    accept: 'application/json',
+  };
 
   try {
-    const response = await fetch('https://trackcmp.net/event', {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body,
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
+    const contactResponse = await fetch(
+      `${base}/api/3/contacts?email=${encodeURIComponent(email)}&limit=2`,
+      { headers, cache: 'no-store' },
+    );
+    if (!contactResponse.ok) {
       return {
         ok: false,
         delivered: false,
         provider: 'activecampaign',
-        reason: `HTTP_${response.status}`,
+        reason: `CONTACT_LOOKUP_HTTP_${contactResponse.status}`,
       };
     }
 
-    const payload = (await response.json().catch(() => null)) as { success?: number } | null;
-    if (payload?.success !== 1) {
-      return { ok: false, delivered: false, provider: 'activecampaign', reason: 'PROVIDER_REJECTED' };
+    const contactPayload = (await contactResponse.json().catch(() => null)) as
+      | { contacts?: Array<{ id?: string; email?: string }> }
+      | null;
+    const contact = contactPayload?.contacts?.find(
+      (candidate) => candidate.email?.trim().toLowerCase() === email && candidate.id,
+    );
+    if (!contact?.id) {
+      return { ok: true, delivered: false, provider: 'activecampaign', reason: 'CONTACT_NOT_FOUND' };
+    }
+
+    const existingTagsResponse = await fetch(
+      `${base}/api/3/contacts/${encodeURIComponent(contact.id)}/contactTags`,
+      { headers, cache: 'no-store' },
+    );
+    if (!existingTagsResponse.ok) {
+      return {
+        ok: false,
+        delivered: false,
+        provider: 'activecampaign',
+        reason: `TAG_LOOKUP_HTTP_${existingTagsResponse.status}`,
+      };
+    }
+    const existingTagsPayload = (await existingTagsResponse.json().catch(() => null)) as
+      | { contactTags?: Array<{ tag?: string }> }
+      | null;
+    if (existingTagsPayload?.contactTags?.some((record) => String(record.tag) === tagId)) {
+      return { ok: true, delivered: false, provider: 'activecampaign', reason: 'ALREADY_DELIVERED' };
+    }
+
+    const tagResponse = await fetch(`${base}/api/3/contactTags`, {
+      method: 'POST',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ contactTag: { contact: contact.id, tag: tagId } }),
+      cache: 'no-store',
+    });
+    if (!tagResponse.ok) {
+      return {
+        ok: false,
+        delivered: false,
+        provider: 'activecampaign',
+        reason: `TAG_ADD_HTTP_${tagResponse.status}`,
+      };
     }
 
     return { ok: true, delivered: true, provider: 'activecampaign' };
