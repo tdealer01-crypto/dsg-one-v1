@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { callAppBuilderBuildTool, type AppBuilderToolCallInput } from '@/lib/dsg/app-builder/build-tools';
+import { assertCandidateRealizationExecutionAuthorized } from '@/lib/dsg/app-builder/realization-execution-gate';
 import { getAppBuilderRequestContext } from '@/lib/dsg/server/app-builder/context';
 import { getAppBuilderJob, recordAppBuilderToolAudit, updateAppBuilderJob } from '@/lib/dsg/server/app-builder/repository';
 
@@ -17,6 +18,7 @@ export async function POST(req: Request, context: { params: Promise<{ jobId: str
     const body = (await req.json()) as AppBuilderToolCallInput;
     const ctx = await getAppBuilderRequestContext(req, 'job:control');
     const job = await getAppBuilderJob(ctx, jobId);
+    assertCandidateRealizationExecutionAuthorized(job);
 
     await updateAppBuilderJob({
       ctx,
@@ -33,6 +35,7 @@ export async function POST(req: Request, context: { params: Promise<{ jobId: str
     });
 
     const freshJob = await getAppBuilderJob(ctx, jobId);
+    assertCandidateRealizationExecutionAuthorized(freshJob);
     const result = await callAppBuilderBuildTool(freshJob, body);
 
     await recordAppBuilderToolAudit({
