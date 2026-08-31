@@ -4,6 +4,7 @@ import { type AppBuilderGeneratedFile, type AppBuilderRuntimeExecutionResult } f
 import type { AppBuilderJob } from './model';
 import { createAppBuilderRuntimeHandoff, type AppBuilderRuntimeHandoff } from './runtime-handoff';
 import { buildVirtualPcGeneratedAppFiles, isVirtualPcAppBuilderJob } from './virtual-pc-generated-files';
+import { assertCandidateRealizationTargetRepository } from './realization-execution-gate';
 
 type GithubRuntimeConfig = {
   token: string;
@@ -178,6 +179,7 @@ export async function executeApprovedAiFirstAppBuilderJob(job: AppBuilderJob): P
   assertRuntimeAllowed(job, handoff, files);
 
   const config = runtimeConfig();
+  assertCandidateRealizationTargetRepository(job, `${config.owner}/${config.repo}`);
   const branchPrefix = selected.mode === 'virtual_pc_renderer' ? 'dsg-virtual-pc' : 'dsg-ai-builder';
   const branchName = `${branchPrefix}-${safeSegment(job.id).slice(0, 16)}`;
   await ensureBranch(config, branchName);

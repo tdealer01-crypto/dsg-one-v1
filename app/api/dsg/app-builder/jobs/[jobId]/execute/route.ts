@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { executeApprovedAppBuilderJob } from '@/lib/dsg/app-builder/action-runtime';
+import { assertCandidateRealizationExecutionAuthorized } from '@/lib/dsg/app-builder/realization-execution-gate';
 import { getAppBuilderRequestContext } from '@/lib/dsg/server/app-builder/context';
 import { getAppBuilderJob, updateAppBuilderJob } from '@/lib/dsg/server/app-builder/repository';
 
@@ -17,6 +18,7 @@ export async function POST(req: Request, context: { params: Promise<{ jobId: str
 
     if (job.status !== 'READY_FOR_RUNTIME') throw new Error('APP_BUILDER_JOB_NOT_READY_FOR_RUNTIME');
     if (!job.approvedPlan) throw new Error('APP_BUILDER_APPROVED_PLAN_REQUIRED');
+    assertCandidateRealizationExecutionAuthorized(job);
 
     await updateAppBuilderJob({
       ctx,
@@ -32,6 +34,7 @@ export async function POST(req: Request, context: { params: Promise<{ jobId: str
     });
 
     const freshJob = await getAppBuilderJob(ctx, jobId);
+    assertCandidateRealizationExecutionAuthorized(freshJob);
     const result = await executeApprovedAppBuilderJob(freshJob);
 
     const updated = await updateAppBuilderJob({

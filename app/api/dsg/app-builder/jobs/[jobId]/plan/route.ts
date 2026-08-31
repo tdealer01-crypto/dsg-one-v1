@@ -3,6 +3,11 @@ import { createDeterministicAppBuilderPrd } from '@/lib/dsg/app-builder/prd-gene
 import { createAppBuilderProposedPlan } from '@/lib/dsg/app-builder/plan-generator';
 import { gateAppBuilderPlan } from '@/lib/dsg/app-builder/gate';
 import { gateAppBuilderExternalEvidence } from '@/lib/dsg/app-builder/external-evidence-gate';
+import {
+  constrainPlanToRealizationAuthorization,
+  verifyStoredRealizationAuthorization,
+  type StoredRealizationAuthorization,
+} from '@/lib/dsg/app-builder/candidate-realization';
 import { getAppBuilderRequestContext } from '@/lib/dsg/server/app-builder/context';
 import { getAppBuilderJob, updateAppBuilderJob } from '@/lib/dsg/server/app-builder/repository';
 
@@ -38,7 +43,18 @@ export async function POST(req: Request, context: { params: Promise<{ jobId: str
     }
 
     const prd = job.prd ?? createDeterministicAppBuilderPrd(job.goal);
-    const proposedPlan = createAppBuilderProposedPlan({ goal: job.goal, prd });
+    let proposedPlan = createAppBuilderProposedPlan({ goal: job.goal, prd });
+    let realizationScopeBound = false;
+
+    if (job.metadata?.intakeSource === 'GOVERNED_SIMULATION_CANDIDATE') {
+      const spec = job.metadata.candidateRealizationSpec;
+      const authorization = job.metadata.realizationAuthorization as StoredRealizationAuthorization | undefined;
+      if (!authorization) throw new Error('APP_BUILDER_REALIZATION_AUTHORIZATION_REQUIRED');
+      const receipt = verifyStoredRealizationAuthorization(spec, authorization);
+      proposedPlan = constrainPlanToRealizationAuthorization(proposedPlan, receipt);
+      realizationScopeBound = true;
+    }
+
     const gateResult = gateAppBuilderPlan(proposedPlan);
     const status = gateResult.status === 'BLOCK' ? 'BLOCKED' : gateResult.approvalRequired ? 'WAITING_APPROVAL' : 'PLAN_READY';
 
@@ -55,6 +71,7 @@ export async function POST(req: Request, context: { params: Promise<{ jobId: str
           ...(job.metadata ?? {}),
           externalEvidenceGate,
           externalEvidenceGatedAt: new Date().toISOString(),
+          realizationScopeBound,
         },
       },
     });
