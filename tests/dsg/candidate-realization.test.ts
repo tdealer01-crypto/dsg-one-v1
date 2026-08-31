@@ -11,6 +11,10 @@ import { assertCandidateRealizationExecutionAuthorized } from '../../lib/dsg/app
 import type { AppBuilderJob, AppBuilderProposedPlan } from '../../lib/dsg/app-builder/model';
 
 const SECRET = 'unit-test-realization-secret';
+const TEST_ENV = {
+  NODE_ENV: 'test',
+  DSG_REALIZATION_AUTHORIZATION_SECRET: SECRET,
+} as NodeJS.ProcessEnv;
 
 function sha256(value: string) {
   return createHash('sha256').update(value).digest('hex');
@@ -133,9 +137,7 @@ describe('candidate realization adapter', () => {
 
   it('verifies the Control Plane receipt signature and exact candidate binding', () => {
     const input = spec();
-    const verified = verifyStoredRealizationAuthorization(input, authorization(input), {
-      DSG_REALIZATION_AUTHORIZATION_SECRET: SECRET,
-    });
+    const verified = verifyStoredRealizationAuthorization(input, authorization(input), TEST_ENV);
     expect(verified.authority).toBe('DSG_CONTROL_PLANE');
     expect(verified.originCandidateCommit).toBe(input.candidateCommit);
   });
@@ -144,9 +146,7 @@ describe('candidate realization adapter', () => {
     const input = spec();
     const auth = authorization(input);
     auth.receipt.allowedPaths = ['app/**'];
-    expect(() => verifyStoredRealizationAuthorization(input, auth, {
-      DSG_REALIZATION_AUTHORIZATION_SECRET: SECRET,
-    })).toThrow();
+    expect(() => verifyStoredRealizationAuthorization(input, auth, TEST_ENV)).toThrow();
   });
 
   it('intersects the App Builder plan with the independently authorized scope', () => {
@@ -182,8 +182,6 @@ describe('candidate realization adapter', () => {
       },
     } as AppBuilderJob;
 
-    expect(() => assertCandidateRealizationExecutionAuthorized(job, {
-      DSG_REALIZATION_AUTHORIZATION_SECRET: SECRET,
-    })).toThrow('APP_BUILDER_REALIZATION_APPROVED_PLAN_SCOPE_WIDENED');
+    expect(() => assertCandidateRealizationExecutionAuthorized(job, TEST_ENV)).toThrow('APP_BUILDER_REALIZATION_APPROVED_PLAN_SCOPE_WIDENED');
   });
 });
