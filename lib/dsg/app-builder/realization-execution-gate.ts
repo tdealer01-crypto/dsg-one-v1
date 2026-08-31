@@ -45,3 +45,16 @@ export function assertCandidateRealizationExecutionAuthorized(
 
   return receipt;
 }
+
+export function assertCandidateRealizationTargetRepository(
+  job: AppBuilderJob,
+  actualRepository: string,
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  if (job.metadata?.intakeSource !== 'GOVERNED_SIMULATION_CANDIDATE') return;
+  const receipt = assertCandidateRealizationExecutionAuthorized(job, env);
+  if (!receipt) throw new Error('APP_BUILDER_REALIZATION_RECEIPT_REQUIRED');
+  if (receipt.targetRepository !== actualRepository) {
+    throw new Error(`APP_BUILDER_REALIZATION_TARGET_REPOSITORY_MISMATCH:${actualRepository}`);
+  }
+}
