@@ -6,18 +6,36 @@ import {
   verifyCandidateRealizationSpecV1,
 } from '@/lib/dsg/app-builder/candidate-realization';
 import { getAppBuilderRequestContext } from '@/lib/dsg/server/app-builder/context';
+import { getCandidateServiceContext } from '@/lib/dsg/server/app-builder/candidate-service-context';
 import { createAppBuilderJob, updateAppBuilderJob } from '@/lib/dsg/server/app-builder/repository';
 
 function fail(error: unknown) {
   const code = error instanceof Error ? error.message : 'APP_BUILDER_CANDIDATE_INTAKE_FAILED';
-  const status = code.startsWith('DSG_') ? 401 : code.includes('NOT_AUTHORIZED') ? 403 : 400;
+  const status = code.includes('NOT_CONFIGURED')
+    ? 503
+    : code.includes('SIGNATURE_INVALID')
+      ? 401
+      : code.includes('MEMBERSHIP_REQUIRED') || code.includes('PERMISSION_DENIED') || code.includes('NOT_AUTHORIZED')
+        ? 403
+        : code.startsWith('DSG_')
+          ? 401
+          : 400;
   return NextResponse.json({ ok: false, error: { code, message: code } }, { status });
 }
 
 export async function POST(req: Request) {
   try {
-    const ctx = await getAppBuilderRequestContext(req, 'job:create');
-    const body = (await req.json().catch(() => null)) as { spec?: unknown } | null;
+    const rawBody = await req.text();
+    const serviceCtx = await getCandidateServiceContext(req.headers, rawBody);
+    const ctx = serviceCtx ?? await getAppBuilderRequestContext(req, 'job:create');
+
+    let body: { spec?: unknown } | null = null;
+    try {
+      body = JSON.parse(rawBody) as { spec?: unknown };
+    } catch {
+      throw new Error('APP_BUILDER_CANDIDATE_INTAKE_INVALID_JSON');
+    }
+
     const spec = verifyCandidateRealizationSpecV1(body?.spec);
     const authorization = await requestRealizationAuthorization(spec);
     const rawGoal = appBuilderGoalFromCandidateRealization(spec);
@@ -30,6 +48,7 @@ export async function POST(req: Request) {
         metadata: {
           ...(created.metadata ?? {}),
           intakeSource: 'GOVERNED_SIMULATION_CANDIDATE',
+          intakeAuthMode: serviceCtx ? 'SIGNED_SERVICE' : 'VERIFIED_USER',
           candidateRealizationSpec: spec,
           originCandidateCommit: spec.candidateCommit,
           realizationAuthorization: authorization,
