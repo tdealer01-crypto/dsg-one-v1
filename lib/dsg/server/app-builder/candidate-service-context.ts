@@ -6,6 +6,8 @@ import { supabaseRest } from './supabase-rest';
 type Env = Record<string, string | undefined>;
 type MembershipRow = { role?: DsgServerActor['role'] };
 
+const MAX_REQUEST_AGE_MS = 5 * 60 * 1000;
+
 export type CandidateServiceIdentity = {
   actorId: string;
   workspaceId: string;
@@ -27,12 +29,22 @@ function safeEqualHex(left: string, right: string): boolean {
 export function verifyCandidateServiceRequest(
   rawBody: string,
   signatureHeader: string | null,
+  timestampHeader: string | null,
   env: Env = process.env,
+  nowMs = Date.now(),
 ): CandidateServiceIdentity | null {
-  if (!signatureHeader) return null;
+  if (!signatureHeader && !timestampHeader) return null;
+  if (!signatureHeader) throw new Error('DSG_BUILDER_CANDIDATE_INTAKE_SIGNATURE_REQUIRED');
+  if (!timestampHeader) throw new Error('DSG_BUILDER_CANDIDATE_INTAKE_TIMESTAMP_REQUIRED');
+
+  const issuedAt = Date.parse(timestampHeader);
+  if (!Number.isFinite(issuedAt) || Math.abs(nowMs - issuedAt) > MAX_REQUEST_AGE_MS) {
+    throw new Error('DSG_BUILDER_CANDIDATE_INTAKE_TIMESTAMP_STALE');
+  }
 
   const supplied = signatureHeader.replace(/^sha256=/i, '').trim();
-  const expected = createHmac('sha256', intakeSecret(env)).update(rawBody).digest('hex');
+  const signedPayload = `${timestampHeader}\n${rawBody}`;
+  const expected = createHmac('sha256', intakeSecret(env)).update(signedPayload).digest('hex');
   if (!safeEqualHex(supplied, expected)) throw new Error('DSG_BUILDER_CANDIDATE_INTAKE_SIGNATURE_INVALID');
 
   const actorId = env.DSG_BUILDER_SERVICE_ACTOR_ID?.trim();
@@ -47,7 +59,12 @@ export async function getCandidateServiceContext(
   rawBody: string,
   env: Env = process.env,
 ): Promise<AppBuilderRequestContext | null> {
-  const identity = verifyCandidateServiceRequest(rawBody, headers.get('x-dsg-builder-signature'), env);
+  const identity = verifyCandidateServiceRequest(
+    rawBody,
+    headers.get('x-dsg-builder-signature'),
+    headers.get('x-dsg-builder-timestamp'),
+    env,
+  );
   if (!identity) return null;
 
   const workspace = encodeURIComponent(identity.workspaceId);
