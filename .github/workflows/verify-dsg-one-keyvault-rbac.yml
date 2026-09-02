@@ -1,0 +1,128 @@
+name: Verify DSG ONE Key Vault RBAC
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/azure-bootstrap-dsg-one-keyvault.sh'
+      - '.github/workflows/verify-dsg-one-keyvault-rbac.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/azure-bootstrap-dsg-one-keyvault.sh'
+      - '.github/workflows/verify-dsg-one-keyvault-rbac.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      AZURE_CLIENT_ID: bd54ab6e-5f92-48c8-8f8d-0c114ef938da
+      AZURE_TENANT_ID: cbc618d5-9aa3-46b5-ae64-d07794603a7a
+      AZURE_SUBSCRIPTION_ID: dcf13c0d-0d9f-4f81-aa89-c6b50aaef839
+      RESOURCE_GROUP: rg-t.dealer01-0468
+      VAULT_NAME: dsg-shared-secrets
+      WEBAPP_NAME: dsg-one-v1
+      OIDC_OBJECT_ID: 4de7b2bd-2cf2-4f9f-a290-1c3b448f483e
+      SETTING_NAME: DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY
+      APP_URL: https://dsg-one-v1.azurewebsites.net
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login with production OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Capture safe Key Vault binding evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/keyvault
+          az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
+          VAULT_ID=$(az keyvault show \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$VAULT_NAME" \
+            --query id --output tsv)
+          WEBAPP_PRINCIPAL=$(az webapp identity show \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$WEBAPP_NAME" \
+            --query principalId --output tsv)
+
+          oidc_role=$(az role assignment list \
+            --assignee-object-id "$OIDC_OBJECT_ID" \
+            --scope "$VAULT_ID" \
+            --query "[?roleDefinitionName=='Key Vault Secrets Officer'] | length(@)" \
+            --output tsv 2>/dev/null || echo 0)
+          app_role=$(az role assignment list \
+            --assignee-object-id "$WEBAPP_PRINCIPAL" \
+            --scope "$VAULT_ID" \
+            --query "[?roleDefinitionName=='Key Vault Secrets User'] | length(@)" \
+            --output tsv 2>/dev/null || echo 0)
+          reference=$(az webapp config appsettings list \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$WEBAPP_NAME" \
+            --query "[?name=='$SETTING_NAME'].value | [0]" \
+            --output tsv)
+
+          reference_bound=false
+          if [[ "$reference" == @Microsoft.KeyVault\(* ]]; then
+            reference_bound=true
+          fi
+
+          runtime_code=$(curl --silent --show-error \
+            --output evidence/keyvault/agent-status.json \
+            --write-out '%{http_code}' \
+            "$APP_URL/api/agent/status" || true)
+
+          jq -n \
+            --arg source_sha "$GITHUB_SHA" \
+            --argjson oidc_role "$([[ "$oidc_role" != '0' ]] && echo true || echo false)" \
+            --argjson app_role "$([[ "$app_role" != '0' ]] && echo true || echo false)" \
+            --argjson reference_bound "$reference_bound" \
+            --arg runtime_http "$runtime_code" \
+            '{
+              source_sha: $source_sha,
+              github_oidc_key_vault_secrets_officer: $oidc_role,
+              webapp_key_vault_secrets_user: $app_role,
+              service_role_setting_is_key_vault_reference: $reference_bound,
+              production_agent_status_http: $runtime_http,
+              secret_values_exposed: false
+            }' > evidence/keyvault/rbac-proof.json
+
+          if [[ "$oidc_role" != '0' && "$app_role" != '0' && "$reference_bound" == 'true' && "$runtime_code" == '200' ]]; then
+            state=PASS
+          else
+            state=BLOCKED
+          fi
+
+          {
+            echo "## DSG ONE Key Vault RBAC — $state"
+            echo
+            echo "- GitHub OIDC → Key Vault Secrets Officer: $([[ "$oidc_role" != '0' ]] && echo PASS || echo MISSING)"
+            echo "- Web App identity → Key Vault Secrets User: $([[ "$app_role" != '0' ]] && echo PASS || echo MISSING)"
+            echo "- $SETTING_NAME uses Key Vault reference: $([[ "$reference_bound" == 'true' ]] && echo PASS || echo MISSING)"
+            echo "- /api/agent/status HTTP: $runtime_code"
+            echo '- Secret values printed: NO'
+            if [[ "$state" == 'BLOCKED' ]]; then
+              echo '- Next action: run scripts/azure-bootstrap-dsg-one-keyvault.sh with an Azure Owner/User Access Administrator identity.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload safe RBAC evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsg-one-keyvault-rbac-${{ github.run_id }}
+          path: evidence/keyvault
+          if-no-files-found: error
+          retention-days: 30
