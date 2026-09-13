@@ -202,6 +202,16 @@ jobs:
             --set properties.acrUseManagedIdentityCreds=true \
             --output none
 
+          SERVER_SUPABASE_URL=$(az webapp config appsettings list \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$WEBAPP_NAME" \
+            --query "[?name=='NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL'].value | [0]" \
+            --output tsv --only-show-errors)
+          test -n "$SERVER_SUPABASE_URL" || {
+            echo 'BLOCK: NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL is absent.' >&2
+            exit 1
+          }
+
           az webapp config appsettings set \
             --resource-group "$RESOURCE_GROUP" \
             --name "$WEBAPP_NAME" \
@@ -210,6 +220,7 @@ jobs:
               PORT=8080 \
               "DSG_DEPLOYED_SOURCE_SHA=$SOURCE_SHA" \
               "DSG_DEPLOYED_IMAGE_DIGEST=${{ steps.image.outputs.digest }}" \
+              "DSG_ONE_V1_SUPABASE_URL=$SERVER_SUPABASE_URL" \
             --output none
 
           az webapp config container set \
