@@ -20,7 +20,20 @@ describe('DSG ONE governed Azure deployment workflow', () => {
     expect(workflow).toContain('.deployment.buildSourceSha == $sha');
     expect(workflow).toContain('.deployment.imageDigest == $digest');
     expect(workflow).toContain('.checks.db == true');
+    expect(workflow).toContain('.checks.automationDb == true');
+    expect(workflow).toContain('.checks.automationEngine == true');
+    expect(workflow).toContain('.readiness.database.ok == true');
+    expect(workflow).toContain('.readiness.automationDatabase.ok == true');
     expect(workflow).toContain('.readiness.deploymentIdentityOk == true');
+    expect(workflow).toContain('.readiness.automationEngine.ok == true');
+  });
+
+  it('preserves sanitized readiness diagnostics when production proof fails', () => {
+    expect(workflow).toContain('SANITIZED_READINESS_DIAGNOSTIC:');
+    expect(workflow).toContain('production-readiness-diagnostics.json');
+    expect(workflow).toContain('dsg-one-production-readiness-diagnostics-${{ env.SOURCE_SHA }}');
+    expect(workflow).toContain('automationDatabase: .readiness.automationDatabase');
+    expect(workflow).not.toContain('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY');
   });
 
   it('records the protected route truth without turning a negative control into E2E PASS', () => {
