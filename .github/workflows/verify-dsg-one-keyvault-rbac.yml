@@ -122,7 +122,7 @@ jobs:
           fi
 
           key_valid=false
-          if [[ "$vault_root_http" =~ ^2 && "$vault_automation_http" =~ ^2 ]]; then
+          if [[ "$vault_root_http" =~ ^2 ]]; then
             key_valid=true
           fi
           echo "key_valid=$key_valid" >> "$GITHUB_OUTPUT"
