@@ -12,6 +12,11 @@ export type AutomationRunRecord = {
   id: string;
   jobId: string;
   workspaceId: string;
+  taskPlanId: string;
+  wavePlanId: string;
+  planHash: string;
+  waveHash: string;
+  planGraphHash: string;
   engine: string;
   engineVersion: string;
   workflowName: string;
@@ -26,6 +31,11 @@ type AutomationRunRow = {
   id: string;
   job_id: string;
   workspace_id: string;
+  task_plan_id: string;
+  wave_plan_id: string;
+  plan_hash: string;
+  wave_hash: string;
+  plan_graph_hash: string;
   engine: string;
   engine_version: string;
   workflow_name: string;
@@ -56,6 +66,11 @@ function mapRun(row: AutomationRunRow): AutomationRunRecord {
     id: row.id,
     jobId: row.job_id,
     workspaceId: row.workspace_id,
+    taskPlanId: row.task_plan_id,
+    wavePlanId: row.wave_plan_id,
+    planHash: row.plan_hash,
+    waveHash: row.wave_hash,
+    planGraphHash: row.plan_graph_hash,
     engine: row.engine,
     engineVersion: row.engine_version,
     workflowName: row.workflow_name,
@@ -74,33 +89,44 @@ export async function getLatestAutomationRun(
   const rows = await readDsgRest<AutomationRunRow[]>(getDsgSupabaseRpcConfig(context.userAccessToken), 'dsg_automation_runs', {
     job_id: `eq.${jobId}`,
     workspace_id: `eq.${context.workspaceId}`,
-    select: 'id,job_id,workspace_id,engine,engine_version,workflow_name,status,current_checkpoint_id,current_iteration,created_at,updated_at',
+    select: 'id,job_id,workspace_id,task_plan_id,wave_plan_id,plan_hash,wave_hash,plan_graph_hash,engine,engine_version,workflow_name,status,current_checkpoint_id,current_iteration,created_at,updated_at',
     order: 'created_at.desc',
     limit: '1',
   });
   return rows[0] ? mapRun(rows[0]) : null;
 }
 
-export async function getAutomationPlan(context: DsgRepositoryContext, jobId: string) {
+export async function getAutomationPlan(
+  context: DsgRepositoryContext,
+  jobId: string,
+  binding?: { taskPlanId: string; wavePlanId: string; planHash: string; waveHash: string },
+) {
   const config = getDsgSupabaseRpcConfig(context.userAccessToken);
-  const plans = await readDsgRest<TaskPlanRow[]>(config, 'dsg_task_plans', {
+  const planQuery: Record<string, string> = {
     job_id: `eq.${jobId}`,
     workspace_id: `eq.${context.workspaceId}`,
     select: 'id,plan_hash,tasks,dependency_edges,created_at',
-    order: 'created_at.desc',
     limit: '1',
-  });
+  };
+  if (binding) planQuery.id = `eq.${binding.taskPlanId}`;
+  else planQuery.order = 'created_at.desc';
+  const plans = await readDsgRest<TaskPlanRow[]>(config, 'dsg_task_plans', planQuery);
   const taskPlan = plans[0];
-  if (!taskPlan) throw new Error('AUTOMATION_TASK_PLAN_REQUIRED');
-  const waves = await readDsgRest<WavePlanRow[]>(config, 'dsg_wave_plans', {
+  if (!taskPlan) throw new Error(binding ? 'AUTOMATION_BOUND_TASK_PLAN_MISSING' : 'AUTOMATION_TASK_PLAN_REQUIRED');
+  if (binding && taskPlan.plan_hash !== binding.planHash) throw new Error('AUTOMATION_BOUND_PLAN_HASH_MISMATCH');
+
+  const waveQuery: Record<string, string> = {
     task_plan_id: `eq.${taskPlan.id}`,
     workspace_id: `eq.${context.workspaceId}`,
     select: 'id,wave_hash,waves,created_at',
-    order: 'created_at.desc',
     limit: '1',
-  });
+  };
+  if (binding) waveQuery.id = `eq.${binding.wavePlanId}`;
+  else waveQuery.order = 'created_at.desc';
+  const waves = await readDsgRest<WavePlanRow[]>(config, 'dsg_wave_plans', waveQuery);
   const wavePlan = waves[0];
-  if (!wavePlan) throw new Error('AUTOMATION_WAVE_PLAN_REQUIRED');
+  if (!wavePlan) throw new Error(binding ? 'AUTOMATION_BOUND_WAVE_PLAN_MISSING' : 'AUTOMATION_WAVE_PLAN_REQUIRED');
+  if (binding && wavePlan.wave_hash !== binding.waveHash) throw new Error('AUTOMATION_BOUND_WAVE_HASH_MISMATCH');
   return { taskPlan, wavePlan };
 }
 
@@ -119,6 +145,8 @@ export async function startAutomationRun(
   }).replace(/^sha256:/, '');
   const runId = await callDsgRpc<string>(getDsgSupabaseRpcConfig(context.userAccessToken), 'dsg_start_automation_run', {
     p_job_id: input.jobId,
+    p_task_plan_id: taskPlan.id,
+    p_wave_plan_id: wavePlan.id,
     p_workflow_name: `core-spin:${input.jobId}`,
     p_plan_graph_hash: planGraphHash,
     p_engine_version: ENGINE_VERSION,
@@ -227,7 +255,21 @@ export async function evaluateAutomationRun(
   context: DsgRepositoryContext,
   run: AutomationRunRecord,
 ): Promise<AutomationEngineResponse> {
-  const { taskPlan, wavePlan } = await getAutomationPlan(context, run.jobId);
+  const { taskPlan, wavePlan } = await getAutomationPlan(context, run.jobId, {
+    taskPlanId: run.taskPlanId,
+    wavePlanId: run.wavePlanId,
+    planHash: run.planHash,
+    waveHash: run.waveHash,
+  });
+  const currentPlanGraphHash = sha256Json({
+    taskPlanId: taskPlan.id,
+    planHash: taskPlan.plan_hash,
+    dependencyEdges: taskPlan.dependency_edges,
+    wavePlanId: wavePlan.id,
+    waveHash: wavePlan.wave_hash,
+    waves: wavePlan.waves,
+  }).replace(/^sha256:/, '');
+  if (currentPlanGraphHash !== run.planGraphHash) throw new Error('AUTOMATION_BOUND_PLAN_GRAPH_MISMATCH');
   const steps = await getAutomationSteps(context, run.id);
   const byId = new Map(steps.map((step) => [step.taskId, step] as const));
   const tasks = taskPlan.tasks.map((task) => ({

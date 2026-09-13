@@ -2,6 +2,10 @@ create table if not exists public.dsg_automation_runs (
   id uuid primary key default gen_random_uuid(),
   job_id uuid not null references public.dsg_runtime_jobs(id) on delete cascade,
   workspace_id uuid not null references public.dsg_workspaces(id) on delete cascade,
+  task_plan_id uuid not null references public.dsg_task_plans(id) on delete restrict,
+  wave_plan_id uuid not null references public.dsg_wave_plans(id) on delete restrict,
+  plan_hash text not null,
+  wave_hash text not null,
   engine text not null default 'microsoft-agent-framework',
   engine_version text not null default '1.18.0',
   workflow_name text not null,
@@ -111,6 +115,8 @@ alter table public.dsg_automation_leases enable row level security;
 
 create or replace function public.dsg_start_automation_run(
   p_job_id uuid,
+  p_task_plan_id uuid,
+  p_wave_plan_id uuid,
   p_workflow_name text,
   p_plan_graph_hash text,
   p_engine_version text default '1.18.0',
@@ -118,6 +124,7 @@ create or replace function public.dsg_start_automation_run(
 )
 returns uuid
 language plpgsql
+security definer
 set search_path = public, pg_temp
 as $$
 declare
@@ -126,6 +133,8 @@ declare
   v_run_id uuid;
   v_existing public.dsg_automation_runs%rowtype;
   v_tasks jsonb;
+  v_plan_hash text;
+  v_wave_hash text;
 begin
   select workspace_id into v_workspace_id from public.dsg_runtime_jobs where id = p_job_id;
   if v_workspace_id is null then raise exception 'DSG_JOB_NOT_FOUND'; end if;
@@ -133,10 +142,19 @@ begin
   if not public.dsg_has_permission(v_workspace_id, 'job:control') then raise exception 'DSG_PERMISSION_DENIED'; end if;
   if nullif(trim(p_workflow_name), '') is null then raise exception 'AUTOMATION_WORKFLOW_NAME_REQUIRED'; end if;
   if p_plan_graph_hash !~ '^[0-9a-f]{64}$' then raise exception 'AUTOMATION_PLAN_GRAPH_HASH_INVALID'; end if;
+  if p_engine_version <> '1.18.0' then raise exception 'AUTOMATION_ENGINE_VERSION_MISMATCH'; end if;
   if p_max_retries < 0 or p_max_retries > 20 then raise exception 'AUTOMATION_RETRY_LIMIT_INVALID'; end if;
 
-  select tasks into v_tasks from public.dsg_task_plans where job_id = p_job_id order by created_at desc limit 1;
-  if v_tasks is null or jsonb_array_length(v_tasks) = 0 then raise exception 'AUTOMATION_TASK_PLAN_REQUIRED'; end if;
+  select plan_hash, tasks into v_plan_hash, v_tasks
+  from public.dsg_task_plans
+  where id = p_task_plan_id and job_id = p_job_id and workspace_id = v_workspace_id;
+  if v_tasks is null or jsonb_array_length(v_tasks) = 0 then raise exception 'AUTOMATION_TASK_PLAN_MISMATCH'; end if;
+
+  select wave_hash into v_wave_hash
+  from public.dsg_wave_plans
+  where id = p_wave_plan_id and task_plan_id = p_task_plan_id
+    and job_id = p_job_id and workspace_id = v_workspace_id;
+  if v_wave_hash is null then raise exception 'AUTOMATION_WAVE_PLAN_MISMATCH'; end if;
 
   select * into v_existing
   from public.dsg_automation_runs
@@ -147,6 +165,8 @@ begin
   for update;
   if v_existing.id is not null then
     if v_existing.workflow_name = p_workflow_name
+       and v_existing.task_plan_id = p_task_plan_id
+       and v_existing.wave_plan_id = p_wave_plan_id
        and v_existing.plan_graph_hash = p_plan_graph_hash
        and v_existing.engine_version = p_engine_version then
       return v_existing.id;
@@ -155,11 +175,11 @@ begin
   end if;
 
   insert into public.dsg_automation_runs(
-    job_id, workspace_id, workflow_name, plan_graph_hash,
-    engine_version, max_retries, created_by
+    job_id, workspace_id, task_plan_id, wave_plan_id, plan_hash, wave_hash,
+    workflow_name, plan_graph_hash, engine_version, max_retries, created_by
   ) values (
-    p_job_id, v_workspace_id, p_workflow_name, p_plan_graph_hash,
-    p_engine_version, p_max_retries, v_actor
+    p_job_id, v_workspace_id, p_task_plan_id, p_wave_plan_id, v_plan_hash, v_wave_hash,
+    p_workflow_name, p_plan_graph_hash, p_engine_version, p_max_retries, v_actor
   ) returning id into v_run_id;
 
   insert into public.dsg_automation_steps(run_id, job_id, workspace_id, task_id, dependencies)
@@ -172,7 +192,7 @@ begin
   values (
     p_job_id, v_workspace_id, 'AUTOMATION_RUN_CREATED',
     'Automation Spacetime run created', v_actor,
-    jsonb_build_object('automation_run_id', v_run_id, 'workflow_name', p_workflow_name, 'engine_version', p_engine_version, 'plan_graph_hash', p_plan_graph_hash)
+    jsonb_build_object('automation_run_id', v_run_id, 'workflow_name', p_workflow_name, 'engine_version', p_engine_version, 'plan_graph_hash', p_plan_graph_hash, 'task_plan_id', p_task_plan_id, 'wave_plan_id', p_wave_plan_id, 'plan_hash', v_plan_hash, 'wave_hash', v_wave_hash)
   );
 
   return v_run_id;
@@ -242,7 +262,8 @@ begin
 end
 $$;
 
-revoke execute on function public.dsg_start_automation_run(uuid, text, text, text, integer) from anon;
+revoke execute on function public.dsg_start_automation_run(uuid, uuid, uuid, text, text, text, integer) from public, anon;
+grant execute on function public.dsg_start_automation_run(uuid, uuid, uuid, text, text, text, integer) to authenticated, service_role;
 revoke execute on function public.dsg_automation_save_checkpoint(uuid, text, text, text, text, integer, jsonb, text, timestamptz) from public, anon, authenticated;
 grant execute on function public.dsg_automation_save_checkpoint(uuid, text, text, text, text, integer, jsonb, text, timestamptz) to service_role;
 
@@ -257,6 +278,7 @@ create or replace function public.dsg_automation_transition_step(
 )
 returns jsonb
 language plpgsql
+security definer
 set search_path = public, pg_temp
 as $$
 declare
@@ -333,6 +355,7 @@ create or replace function public.dsg_automation_acquire_lease(
 )
 returns uuid
 language plpgsql
+security definer
 set search_path = public, pg_temp
 as $$
 declare
@@ -367,5 +390,7 @@ begin
 end
 $$;
 
-revoke execute on function public.dsg_automation_transition_step(uuid, text, text, text, text, text, timestamptz) from anon;
-revoke execute on function public.dsg_automation_acquire_lease(uuid, text, text, integer) from anon;
+revoke execute on function public.dsg_automation_transition_step(uuid, text, text, text, text, text, timestamptz) from public, anon;
+grant execute on function public.dsg_automation_transition_step(uuid, text, text, text, text, text, timestamptz) to authenticated, service_role;
+revoke execute on function public.dsg_automation_acquire_lease(uuid, text, text, integer) from public, anon;
+grant execute on function public.dsg_automation_acquire_lease(uuid, text, text, integer) to authenticated, service_role;
