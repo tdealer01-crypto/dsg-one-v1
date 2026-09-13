@@ -37,6 +37,9 @@ jobs:
       ACR_NAME: dsgcp50aaef839
       IMAGE_NAME: dsg-one-v1
       APP_URL: https://dsg-one-v1.azurewebsites.net
+      SUPABASE_PROJECT_REF: zeyguilldygozufpgxms
+      SUPABASE_PROJECT_URL: https://zeyguilldygozufpgxms.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable__T5uR3y1_EH6cDabodIEwA_Vads9ni4
 
     steps:
       - name: Validate exact source authority
@@ -70,6 +73,21 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+
+      - name: Validate canonical Supabase endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import dns from 'node:dns/promises';
+          const expectedHost = `${process.env.SUPABASE_PROJECT_REF}.supabase.co`;
+          const url = new URL(process.env.SUPABASE_PROJECT_URL);
+          if (url.protocol !== 'https:' || url.hostname !== expectedHost || url.pathname !== '/') {
+            throw new Error('BLOCK: canonical Supabase project URL does not match the verified project ref.');
+          }
+          await dns.lookup(url.hostname);
+          console.log(`Supabase endpoint verified: ${url.hostname}`);
+          NODE
 
       - name: Pre-deploy hard gates
         shell: bash
@@ -119,21 +137,12 @@ jobs:
           echo "previous_source_sha=$PREVIOUS_SOURCE_SHA" >> "$GITHUB_OUTPUT"
           echo "previous_image_digest=$PREVIOUS_IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
 
-          PUBLIC_URL=$(SETTINGS="$SETTINGS" node --input-type=module <<'NODE'
-          const rows = JSON.parse(process.env.SETTINGS);
-          process.stdout.write(rows.find((x) => x.name === 'NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL')?.value ?? '');
-          NODE
-          )
-          PUBLIC_KEY=$(SETTINGS="$SETTINGS" node --input-type=module <<'NODE'
-          const rows = JSON.parse(process.env.SETTINGS);
-          process.stdout.write(rows.find((x) => x.name === 'NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY')?.value ?? '');
-          NODE
-          )
+          PUBLIC_URL="$SUPABASE_PROJECT_URL"
+          PUBLIC_KEY="$SUPABASE_PUBLISHABLE_KEY"
           test -n "$PUBLIC_URL" && test -n "$PUBLIC_KEY" || {
-            echo 'BLOCK: required public Supabase build settings are absent.' >&2
+            echo 'BLOCK: verified Supabase build settings are absent.' >&2
             exit 1
           }
-          echo "::add-mask::$PUBLIC_URL"
           echo "::add-mask::$PUBLIC_KEY"
 
           SHORT_SHA="${SOURCE_SHA:0:12}"
@@ -202,16 +211,6 @@ jobs:
             --set properties.acrUseManagedIdentityCreds=true \
             --output none
 
-          SERVER_SUPABASE_URL=$(az webapp config appsettings list \
-            --resource-group "$RESOURCE_GROUP" \
-            --name "$WEBAPP_NAME" \
-            --query "[?name=='NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL'].value | [0]" \
-            --output tsv --only-show-errors)
-          test -n "$SERVER_SUPABASE_URL" || {
-            echo 'BLOCK: NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL is absent.' >&2
-            exit 1
-          }
-
           az webapp config appsettings set \
             --resource-group "$RESOURCE_GROUP" \
             --name "$WEBAPP_NAME" \
@@ -220,7 +219,9 @@ jobs:
               PORT=8080 \
               "DSG_DEPLOYED_SOURCE_SHA=$SOURCE_SHA" \
               "DSG_DEPLOYED_IMAGE_DIGEST=${{ steps.image.outputs.digest }}" \
-              "DSG_ONE_V1_SUPABASE_URL=$SERVER_SUPABASE_URL" \
+              "NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL=$SUPABASE_PROJECT_URL" \
+              "NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY" \
+              "DSG_ONE_V1_SUPABASE_URL=$SUPABASE_PROJECT_URL" \
             --output none
 
           az webapp config container set \

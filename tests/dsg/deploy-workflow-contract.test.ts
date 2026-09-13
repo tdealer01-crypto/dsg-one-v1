@@ -15,6 +15,17 @@ describe('DSG ONE governed Azure deployment workflow', () => {
     expect(workflow).toContain('--build-arg "DSG_BUILD_SOURCE_SHA=$SOURCE_SHA"');
   });
 
+  it('pins production to the verified Supabase project and rejects DNS drift before build', () => {
+    expect(workflow).toContain('SUPABASE_PROJECT_REF: zeyguilldygozufpgxms');
+    expect(workflow).toContain('SUPABASE_PROJECT_URL: https://zeyguilldygozufpgxms.supabase.co');
+    expect(workflow).toContain('Validate canonical Supabase endpoint');
+    expect(workflow).toContain("await dns.lookup(url.hostname)");
+    expect(workflow).toContain('PUBLIC_URL="$SUPABASE_PROJECT_URL"');
+    expect(workflow).toContain('"NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL=$SUPABASE_PROJECT_URL"');
+    expect(workflow).toContain('"DSG_ONE_V1_SUPABASE_URL=$SUPABASE_PROJECT_URL"');
+    expect(workflow).not.toContain("rows.find((x) => x.name === 'NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL')");
+  });
+
   it('requires live source, digest, and database identity before readiness passes', () => {
     expect(workflow).toContain('$APP_URL/api/agent/status');
     expect(workflow).toContain('.deployment.buildSourceSha == $sha');
