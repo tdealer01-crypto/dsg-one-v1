@@ -14,12 +14,13 @@ function networkDiagnostic(error: unknown): string {
   return code ? `${error.name}:${code}` : error.name;
 }
 
-function supabaseRequestHeaders(serverKey: string, acceptJson = false): Record<string, string> {
+function supabaseRequestHeaders(serverKey: string, acceptJson = false, profile?: string): Record<string, string> {
   const headers: Record<string, string> = { apikey: serverKey };
   if (!serverKey.startsWith('sb_')) {
     headers.authorization = `Bearer ${serverKey}`;
   }
   if (acceptJson) headers.Accept = 'application/json';
+  if (profile) headers['Accept-Profile'] = profile;
   return headers;
 }
 
@@ -67,7 +68,7 @@ async function checkAutomationSchema(): Promise<DatabaseCheck> {
 
   try {
     const response = await fetch(`${baseUrl}/rest/v1/dsg_automation_runs?select=id&limit=1`, {
-      headers: supabaseRequestHeaders(serviceRoleKey, true),
+      headers: supabaseRequestHeaders(serviceRoleKey, true, 'public'),
       cache: 'no-store',
       signal: controller.signal,
     });

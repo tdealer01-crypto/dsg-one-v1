@@ -45,6 +45,23 @@ export function getDsgSupabaseRpcConfig(userAccessToken?: string): DsgSupabaseRp
   return { url: url.value.replace(/\/$/, ''), key: key.value, userAccessToken };
 }
 
+
+function authorizationHeader(config: DsgSupabaseRpcConfig): string | undefined {
+  if (config.userAccessToken) return `Bearer ${config.userAccessToken}`;
+  if (!config.key.startsWith('sb_')) return `Bearer ${config.key}`;
+  return undefined;
+}
+
+function requestHeaders(
+  config: DsgSupabaseRpcConfig,
+  extra: Record<string, string>,
+): Record<string, string> {
+  const headers: Record<string, string> = { apikey: config.key, ...extra };
+  const authorization = authorizationHeader(config);
+  if (authorization) headers.Authorization = authorization;
+  return headers;
+}
+
 function parseJsonBody<T>(text: string): T | DsgRpcError | null {
   return text ? (JSON.parse(text) as T | DsgRpcError) : null;
 }
@@ -56,13 +73,11 @@ export async function callDsgRpc<T>(
 ): Promise<T> {
   const response = await fetch(`${config.url}/rest/v1/rpc/${functionName}`, {
     method: 'POST',
-    headers: {
-      apikey: config.key,
-      Authorization: `Bearer ${config.userAccessToken ?? config.key}`,
+    headers: requestHeaders(config, {
       'Content-Type': 'application/json',
       'Content-Profile': 'public',
       Prefer: 'return=representation',
-    },
+    }),
     body: JSON.stringify(body),
     cache: 'no-store',
   });
@@ -88,12 +103,10 @@ export async function readDsgRest<T>(
   }
 
   const response = await fetch(url, {
-    headers: {
-      apikey: config.key,
-      Authorization: `Bearer ${config.key}`,
+    headers: requestHeaders(config, {
       Accept: 'application/json',
       'Accept-Profile': 'public',
-    },
+    }),
     cache: 'no-store',
   });
 
