@@ -8,7 +8,7 @@ describe('DSG Supabase REST/RPC auth headers', () => {
   });
 
   it('uses modern sb_secret keys only as apikey when no user token is present', async () => {
-    const fetchMock = vi.fn(async () => new Response('[]', { status: 200 }));
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response('[]', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     await readDsgRest(
@@ -24,7 +24,7 @@ describe('DSG Supabase REST/RPC auth headers', () => {
   });
 
   it('uses the user JWT as Authorization while keeping the server key in apikey', async () => {
-    const fetchMock = vi.fn(async () => new Response('[]', { status: 200 }));
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response('[]', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     await readDsgRest(
