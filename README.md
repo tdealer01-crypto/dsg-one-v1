@@ -9,6 +9,25 @@ Includes **DSG SkillGate** — open-source GitHub skill discovery, inspection, v
 
 Production authority: Azure only. Resolve the current hostname from the latest governed deployment receipt; no live hostname is asserted by this README.
 
+## Current verified production status — 2026-09-13 ICT
+
+```text
+Runtime: PASS
+Production endpoint: https://dsg-one-v1.azurewebsites.net/api/agent/status
+HTTP: 200
+ok: true
+DB: 200 / true
+Automation DB: 200 / true
+Automation Engine: microsoft-agent-framework 1.18.0
+Source SHA: 0a45fb71733e26d024627cd4a39d5eb23662c721
+Image digest: sha256:24c0cc92687415760d38d636cb96f4347a39bf5eb96e41dd3717fb5a771c1631
+sourceBound: true
+digestBound: true
+GitHub production workflow: 34769532385 / success
+```
+
+This is a runtime/deployment claim only. It does not assert marketplace acceptance, independent audit, legal certification, SOC 2, ISO certification, or cloud-provider endorsement.
+
 ---
 
 ## Test Status (2026-05-26)
@@ -69,16 +88,16 @@ needsApprovalDeniedAtRunGate:   true
 
 ## Overall status
 
-Last verified: **2026-05-26 ICT**
+Last verified runtime deployment: **2026-09-13 ICT**
 
 ```text
-System claim: DSG_AUTONOMOUS_LEVEL_COMPLETE + TEMPLATE_MARKETPLACE_LIVE + GRAPHMAP_PLUGIN_DEPLOYED
-Completion: true
-Passed required lanes: 9/9
-Template marketplace: LIVE (Stripe Checkout wired)
-GraphMap Plugin: DEPLOYED — agents query repo graph autonomously via AGENTS.md rules
-Audit packet final verdict: BLOCKED (governance gates unchanged)
-Production-ready marketplace claim: false (pending RBAC + entitlement enforcement)
+DSG ONE runtime: PRODUCTION E2E PASS
+Database: PASS
+Automation Spacetime database: PASS
+Automation engine: Microsoft Agent Framework 1.18.0 / PASS
+Exact source + image binding: PASS
+Production workflow: PASS
+Marketplace / certification / independent-audit claims: NOT IMPLIED BY RUNTIME PASS
 ```
 
 ## Production smoke evidence
