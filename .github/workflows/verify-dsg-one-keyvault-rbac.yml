@@ -118,6 +118,7 @@ jobs:
               --user-agent 'DSG-One-KeyVault-Probe/1.0' \
               --output evidence/keyvault/automation-rest.json --write-out '%{http_code}' \
               "${auth_headers[@]}" \
+              -H 'Accept-Profile: public' \
               "$SUPABASE_PROJECT_URL/rest/v1/dsg_automation_runs?select=id&limit=1" || true)
           fi
 
