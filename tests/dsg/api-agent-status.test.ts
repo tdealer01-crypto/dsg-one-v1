@@ -38,7 +38,7 @@ describe('GET /api/agent/status', () => {
   it('uses sb_secret keys only in the apikey header', async () => {
     vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://example.supabase.co');
     vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'sb_secret_production');
-    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response(null, { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await GET();
@@ -51,8 +51,10 @@ describe('GET /api/agent/status', () => {
   });
 
   it('keeps Authorization Bearer for legacy service_role JWT compatibility', async () => {
-    configureDatabase();
-    const fetchMock = vi.mocked(fetch);
+    vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://example.supabase.co');
+    vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'service-role-key');
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
 
     await GET();
 
