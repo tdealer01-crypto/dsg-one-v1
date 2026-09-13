@@ -48,6 +48,19 @@ ENV DSG_BUILD_SOURCE_SHA=$DSG_BUILD_SOURCE_SHA
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/automation_spacetime ./automation_spacetime
+COPY --from=builder /app/scripts/dsg-one-container-entrypoint.sh /usr/local/bin/dsg-one-container-entrypoint
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates python3 python3-venv \
+    && python3 -m venv /opt/dsg-automation \
+    && /opt/dsg-automation/bin/pip install --no-cache-dir -r /app/automation_spacetime/requirements.txt \
+    && chmod 0755 /usr/local/bin/dsg-one-container-entrypoint \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV DSG_AUTOMATION_PYTHON=/opt/dsg-automation/bin/python \
+    DSG_AUTOMATION_ENGINE=/app/automation_spacetime/engine.py \
+    DSG_AUTOMATION_ENGINE_VERSION=1.18.0
 
 EXPOSE 8080
-CMD ["node", "server.js"]
+CMD ["/usr/local/bin/dsg-one-container-entrypoint"]

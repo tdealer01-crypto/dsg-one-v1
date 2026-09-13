@@ -41,11 +41,45 @@ async function checkDatabase(): Promise<DatabaseCheck> {
   }
 }
 
+async function checkAutomationSchema(): Promise<DatabaseCheck> {
+  const baseUrl = process.env.DSG_ONE_V1_SUPABASE_URL?.trim().replace(/\/+$/, '');
+  const serviceRoleKey = process.env.DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY?.trim();
+
+  if (!baseUrl || !serviceRoleKey) {
+    return { ok: false, status: null, reason: 'NOT_CONFIGURED' };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+
+  try {
+    const response = await fetch(`${baseUrl}/rest/v1/dsg_automation_runs?select=id&limit=1`, {
+      headers: {
+        apikey: serviceRoleKey,
+        authorization: `Bearer ${serviceRoleKey}`,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return { ok: false, status: response.status, reason: 'HTTP_ERROR' };
+    }
+    return { ok: true, status: response.status };
+  } catch {
+    return { ok: false, status: null, reason: 'UNREACHABLE' };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function GET() {
   const buildSourceSha = process.env.DSG_BUILD_SOURCE_SHA?.trim() || null;
   const expectedSourceSha = process.env.DSG_DEPLOYED_SOURCE_SHA?.trim() || null;
   const imageDigest = process.env.DSG_DEPLOYED_IMAGE_DIGEST?.trim() || null;
   const isAzure = Boolean(process.env.WEBSITE_SITE_NAME);
+  const automationEngineVersion = process.env.DSG_AUTOMATION_ENGINE_VERSION?.trim() || null;
+  const automationEngineOk = automationEngineVersion === '1.18.0';
 
   const sourceBound = Boolean(
     buildSourceSha
@@ -56,8 +90,8 @@ export async function GET() {
   );
   const digestBound = Boolean(imageDigest && DIGEST_PATTERN.test(imageDigest));
   const deploymentIdentityOk = isAzure ? sourceBound && digestBound : true;
-  const database = await checkDatabase();
-  const ok = deploymentIdentityOk && database.ok;
+  const [database, automationDatabase] = await Promise.all([checkDatabase(), checkAutomationSchema()]);
+  const ok = deploymentIdentityOk && database.ok && automationDatabase.ok && (!isAzure || automationEngineOk);
 
   return NextResponse.json(
     {
@@ -76,10 +110,18 @@ export async function GET() {
       checks: {
         process: true,
         db: database.ok,
+        automationDb: automationDatabase.ok,
+        automationEngine: automationEngineOk,
       },
       readiness: {
         database,
+        automationDatabase,
         deploymentIdentityOk,
+        automationEngine: {
+          ok: automationEngineOk,
+          engine: 'microsoft-agent-framework',
+          version: automationEngineVersion,
+        },
       },
     },
     { status: ok ? 200 : 503 },
