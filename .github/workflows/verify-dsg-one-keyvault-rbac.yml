@@ -116,7 +116,7 @@ jobs:
               "$SUPABASE_PROJECT_URL/rest/v1/" || true)
             vault_automation_http=$(curl --silent --show-error \
               --user-agent 'DSG-One-KeyVault-Probe/1.0' \
-              --output /dev/null --write-out '%{http_code}' \
+              --output evidence/keyvault/automation-rest.json --write-out '%{http_code}' \
               "${auth_headers[@]}" \
               "$SUPABASE_PROJECT_URL/rest/v1/dsg_automation_runs?select=id&limit=1" || true)
           fi
