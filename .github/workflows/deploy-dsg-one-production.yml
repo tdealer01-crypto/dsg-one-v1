@@ -319,12 +319,50 @@ jobs:
                   .deployment.sourceBound == true and
                   .deployment.digestBound == true and
                   .checks.db == true and
-                  .readiness.deploymentIdentityOk == true
+                  .checks.automationDb == true and
+                  .checks.automationEngine == true and
+                  .readiness.database.ok == true and
+                  .readiness.automationDatabase.ok == true and
+                  .readiness.deploymentIdentityOk == true and
+                  .readiness.automationEngine.ok == true
                 ' "$RUNNER_TEMP/status.json" >/dev/null; then
               break
             fi
 
             if (( SECONDS >= DEADLINE )); then
+              if [[ -s "$RUNNER_TEMP/status.json" ]] && jq -e 'type == "object"' "$RUNNER_TEMP/status.json" >/dev/null 2>&1; then
+                jq '{
+                  observed_at: .ts,
+                  ok,
+                  repo,
+                  version,
+                  env,
+                  deployment,
+                  checks,
+                  readiness: {
+                    database: .readiness.database,
+                    automationDatabase: .readiness.automationDatabase,
+                    deploymentIdentityOk: .readiness.deploymentIdentityOk,
+                    automationEngine: .readiness.automationEngine
+                  }
+                }' "$RUNNER_TEMP/status.json" > production-readiness-diagnostics.json
+              else
+                jq -n \
+                  --arg verify_http "$VERIFY_HTTP" \
+                  --arg verify_location "$VERIFY_LOCATION" \
+                  --arg login_http "$LOGIN_HTTP" \
+                  --arg status_http "$STATUS_HTTP" '{
+                    status_body_available:false,
+                    probes:{
+                      verify_http:$verify_http,
+                      verify_location:$verify_location,
+                      login_http:$login_http,
+                      status_http:$status_http
+                    }
+                  }' > production-readiness-diagnostics.json
+              fi
+              echo 'SANITIZED_READINESS_DIAGNOSTIC:' >&2
+              jq -c . production-readiness-diagnostics.json >&2
               echo "BLOCK: runtime identity/readiness was not proven; verify_http=$VERIFY_HTTP location=$VERIFY_LOCATION login_http=$LOGIN_HTTP status_http=$STATUS_HTTP" >&2
               false
             fi
@@ -466,6 +504,15 @@ jobs:
           echo "runtime_gate=$RUNTIME_GATE" >> "$GITHUB_OUTPUT"
           echo "claim_status=$CLAIM_STATUS" >> "$GITHUB_OUTPUT"
           trap - ERR TERM INT
+
+      - name: Upload failed readiness diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsg-one-production-readiness-diagnostics-${{ env.SOURCE_SHA }}
+          path: production-readiness-diagnostics.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Upload immutable deployment evidence
         uses: actions/upload-artifact@v4
