@@ -5,7 +5,14 @@ const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
 
 type DatabaseCheck =
   | { ok: true; status: number }
-  | { ok: false; status: number | null; reason: 'NOT_CONFIGURED' | 'UNREACHABLE' | 'HTTP_ERROR' };
+  | { ok: false; status: number | null; reason: 'NOT_CONFIGURED' | 'UNREACHABLE' | 'HTTP_ERROR'; diagnostic?: string };
+
+function networkDiagnostic(error: unknown): string {
+  if (!(error instanceof Error)) return 'UNKNOWN';
+  const cause = (error as Error & { cause?: { code?: unknown } }).cause;
+  const code = cause && typeof cause.code === 'string' ? cause.code : null;
+  return code ? `${error.name}:${code}` : error.name;
+}
 
 async function checkDatabase(): Promise<DatabaseCheck> {
   const baseUrl = process.env.DSG_ONE_V1_SUPABASE_URL?.trim().replace(/\/+$/, '');
@@ -34,8 +41,8 @@ async function checkDatabase(): Promise<DatabaseCheck> {
     }
 
     return { ok: true, status: response.status };
-  } catch {
-    return { ok: false, status: null, reason: 'UNREACHABLE' };
+  } catch (error) {
+    return { ok: false, status: null, reason: 'UNREACHABLE', diagnostic: networkDiagnostic(error) };
   } finally {
     clearTimeout(timeout);
   }
@@ -66,8 +73,8 @@ async function checkAutomationSchema(): Promise<DatabaseCheck> {
       return { ok: false, status: response.status, reason: 'HTTP_ERROR' };
     }
     return { ok: true, status: response.status };
-  } catch {
-    return { ok: false, status: null, reason: 'UNREACHABLE' };
+  } catch (error) {
+    return { ok: false, status: null, reason: 'UNREACHABLE', diagnostic: networkDiagnostic(error) };
   } finally {
     clearTimeout(timeout);
   }

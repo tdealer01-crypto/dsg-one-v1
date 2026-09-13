@@ -105,6 +105,7 @@ describe('GET /api/agent/status', () => {
       ok: false,
       status: null,
       reason: 'UNREACHABLE',
+      diagnostic: 'Error',
     });
   });
 });
