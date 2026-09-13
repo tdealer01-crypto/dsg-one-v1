@@ -52,7 +52,10 @@ if ((policyMigration.match(/create policy dsg_automation_read/g) ?? []).length !
 if (!policyMigration.includes("public.dsg_has_permission(workspace_id, 'job:read')")) throw new Error('AUTOMATION_READ_POLICY_SCOPE_MISSING');
 
 const deployWorkflow = readFileSync('.github/workflows/deploy-dsg-one-production.yml', 'utf8');
-if (!deployWorkflow.includes('DSG_ONE_V1_SUPABASE_URL=$SERVER_SUPABASE_URL')) throw new Error('AUTOMATION_SERVER_SUPABASE_BINDING_MISSING');
+if (!deployWorkflow.includes('SUPABASE_PROJECT_REF: zeyguilldygozufpgxms')) throw new Error('AUTOMATION_SUPABASE_PROJECT_REF_MISSING');
+if (!deployWorkflow.includes('SUPABASE_PROJECT_URL: https://zeyguilldygozufpgxms.supabase.co')) throw new Error('AUTOMATION_SUPABASE_PROJECT_URL_MISSING');
+if (!deployWorkflow.includes('DSG_ONE_V1_SUPABASE_URL=$SUPABASE_PROJECT_URL')) throw new Error('AUTOMATION_SERVER_SUPABASE_BINDING_MISSING');
+if (deployWorkflow.includes('DSG_ONE_V1_SUPABASE_URL=$SERVER_SUPABASE_URL')) throw new Error('AUTOMATION_SERVER_SUPABASE_DRIFT_BINDING_PRESENT');
 if (!readFileSync('lib/dsg/server/automation-spacetime.ts', 'utf8').includes('AUTOMATION_BOUND_PLAN_GRAPH_MISMATCH')) throw new Error('AUTOMATION_PLAN_GRAPH_REBIND_GUARD_MISSING');
 
 if (!engine.includes('"execution_authority": "proposal-only"')) throw new Error('AUTOMATION_ENGINE_AUTHORITY_BOUNDARY_MISSING');
