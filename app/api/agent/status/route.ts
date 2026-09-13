@@ -14,6 +14,15 @@ function networkDiagnostic(error: unknown): string {
   return code ? `${error.name}:${code}` : error.name;
 }
 
+function supabaseRequestHeaders(serverKey: string, acceptJson = false): Record<string, string> {
+  const headers: Record<string, string> = { apikey: serverKey };
+  if (!serverKey.startsWith('sb_')) {
+    headers.authorization = `Bearer ${serverKey}`;
+  }
+  if (acceptJson) headers.Accept = 'application/json';
+  return headers;
+}
+
 async function checkDatabase(): Promise<DatabaseCheck> {
   const baseUrl = process.env.DSG_ONE_V1_SUPABASE_URL?.trim().replace(/\/+$/, '');
   const serviceRoleKey = process.env.DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY?.trim();
@@ -28,10 +37,7 @@ async function checkDatabase(): Promise<DatabaseCheck> {
   try {
     const response = await fetch(`${baseUrl}/rest/v1/`, {
       method: 'HEAD',
-      headers: {
-        apikey: serviceRoleKey,
-        authorization: `Bearer ${serviceRoleKey}`,
-      },
+      headers: supabaseRequestHeaders(serviceRoleKey),
       cache: 'no-store',
       signal: controller.signal,
     });
@@ -61,11 +67,7 @@ async function checkAutomationSchema(): Promise<DatabaseCheck> {
 
   try {
     const response = await fetch(`${baseUrl}/rest/v1/dsg_automation_runs?select=id&limit=1`, {
-      headers: {
-        apikey: serviceRoleKey,
-        authorization: `Bearer ${serviceRoleKey}`,
-        Accept: 'application/json',
-      },
+      headers: supabaseRequestHeaders(serviceRoleKey, true),
       cache: 'no-store',
       signal: controller.signal,
     });

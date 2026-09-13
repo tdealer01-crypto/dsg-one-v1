@@ -35,6 +35,37 @@ describe('GET /api/agent/status', () => {
     expect(typeof body.ts).toBe('string');
   });
 
+  it('uses sb_secret keys only in the apikey header', async () => {
+    vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://example.supabase.co');
+    vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'sb_secret_production');
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init?.headers).toMatchObject({ apikey: 'sb_secret_production' });
+      expect(init?.headers).not.toHaveProperty('authorization');
+    }
+  });
+
+  it('keeps Authorization Bearer for legacy service_role JWT compatibility', async () => {
+    vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://example.supabase.co');
+    vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'service-role-key');
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await GET();
+
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init?.headers).toMatchObject({
+        apikey: 'service-role-key',
+        authorization: 'Bearer service-role-key',
+      });
+    }
+  });
+
   it('fails closed when database configuration is absent', async () => {
     const response = await GET();
     const body = await response.json();
