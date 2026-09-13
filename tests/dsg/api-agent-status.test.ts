@@ -48,6 +48,8 @@ describe('GET /api/agent/status', () => {
       expect(init?.headers).toMatchObject({ apikey: 'sb_secret_production' });
       expect(init?.headers).not.toHaveProperty('authorization');
     }
+    const automationCall = fetchMock.mock.calls.find(([input]) => String(input).includes('/rest/v1/dsg_automation_runs'));
+    expect(automationCall?.[1]?.headers).toMatchObject({ 'Accept-Profile': 'public' });
   });
 
   it('keeps Authorization Bearer for legacy service_role JWT compatibility', async () => {
