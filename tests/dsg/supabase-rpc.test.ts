@@ -40,7 +40,7 @@ describe('DSG Supabase REST/RPC auth headers', () => {
   });
 
   it('keeps Bearer compatibility for legacy JWT-style server keys', async () => {
-    const fetchMock = vi.fn(async () => new Response('"ok"', { status: 200 }));
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response('"ok"', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     await callDsgRpc(
