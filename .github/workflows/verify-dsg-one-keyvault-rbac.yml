@@ -83,10 +83,13 @@ jobs:
             reference_bound=true
           fi
 
-          server_key=$(az keyvault secret show \
+          raw_server_key=$(az keyvault secret show \
             --vault-name "$VAULT_NAME" \
             --name "$SECRET_NAME" \
             --query value --output tsv 2>/dev/null || true)
+          server_key=$(printf '%s' "$raw_server_key" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          if [[ ${#server_key} -ge 2 && "${server_key:0:1}" == '"' && "${server_key: -1}" == '"' ]]; then server_key="${server_key:1:${#server_key}-2}"; fi
+          if [[ "$server_key" == *=sb_secret_* ]]; then server_key="${server_key#*=}"; fi
           key_present=false
           key_kind=missing
           vault_root_http=000
