@@ -40,6 +40,9 @@ if (!route.includes("executionAuthority: 'none'")) throw new Error('AUTOMATION_A
 if (!route.includes('governanceRequired: true')) throw new Error('AUTOMATION_GOVERNANCE_HANDOFF_MISSING');
 
 const engine = readFileSync('automation_spacetime/engine.py', 'utf8');
+if (!engine.includes('name=f"dsg-automation:{run_id}"')) throw new Error('AUTOMATION_WORKFLOW_NAME_NOT_DETERMINISTIC');
+if (!migration.includes('p_previous_checkpoint_id is not null')) throw new Error('AUTOMATION_CHECKPOINT_NEW_ROOT_RULE_MISSING');
+
 if (!engine.includes('"execution_authority": "proposal-only"')) throw new Error('AUTOMATION_ENGINE_AUTHORITY_BOUNDARY_MISSING');
 if (!engine.includes('"governance_authority": "dsg-spacetime"')) throw new Error('AUTOMATION_ENGINE_GOVERNANCE_BOUNDARY_MISSING');
 

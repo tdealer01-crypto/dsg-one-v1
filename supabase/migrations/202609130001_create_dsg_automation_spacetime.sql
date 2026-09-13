@@ -214,7 +214,10 @@ begin
     return;
   end if;
 
-  if v_run.current_checkpoint_id is distinct from p_previous_checkpoint_id then
+  -- A fresh Core Spin evaluation is allowed to start a new checkpoint root.
+  -- Resume/continuation checkpoints must extend the currently committed lineage.
+  if p_previous_checkpoint_id is not null
+     and v_run.current_checkpoint_id is distinct from p_previous_checkpoint_id then
     raise exception 'AUTOMATION_CHECKPOINT_LINEAGE_MISMATCH';
   end if;
 

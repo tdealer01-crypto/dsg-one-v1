@@ -88,7 +88,11 @@ async def _run_evaluate(payload: dict[str, Any]) -> dict[str, Any]:
     normalize = NormalizeExecutor()
     decide = DecisionExecutor()
     workflow = (
-        WorkflowBuilder(start_executor=normalize, checkpoint_storage=storage)
+        WorkflowBuilder(
+            start_executor=normalize,
+            checkpoint_storage=storage,
+            name=f"dsg-automation:{run_id}",
+        )
         .add_edge(normalize, decide)
         .build()
     )
@@ -105,7 +109,11 @@ async def _probe() -> dict[str, Any]:
     normalize = NormalizeExecutor()
     decide = DecisionExecutor()
     workflow = (
-        WorkflowBuilder(start_executor=normalize, checkpoint_storage=storage)
+        WorkflowBuilder(
+            start_executor=normalize,
+            checkpoint_storage=storage,
+            name="dsg-automation-probe",
+        )
         .add_edge(normalize, decide)
         .build()
     )
