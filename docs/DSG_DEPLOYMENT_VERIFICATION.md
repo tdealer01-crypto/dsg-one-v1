@@ -1,26 +1,40 @@
 # DSG Deployment Verification
 
-This document records the deployment verification boundary for `dsg-one-v1`.
+This document records the current deployment verification boundary for `dsg-one-v1`.
 
-## Vercel Project
+## Production authority
 
-- Project: `dsg-one-v1`
-- Project id: `prj_f6nIx3bZKMiw3y1q81m2YdzAtoQH`
-- Team: `tdealer01-cryptos-projects`
+- Provider: **Microsoft Azure**
+- Runtime: Azure App Service
+- App: `dsg-one-v1`
+- Production status endpoint: `https://dsg-one-v1.azurewebsites.net/api/agent/status`
+- Supabase project URL: `https://zeyguilldygozufpgxms.supabase.co`
+- Runtime secrets: Azure Key Vault via App Service Managed Identity
+- Vercel: **retired; not production authority**
 
-## Required repo-scoped environment variables
+## Latest verified production receipt
 
-Use these variables only for the `dsg-one-v1` Vercel project:
+Verified on **2026-09-13 ICT** from GitHub Actions production run `34769532385`.
 
-```bash
-DSG_ONE_V1_SUPABASE_URL=https://zeyguilldygozufpgxms.supabase.co
-DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY=<server-only-secret>
-NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL=https://zeyguilldygozufpgxms.supabase.co
-NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY=sb_publishable__T5uR3y1_EH6cDabodIEwA_Vads9ni4
+```text
+source_sha=0a45fb71733e26d024627cd4a39d5eb23662c721
+image_digest=sha256:24c0cc92687415760d38d636cb96f4347a39bf5eb96e41dd3717fb5a771c1631
+agent_status_http=200
+ok=true
+db=true
+automationDb=true
+automationEngine=true
+database_status=200
+automation_database_status=200
+engine=microsoft-agent-framework
+engine_version=1.18.0
+sourceBound=true
+digestBound=true
+workflow_conclusion=success
 ```
-
-Do not use shared Supabase environment variable names for this repo.
 
 ## Verification rule
 
-Production remains blocked until Vercel shows a `main` deployment with `target = production`, `state = READY`, and the latest GitHub commit SHA.
+A production claim is allowed only when the deployed runtime proves the exact source SHA and image digest, database readiness, Automation Spacetime database readiness, and automation engine readiness. Missing or mismatched evidence remains fail-closed.
+
+Runtime PASS does **not** imply marketplace acceptance, third-party certification, independent audit, legal compliance, SOC 2, ISO certification, or cloud-provider endorsement. Those require separate evidence.
