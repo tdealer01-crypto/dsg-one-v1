@@ -12,6 +12,7 @@ function configureAzureIdentity(sourceSha = SOURCE_SHA) {
   vi.stubEnv('DSG_DEPLOYED_IMAGE_DIGEST', IMAGE_DIGEST);
   vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://example.supabase.co');
   vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'service-role-key');
+  vi.stubEnv('DSG_AUTOMATION_ENGINE_VERSION', '1.18.0');
 }
 
 afterEach(() => {
@@ -40,10 +41,11 @@ describe('GET /api/agent/status', () => {
         sourceBound: true,
         digestBound: true,
       },
-      checks: { process: true, db: true },
+      checks: { process: true, db: true, automationEngine: true },
       readiness: {
         deploymentIdentityOk: true,
         database: { ok: true, status: 200 },
+        automationEngine: { ok: true, engine: 'microsoft-agent-framework', version: '1.18.0' },
       },
     });
     expect(fetchMock).toHaveBeenCalledWith(

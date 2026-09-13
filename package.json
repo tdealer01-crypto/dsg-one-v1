@@ -19,7 +19,7 @@
     "dsg:typecheck": "tsc --noEmit",
     "dsg:production-flow-check": "node scripts/dsg-production-flow-check.mjs",
     "dsg:product-ready": "node scripts/dsg-product-ready-check.mjs",
-    "dsg:verify": "npm run dsg:claim-gate && npm run dsg:runtime-check && npm run dsg:typecheck && npm run lint",
+    "dsg:verify": "npm run dsg:claim-gate && npm run dsg:runtime-check && npm run dsg:automation-check && npm run dsg:typecheck && npm run lint",
     "smoke:memory-api": "bash scripts/dsg-memory-api-smoke.sh",
     "smoke:app-builder-flow-proof": "node scripts/dsg-app-builder-flow-proof-smoke.mjs",
     "smoke:marketplace-readiness": "node scripts/dsg-marketplace-readiness-check.mjs",
@@ -29,7 +29,8 @@
     "smoke:audit-packet": "node scripts/dsg-audit-packet-check.mjs",
     "smoke:first-value-flow": "node scripts/dsg-first-value-flow-smoke.mjs",
     "dsg:aimo-check": "vitest run tests/dsg/aimo-harness.test.ts",
-    "smoke:aimo-sealed": "node scripts/dsg-aimo-sealed-smoke.mjs"
+    "smoke:aimo-sealed": "node scripts/dsg-aimo-sealed-smoke.mjs",
+    "dsg:automation-check": "node scripts/dsg-automation-spacetime-check.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.17.0",

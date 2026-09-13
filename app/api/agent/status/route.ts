@@ -46,6 +46,8 @@ export async function GET() {
   const expectedSourceSha = process.env.DSG_DEPLOYED_SOURCE_SHA?.trim() || null;
   const imageDigest = process.env.DSG_DEPLOYED_IMAGE_DIGEST?.trim() || null;
   const isAzure = Boolean(process.env.WEBSITE_SITE_NAME);
+  const automationEngineVersion = process.env.DSG_AUTOMATION_ENGINE_VERSION?.trim() || null;
+  const automationEngineOk = automationEngineVersion === '1.18.0';
 
   const sourceBound = Boolean(
     buildSourceSha
@@ -57,7 +59,7 @@ export async function GET() {
   const digestBound = Boolean(imageDigest && DIGEST_PATTERN.test(imageDigest));
   const deploymentIdentityOk = isAzure ? sourceBound && digestBound : true;
   const database = await checkDatabase();
-  const ok = deploymentIdentityOk && database.ok;
+  const ok = deploymentIdentityOk && database.ok && (!isAzure || automationEngineOk);
 
   return NextResponse.json(
     {
@@ -76,10 +78,16 @@ export async function GET() {
       checks: {
         process: true,
         db: database.ok,
+        automationEngine: automationEngineOk,
       },
       readiness: {
         database,
         deploymentIdentityOk,
+        automationEngine: {
+          ok: automationEngineOk,
+          engine: 'microsoft-agent-framework',
+          version: automationEngineVersion,
+        },
       },
     },
     { status: ok ? 200 : 503 },

@@ -19,9 +19,16 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - run: node --version
       - run: npm --version
       - run: npm ci
+      - name: Install Microsoft Agent Framework
+        run: python -m pip install --disable-pip-version-check -r automation_spacetime/requirements.txt
+      - name: Verify Automation Spacetime engine
+        run: printf '%s' '{"operation":"probe"}' | python automation_spacetime/engine.py
       - run: npm run dsg:claim-gate
       - run: npm run dsg:runtime-check
       - run: npm run dsg:typecheck
