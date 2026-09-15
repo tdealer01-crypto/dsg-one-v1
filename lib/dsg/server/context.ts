@@ -40,9 +40,25 @@ export function assertDsgPermission(actor: DsgServerActor | null, permission: Ds
 type SupabaseUserResponse = { id?: string; sub?: string };
 type WorkspaceMemberRow = { role: DsgServerActor['role'] };
 
+function getCookieValue(headers: Headers, name: string): string | undefined {
+  const raw = headers.get('cookie');
+  if (!raw) return undefined;
+  for (const part of raw.split(';')) {
+    const [key, ...rest] = part.trim().split('=');
+    if (key !== name) continue;
+    const value = rest.join('=');
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+  return undefined;
+}
+
 export async function resolveVerifiedDsgActor(headers: Headers): Promise<DsgServerActor | null> {
-  const userAccessToken = getBearerToken(headers);
-  const workspaceId = headers.get('x-dsg-workspace-id');
+  const userAccessToken = getBearerToken(headers) ?? getCookieValue(headers, 'sb-access-token');
+  const workspaceId = headers.get('x-dsg-workspace-id') ?? getCookieValue(headers, 'dsg-workspace-id');
   if (!userAccessToken || !workspaceId) return null;
 
   const config = getDsgSupabaseRpcConfig(userAccessToken);
