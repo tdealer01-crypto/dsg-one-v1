@@ -91,12 +91,19 @@ export default function DsgAccessPage() {
   }, [load]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   useEffect(() => {
-    if (!session || session.selected || session.memberships?.length !== 1 || busyWorkspace) return;
-    void selectWorkspace(session.memberships[0].workspace_id);
+    if (!session || session.selected || session.memberships?.length !== 1 || busyWorkspace) return undefined;
+    const workspaceId = session.memberships[0].workspace_id;
+    const timer = window.setTimeout(() => {
+      void selectWorkspace(workspaceId);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [session, busyWorkspace, selectWorkspace]);
 
   async function signOut() {
