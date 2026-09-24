@@ -2,14 +2,14 @@
   "mcpServers": {
     "dsg-one-v1": {
       "type": "http",
-      "url": "https://dsg-one-v1-aimo.onrender.com/api/mcp-server",
+      "url": "https://dsg-one-v1.azurewebsites.net/api/mcp-server",
       "headers": {
         "Authorization": "Bearer ${DSG_ACCESS_TOKEN}"
       }
     },
     "dsg-control-plane": {
       "type": "http",
-      "url": "https://tdealer01-crypto-dsg-control-plane.onrender.com/api/mcp-server",
+      "url": "https://dsg-control-plane.azurewebsites.net/api/mcp-server",
       "headers": {
         "Authorization": "Bearer ${DSG_ACCESS_TOKEN}"
       }

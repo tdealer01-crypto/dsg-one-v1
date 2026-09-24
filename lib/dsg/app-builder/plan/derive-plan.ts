@@ -77,7 +77,7 @@ export function derivePlanFromPrd(prd: DsgAppBuilderPrd): DsgPlanDraft {
     },
     {
       id: 'deployment_proof',
-      label: 'Verify deployment proof after Render auto-deploy',
+      label: 'Verify deployment proof after Azure App Service deploy',
       type: 'deploy',
       risk: 'HIGH',
       wave: 3,

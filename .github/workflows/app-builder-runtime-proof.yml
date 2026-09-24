@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      PROD_HOST: dsg-one-v1-aimo.onrender.com
+      PROD_HOST: dsg-one-v1.azurewebsites.net
       WORKSPACE_ID: runtime-proof-workspace
       ACTOR_ID: github-actions-runtime-proof
     steps:

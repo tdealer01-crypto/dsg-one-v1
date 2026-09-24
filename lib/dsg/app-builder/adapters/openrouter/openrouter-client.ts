@@ -4,7 +4,7 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL = 'openrouter/free';
 const DEFAULT_MAX_TOKENS = 2048;
 const DEFAULT_TEMPERATURE = 0.2;
-const DEFAULT_SITE_URL = 'https://dsg-one-v1-aimo.onrender.com';
+const DEFAULT_SITE_URL = 'https://dsg-one-v1.azurewebsites.net';
 
 function splitModels(value?: string): string[] {
   return (value || '')

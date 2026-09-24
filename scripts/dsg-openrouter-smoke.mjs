@@ -35,7 +35,7 @@ for (const candidate of models) {
       headers: {
         authorization: `Bearer ${apiKey}`,
         'content-type': 'application/json',
-        'http-referer': process.env.OPENROUTER_SITE_URL || process.env.APP_URL || 'https://dsg-one-v1-aimo.onrender.com',
+        'http-referer': process.env.OPENROUTER_SITE_URL || process.env.APP_URL || 'https://dsg-one-v1.azurewebsites.net',
         'x-title': process.env.OPENROUTER_APP_TITLE || 'DSG One App Builder',
       },
       body: JSON.stringify({

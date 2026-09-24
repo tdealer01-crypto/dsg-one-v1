@@ -12,7 +12,7 @@ jobs:
   ship:
     runs-on: ubuntu-latest
     env:
-      DSG_PRODUCTION_URL: 'https://dsg-one-v1-aimo.onrender.com'
+      DSG_PRODUCTION_URL: 'https://dsg-one-v1.azurewebsites.net'
     steps:
       - name: Checkout
         uses: actions/checkout@v4

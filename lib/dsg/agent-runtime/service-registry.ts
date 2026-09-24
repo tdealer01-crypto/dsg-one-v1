@@ -167,7 +167,7 @@ export function listAgentRuntimeServices(): AgentRuntimeService[] {
       requiredSecrets: [],
       evidence: ['deploymentStatusHash', 'z3ProofHash', 'canTriggerDeploy'],
       userBenefit: 'Deployment eligibility is gated by Z3 invariants while the provider-specific deployment remains outside this monitor.',
-      truthBoundary: 'The monitor verifies evidence and eligibility. It does not itself prove that Render deployed the requested commit.',
+      truthBoundary: 'The monitor verifies evidence and eligibility. It does not itself prove that Azure App Service deployed the requested commit.',
     },
     {
       id: 'dsg.agent.browser-research',
@@ -208,16 +208,16 @@ export function listAgentRuntimeServices(): AgentRuntimeService[] {
       truthBoundary: 'If search fails and requiredEvidence=true, Seed Engine returns BLOCK. Never returns guessed data.',
     },
     {
-      id: 'render.deployment.proof',
-      label: 'Render deployment proof',
-      description: 'Provider-specific deployment proof step for the Render runtime after GitHub/CI handoff.',
+      id: 'azure.deployment.proof',
+      label: 'Azure deployment proof',
+      description: 'Provider-specific deployment proof step for the Azure App Service runtime after GitHub/CI handoff.',
       status: 'connector_required',
       implementation: 'not_implemented_in_repo',
-      action: 'Collect Render deployment status for the exact commit and pair it with health/evidence proof before a production claim.',
+      action: 'Collect Azure App Service deployment status for the exact commit and pair it with health/evidence proof before a production claim.',
       requiredSecrets: [],
       evidence: ['deployment-url', 'deployment-id-or-provider-reference', 'commit-sha', 'production-flow-proof'],
-      userBenefit: 'The user can keep the public site on Framer while production runtime proof remains tied to the actual Render backend deployment.',
-      truthBoundary: 'Render service existence or a reachable URL is not enough. Exact deployment/commit evidence is still required before PRODUCTION_VERIFIED.',
+      userBenefit: 'The user can keep the public site on Framer while production runtime proof remains tied to the actual Azure App Service deployment.',
+      truthBoundary: 'Azure App Service existence or a reachable URL is not enough. Exact deployment/commit evidence is still required before PRODUCTION_VERIFIED.',
     },
   ];
 }
