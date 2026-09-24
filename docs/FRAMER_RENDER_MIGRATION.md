@@ -1,4 +1,13 @@
-# Framer + Render Deployment Contract
+# Framer + Render Deployment Contract (SUPERSEDED)
+
+> **SUPERSEDED 2026-09-24.** This plan targeted Render as the application
+> runtime. Production moved to **Azure App Service `dsg-one-v1`**
+> (`https://dsg-one-v1.azurewebsites.net`) instead — see `AGENTS.md` and
+> `CLAUDE.md` for the current hosting boundary. `dsg-one-v1-aimo.onrender.com`
+> was verified dead (`HTTP 503`) on this date. This document is kept as
+> historical record of the migration plan that was tried; do not treat any
+> Render instruction below as current, and do not use it to justify pointing
+> anything at Render.
 
 ## Goal
 

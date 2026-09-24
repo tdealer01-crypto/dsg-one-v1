@@ -1,6 +1,6 @@
 # CLAUDE.md — DSG One v1 Agent Rules
 
-Read `AGENTS.md` first — especially the middleware critical rule and the Framer + Render production boundary.
+Read `AGENTS.md` first — especially the middleware critical rule and the Azure App Service production boundary.
 
 ## Tech stack
 
@@ -39,7 +39,7 @@ if (Date.now() / 1000 > exp) { /* expired */ }
 - Do not auto-merge pull requests
 - Do not import `@supabase/ssr` anywhere in this repo
 - Do not add Supabase library calls to `middleware.ts`
-- Do not reintroduce Vercel as a production fallback while the production runtime is on Render
+- Do not reintroduce Vercel, Render, or Railway as a production fallback; Azure App Service `dsg-one-v1` is the only production runtime path
 - Do not put server secrets, Stripe webhooks, Z3/Ising execution, or privileged runtime actions into Framer client code
 
 ## Required PR evidence
@@ -135,11 +135,18 @@ import { useChecklist, useAppLanguage, checklistStore, languageStore } from '@/s
 
 ### Current hosting boundary
 - Public presentation layer: Framer
-- DSG application/runtime/API: Render service `dsg-one-v1-aimo`
-- Production runtime origin: `https://dsg-one-v1-aimo.onrender.com`
+- DSG application/runtime/API: Azure App Service `dsg-one-v1`
+- Production runtime origin: `https://dsg-one-v1.azurewebsites.net`
+
+Render (`dsg-one-v1-aimo.onrender.com`) was an earlier migration target
+(see `docs/FRAMER_RENDER_MIGRATION.md`, superseded) and is not the current
+production runtime — verified dead (`HTTP 503`) on 2026-09-24. Several
+scripts, workflow env defaults, and fallback URL constants elsewhere in this
+repo still point at the Render origin; treat those as stale unless you
+re-verify them, not as evidence Render is live.
 
 ### Check if production is alive
-GET https://dsg-one-v1-aimo.onrender.com/api/agent/status
+GET https://dsg-one-v1.azurewebsites.net/api/agent/status
 
 ### Ship from chat (triggers CI → verify)
 Use GitHub MCP tool `mcp__github__create_dispatch_event` or trigger workflow_dispatch on `.github/workflows/ship.yml` with input `reason: "<what you did>"`.
@@ -147,8 +154,8 @@ Use GitHub MCP tool `mcp__github__create_dispatch_event` or trigger workflow_dis
 ### Full loop
 1. Write code → commit → push to claude/* branch
 2. Open PR; merge only after required verification and approval policy are satisfied
-3. Render auto-deploys the configured `main` branch
-4. Verify the Render deployment corresponds to the intended commit
-5. Call GET /api/agent/status on the Render origin
+3. `.github/workflows/deploy-dsg-one-production.yml` deploys `main` to Azure App Service `dsg-one-v1`
+4. Verify the Azure deployment's `buildSourceSha`/`imageDigest` correspond to the intended commit
+5. Call GET /api/agent/status on the Azure origin
 6. Treat a reachable URL as availability evidence only; claim production verification only after deployment/commit and production-flow proof are attached
 
