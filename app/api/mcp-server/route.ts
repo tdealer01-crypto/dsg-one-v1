@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAimoServiceReadiness } from '@/lib/dsg/aimo/service-registry';
+import { getNvidiaIsingStrategy } from '@/lib/dsg/aimo/nvidia-ising';
 
 // ERROR_HANDLER_EXEMPT: MCP JSON-RPC protocol requires structured error responses
 export const dynamic = 'force-dynamic';
@@ -72,6 +73,29 @@ const TOOLS = [
     name: 'aimo_status',
     description: 'Return non-secret readiness for the DSG AIMO MCP gateway, deterministic search service, and Cinema proof verifier.',
     inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'physics_ising_strategy',
+    description: 'Get a governed advisory NVIDIA Ising strategy for shared Spacetime/MCP compute. This tool does not verify, approve, or execute the proposed strategy.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        problem: {
+          type: 'object',
+          properties: {
+            problemId: { type: 'string' },
+            statement: { type: 'string' },
+            domain: { type: 'string' },
+            constraints: { type: 'object' },
+          },
+          required: ['statement'],
+        },
+        mode: { type: 'string', enum: ['live', 'pinned'] },
+        pinnedText: { type: 'string' },
+        model: { type: 'string' },
+      },
+      required: ['problem'],
+    },
   },
   {
     name: 'solve_aimo',
@@ -201,6 +225,36 @@ async function callTool(
           error: error instanceof Error ? error.message : String(error),
         };
       }
+    }
+    case 'physics_ising_strategy': {
+      const problem = (toolInput.problem ?? {}) as Record<string, unknown>;
+      const statement = typeof problem.statement === 'string' ? problem.statement.trim() : '';
+      if (!statement) {
+        return { ok: false, verdict: 'BLOCKED', error: 'problem.statement is required' };
+      }
+      const mode = toolInput.mode === 'pinned' ? 'pinned' : 'live';
+      const strategy = await getNvidiaIsingStrategy(
+        {
+          problemId: typeof problem.problemId === 'string' ? problem.problemId : undefined,
+          statement,
+          domain: typeof problem.domain === 'string' ? problem.domain : undefined,
+          constraints: problem.constraints && typeof problem.constraints === 'object'
+            ? problem.constraints as Record<string, unknown>
+            : undefined,
+        },
+        {
+          mode,
+          pinnedText: typeof toolInput.pinnedText === 'string' ? toolInput.pinnedText : undefined,
+          model: typeof toolInput.model === 'string' ? toolInput.model : undefined,
+        },
+      );
+      return {
+        ok: Boolean(strategy),
+        verdict: strategy ? 'ADVISORY' : 'BLOCKED',
+        authority: 'ADVISORY_ONLY',
+        strategy,
+        truthBoundary: 'NVIDIA Ising output is compute advice only. Execution or PASS requires downstream DSG governance and verification.',
+      };
     }
     case 'solve_aimo': {
       const res = await fetch(`${base}/api/dsg/aimo/solve`, {
