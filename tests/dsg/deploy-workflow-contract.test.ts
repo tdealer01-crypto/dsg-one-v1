@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 
 const workflow = readFileSync('.github/workflows/deploy-dsg-one-production.yml', 'utf8');
 
-describe('DSG ONE governed Azure deployment workflow', () => {
-  it('deploys the push SHA and uses a run-unique locked image tag', () => {
+describe('DSG ONE historical manual Azure deployment workflow', () => {
+  it('is manual-only and uses an exact source SHA with a run-unique locked image tag', () => {
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).not.toContain('\n  push:');
     expect(workflow).toContain(
       "SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || github.sha }}",
     );
