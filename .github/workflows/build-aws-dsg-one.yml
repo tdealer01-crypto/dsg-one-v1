@@ -1,0 +1,83 @@
+name: Build DSG ONE V1 production image on AWS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-aws-dsg-one.yml"
+      - "Dockerfile"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.ts"
+      - "automation_spacetime/**"
+      - "scripts/dsg-one-container-entrypoint.sh"
+      - "app/api/agent/status/route.ts"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: dsg-one-v1-aws-production-image
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      AWS_REGION: us-east-1
+      AWS_ROLE_ARN: arn:aws:iam::121205961822:role/dsg-one-v1-github-deploy
+      ECR_REPOSITORY: dsg-one-v1-prod
+      NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL: ${{ vars.DSG_ONE_V1_SUPABASE_URL || 'https://zeyguilldygozufpgxms.supabase.co' }}
+      NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY: ${{ vars.DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable__T5uR3y1_EH6cDabodIEwA_Vads9ni4' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Configure AWS credentials with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build or reuse immutable image and verify digest
+        shell: bash
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+
+          EXISTING_DIGEST="$(aws ecr describe-images             --repository-name "$ECR_REPOSITORY"             --image-ids imageTag="$GITHUB_SHA"             --query 'imageDetails[0].imageDigest'             --output text 2>/dev/null || true)"
+
+          if [[ "$EXISTING_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "AWS_DSG_ONE_IMAGE_REUSE=PASS digest=$EXISTING_DIGEST"
+          else
+            docker build               --build-arg "DSG_BUILD_SOURCE_SHA=$GITHUB_SHA"               --build-arg "NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL=$NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL"               --build-arg "NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY=$NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY"               -t "$IMAGE" .
+            docker push "$IMAGE"
+          fi
+
+          DIGEST="$(aws ecr describe-images             --repository-name "$ECR_REPOSITORY"             --image-ids imageTag="$GITHUB_SHA"             --query 'imageDetails[0].imageDigest'             --output text)"
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "BLOCK: immutable DSG ONE V1 ECR digest missing"
+            exit 24
+          }
+          echo "AWS_DSG_ONE_ECR_BUILD=PASS source_sha=$GITHUB_SHA digest=$DIGEST"
+
+      - name: Cost-safe deployment gate
+        run: |
+          echo "AWS_DSG_ONE_RUNTIME_DEPLOY=BLOCKED_BY_COST_GATE"
+          echo "This workflow publishes/verifies the immutable image only."
+          echo "It does not start EC2, ECS/Fargate, ALB, NAT Gateway, App Runner, or GPU compute."
