@@ -84,6 +84,8 @@ export async function getNvidiaIsingStrategy(
     '',
     `Problem ID: ${normalized.problemId ?? 'unknown'}`,
     `Domain: ${normalized.domain ?? 'unknown'}`,
+    'Constraints:',
+    normalized.constraints ? JSON.stringify(normalized.constraints) : 'none',
     'Problem:',
     normalized.statement,
   ].join('\n');
