@@ -1,17 +1,11 @@
-name: Deploy DSG ONE Production Azure
+name: Historical Manual DSG ONE Azure Deployment
 
 on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact dsg-one-v1 commit SHA to build and deploy
+        description: Historical/manual Azure rollback proof only; exact dsg-one-v1 commit SHA
         required: true
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/deploy-dsg-one-production.yml'
-      - 'Dockerfile'
-      - 'app/api/agent/status/route.ts'
 
 permissions:
   contents: read
