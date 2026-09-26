@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getAimoServiceReadiness } from '@/lib/dsg/aimo/service-registry';
 import { getNvidiaIsingStrategy } from '@/lib/dsg/aimo/nvidia-ising';
+import {
+  recordApiKeyUsage,
+  validateApiKeyFromHeaders,
+} from '@/lib/dsg/mcp/validate-api-key';
 
 // ERROR_HANDLER_EXEMPT: MCP JSON-RPC protocol requires structured error responses
 export const dynamic = 'force-dynamic';
@@ -230,31 +234,106 @@ async function callTool(
       const problem = (toolInput.problem ?? {}) as Record<string, unknown>;
       const statement = typeof problem.statement === 'string' ? problem.statement.trim() : '';
       if (!statement) {
-        return { ok: false, verdict: 'BLOCKED', error: 'problem.statement is required' };
+        return {
+          ok: false,
+          verdict: 'BLOCKED',
+          error: 'problem.statement is required',
+          nextAction: 'Provide a non-empty problem.statement.',
+        };
       }
-      const mode = toolInput.mode === 'pinned' ? 'pinned' : 'live';
-      const strategy = await getNvidiaIsingStrategy(
-        {
-          problemId: typeof problem.problemId === 'string' ? problem.problemId : undefined,
-          statement,
-          domain: typeof problem.domain === 'string' ? problem.domain : undefined,
-          constraints: problem.constraints && typeof problem.constraints === 'object'
-            ? problem.constraints as Record<string, unknown>
-            : undefined,
-        },
-        {
-          mode,
-          pinnedText: typeof toolInput.pinnedText === 'string' ? toolInput.pinnedText : undefined,
-          model: typeof toolInput.model === 'string' ? toolInput.model : undefined,
-        },
-      );
-      return {
-        ok: Boolean(strategy),
-        verdict: strategy ? 'ADVISORY' : 'BLOCKED',
-        authority: 'ADVISORY_ONLY',
-        strategy,
-        truthBoundary: 'NVIDIA Ising output is compute advice only. Execution or PASS requires downstream DSG governance and verification.',
-      };
+
+      const requestedMode = toolInput.mode;
+      if (
+        typeof requestedMode !== 'undefined' &&
+        requestedMode !== 'live' &&
+        requestedMode !== 'pinned'
+      ) {
+        return {
+          ok: false,
+          verdict: 'BLOCKED',
+          error: 'INVALID_MODE',
+          nextAction: 'Set mode to exactly "live" or "pinned".',
+        };
+      }
+      const mode = requestedMode === 'pinned' ? 'pinned' : 'live';
+
+      // Live provider compute consumes paid NVIDIA capacity. Fail closed unless
+      // the caller presents a valid DSG API key and metering succeeds first.
+      if (mode === 'live') {
+        const validation = await validateApiKeyFromHeaders(
+          new Headers(incomingRequest.headers),
+        );
+        if (!validation.valid) {
+          return {
+            ok: false,
+            verdict: 'BLOCKED',
+            error: 'INVALID_API_KEY',
+            nextAction:
+              'Provide a valid X-DSG-Api-Key before requesting live NVIDIA Ising compute.',
+          };
+        }
+        try {
+          await recordApiKeyUsage(
+            validation.keyId,
+            validation.actorId,
+            'physics-ising-strategy',
+          );
+        } catch (error) {
+          return {
+            ok: false,
+            verdict: 'BLOCKED',
+            error: 'USAGE_METER_FAILED',
+            detail: error instanceof Error ? error.message : String(error),
+            nextAction:
+              'Restore DSG API-key metering before requesting live NVIDIA Ising compute.',
+          };
+        }
+      }
+
+      try {
+        const strategy = await getNvidiaIsingStrategy(
+          {
+            problemId: typeof problem.problemId === 'string' ? problem.problemId : undefined,
+            statement,
+            domain: typeof problem.domain === 'string' ? problem.domain : undefined,
+            constraints: problem.constraints && typeof problem.constraints === 'object'
+              ? problem.constraints as Record<string, unknown>
+              : undefined,
+          },
+          {
+            mode,
+            pinnedText: typeof toolInput.pinnedText === 'string' ? toolInput.pinnedText : undefined,
+            model: typeof toolInput.model === 'string' ? toolInput.model : undefined,
+          },
+        );
+        if (!strategy) {
+          return {
+            ok: false,
+            verdict: 'BLOCKED',
+            error: 'ISING_STRATEGY_UNAVAILABLE',
+            nextAction:
+              'Check the Ising mode/provider configuration and retry with valid inputs.',
+          };
+        }
+        return {
+          ok: true,
+          verdict: 'ADVISORY',
+          authority: 'ADVISORY_ONLY',
+          strategy,
+          truthBoundary: 'NVIDIA Ising output is compute advice only. Execution or PASS requires downstream DSG governance and verification.',
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          verdict: 'BLOCKED',
+          error: 'ISING_STRATEGY_UNAVAILABLE',
+          detail: error instanceof Error ? error.message : String(error),
+          nextAction:
+            mode === 'pinned'
+              ? 'Provide a non-empty pinnedText for pinned replay.'
+              : 'Check NVIDIA Ising provider configuration/readiness and retry.',
+        };
+      }
     }
     case 'solve_aimo': {
       const res = await fetch(`${base}/api/dsg/aimo/solve`, {
