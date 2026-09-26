@@ -154,8 +154,8 @@ Use GitHub MCP tool `mcp__github__create_dispatch_event` or trigger workflow_dis
 ### Full loop
 1. Write code → commit → push to claude/* branch
 2. Open PR; merge only after required verification and approval policy are satisfied
-3. `.github/workflows/deploy-dsg-one-production.yml` deploys `main` to Azure App Service `dsg-one-v1`
-4. Verify the Azure deployment's `buildSourceSha`/`imageDigest` correspond to the intended commit
-5. Call GET /api/agent/status on the Azure origin
-6. Treat a reachable URL as availability evidence only; claim production verification only after deployment/commit and production-flow proof are attached
+3. Build and scan the immutable AWS image from `main`
+4. Verify the AWS ECR source-SHA tag/digest binding and release-manifest status
+5. Deploy only through the governed AWS runtime path after the security/cost gates pass
+6. Treat the Azure deployment workflow as historical/manual rollback proof only; never use an Azure PASS as current AWS production evidence
 

@@ -100,7 +100,7 @@ POST /api/plugins/graphmap/query
 - **`lucide-react: ^0.553.0`** มีอยู่ใน `package.json` แล้ว ใช้ได้เลย
 - **`recharts: ^3.8.1`** มีอยู่แล้ว ใช้ได้เลย
 - **`lib/utils.ts`** มีอยู่แล้ว — `cn()` ใช้ได้จาก `@/lib/utils`
-- **Azure deploy** — current production runtime is Azure App Service `dsg-one-v1`; deploy only through `.github/workflows/deploy-dsg-one-production.yml` and verify the exact source SHA, locked ACR tag/digest, runtime deployment identity, and real DB readiness before claiming production proof.
+- **Azure deploy (historical/manual only)** — Azure App Service `dsg-one-v1` is no longer the active production target during the AWS migration. `.github/workflows/deploy-dsg-one-production.yml` is manual-only rollback/proof tooling. Current production claims must come from the AWS release manifest, immutable ECR image, live AWS runtime, and fresh E2E evidence.
 - **Framer public site** — use as the public presentation layer only until authenticated cross-origin flows are deliberately designed and tested.
 - **Build command** — ใช้ `npm run build` หรือ `node scripts/dsg-next-build.mjs` ไม่ใช่ `next build` ตรงๆ
 - **`app/dsg/layout.tsx`** มีอยู่แล้วตั้งแต่ merge นี้ — ถ้าจะเพิ่มหน้าใน `/dsg/*` ไม่ต้องสร้าง layout ใหม่
