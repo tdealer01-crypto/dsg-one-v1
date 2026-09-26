@@ -52,6 +52,7 @@ COPY --from=builder /app/automation_spacetime ./automation_spacetime
 COPY --from=builder /app/scripts/dsg-one-container-entrypoint.sh /usr/local/bin/dsg-one-container-entrypoint
 
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends ca-certificates python3 python3-venv \
     && python3 -m venv /opt/dsg-automation \
     && /opt/dsg-automation/bin/pip install --no-cache-dir -r /app/automation_spacetime/requirements.txt \
