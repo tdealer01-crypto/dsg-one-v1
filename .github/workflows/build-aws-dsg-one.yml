@@ -75,6 +75,30 @@ jobs:
             exit 24
           }
           echo "AWS_DSG_ONE_ECR_BUILD=PASS source_sha=$GITHUB_SHA digest=$DIGEST"
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+        id: image
+
+      - name: Block release on critical ECR findings
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIGEST="${{ steps.image.outputs.digest }}"
+          aws ecr wait image-scan-complete \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-id imageDigest="$DIGEST"
+          FINDINGS="$(aws ecr describe-image-scan-findings \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-id imageDigest="$DIGEST" \
+            --output json)"
+          CRITICAL="$(jq -r '.imageScanFindings.findingSeverityCounts.CRITICAL // 0' <<<"$FINDINGS")"
+          HIGH="$(jq -r '.imageScanFindings.findingSeverityCounts.HIGH // 0' <<<"$FINDINGS")"
+          MEDIUM="$(jq -r '.imageScanFindings.findingSeverityCounts.MEDIUM // 0' <<<"$FINDINGS")"
+          echo "AWS_DSG_ONE_ECR_SCAN critical=$CRITICAL high=$HIGH medium=$MEDIUM"
+          if (( CRITICAL > 0 )); then
+            echo "BLOCK: DSG ONE V1 image has critical ECR findings"
+            exit 25
+          fi
+          echo "AWS_DSG_ONE_ECR_SCAN_GATE=PASS"
 
       - name: Cost-safe deployment gate
         run: |
