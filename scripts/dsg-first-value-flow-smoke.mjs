@@ -15,7 +15,7 @@ function resolveBaseUrl() {
   const rawBaseUrl = process.env.APP_URL || process.env.DSG_ONE_V1_PRODUCTION_URL;
   if (!rawBaseUrl) {
     failSummary(['APP_URL or DSG_ONE_V1_PRODUCTION_URL is required'], {
-      nextAction: 'Set APP_URL="https://dsg-one-v1.azurewebsites.net" or DSG_ONE_V1_PRODUCTION_URL before running this production smoke.',
+      nextAction: 'Set APP_URL or DSG_ONE_V1_PRODUCTION_URL to the currently verified DSG ONE HTTPS runtime from AWS cutover evidence before running this production smoke.',
     });
   }
 

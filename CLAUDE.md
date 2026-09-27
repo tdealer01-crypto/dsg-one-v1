@@ -1,6 +1,6 @@
 # CLAUDE.md — DSG One v1 Agent Rules
 
-Read `AGENTS.md` first — especially the middleware critical rule and the Azure App Service production boundary.
+Read `AGENTS.md` first — especially the middleware critical rule and the AWS migration truth boundary.
 
 ## Tech stack
 
@@ -39,7 +39,7 @@ if (Date.now() / 1000 > exp) { /* expired */ }
 - Do not auto-merge pull requests
 - Do not import `@supabase/ssr` anywhere in this repo
 - Do not add Supabase library calls to `middleware.ts`
-- Do not reintroduce Vercel, Render, or Railway as a production fallback; Azure App Service `dsg-one-v1` is the only production runtime path
+- Do not reintroduce Vercel, Render, Railway, or silent Azure fallbacks; AWS is the active runtime migration target and no public runtime URL may be invented before verified cutover
 - Do not put server secrets, Stripe webhooks, Z3/Ising execution, or privileged runtime actions into Framer client code
 
 ## Required PR evidence
@@ -135,8 +135,9 @@ import { useChecklist, useAppLanguage, checklistStore, languageStore } from '@/s
 
 ### Current hosting boundary
 - Public presentation layer: Framer
-- DSG application/runtime/API: Azure App Service `dsg-one-v1`
-- Production runtime origin: `https://dsg-one-v1.azurewebsites.net`
+- DSG application/runtime/API: AWS migration target, source-bound immutable ECR images
+- Public AWS runtime origin: **not asserted yet**; live runtime E2E and HTTPS cutover remain NOT_RUN / NOT_DONE
+- Azure App Service: historical/manual rollback proof only
 
 Render (`dsg-one-v1-aimo.onrender.com`) was an earlier migration target
 (see `docs/FRAMER_RENDER_MIGRATION.md`, superseded) and is not the current
@@ -146,7 +147,7 @@ repo still point at the Render origin; treat those as stale unless you
 re-verify them, not as evidence Render is live.
 
 ### Check if production is alive
-GET https://dsg-one-v1.azurewebsites.net/api/agent/status
+Use the currently verified HTTPS runtime origin from the AWS cutover evidence. If no verified origin exists, report BLOCKED; do not fall back to Azure.
 
 ### Ship from chat (triggers CI → verify)
 Use GitHub MCP tool `mcp__github__create_dispatch_event` or trigger workflow_dispatch on `.github/workflows/ship.yml` with input `reason: "<what you did>"`.

@@ -17,13 +17,15 @@
   - npm run smoke:app-builder-flow-proof
   - npm run smoke:audit-packet
   - npm run smoke:first-value-flow
-- If APP_URL is required, use:
-  export APP_URL="https://dsg-one-v1.azurewebsites.net"
+- If APP_URL is required:
+  - set `APP_URL` or `DSG_ONE_V1_PRODUCTION_URL` explicitly from current verified AWS cutover evidence;
+  - until public AWS HTTPS cutover is verified, fail closed instead of falling back to an Azure hostname.
 - Production hosting boundary:
   - Framer = public website / marketing / docs / public presentation.
-  - Azure App Service `dsg-one-v1` = DSG ONE application runtime, APIs, protected `/dsg/*`, MCP, auth-dependent flows, Z3/Ising, webhooks, audit/evidence execution.
+  - AWS is the active DSG ONE runtime migration target; current immutable ECR image/security evidence is authoritative for the container stage.
+  - Azure App Service is historical/manual rollback proof only and must not be used as current AWS production evidence.
   - Do not put server secrets or privileged execution logic in Framer client code.
-  - Do not reintroduce Vercel, Render, or Railway production fallbacks; Azure is the only production runtime path.
+  - Do not reintroduce Vercel, Render, Railway, or silent Azure production fallbacks.
 
 ---
 

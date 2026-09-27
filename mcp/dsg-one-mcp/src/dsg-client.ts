@@ -1,5 +1,23 @@
-const DSG_BASE = (process.env.DSG_APP_URL || "https://dsg-one-v1.azurewebsites.net").replace(/\/+$/, "");
 const DSG_API_KEY = process.env.DSG_API_KEY;
+
+function dsgBase(): string {
+  const raw = (process.env.DSG_APP_URL || "").trim();
+  if (!raw) {
+    throw new Error(
+      "DSG_APP_URL_REQUIRED: set DSG_APP_URL to the currently verified DSG ONE HTTPS runtime from AWS cutover evidence.",
+    );
+  }
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("DSG_APP_URL_INVALID: DSG_APP_URL must be a valid absolute URL.");
+  }
+  if (url.protocol !== "https:") {
+    throw new Error("DSG_APP_URL_HTTPS_REQUIRED: DSG_APP_URL must use HTTPS.");
+  }
+  return url.origin.replace(/\/+$/, "");
+}
 
 function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -12,7 +30,7 @@ export async function callDsgGate(
   evidence: Record<string, unknown>,
 ): Promise<{ verdict: "ALLOW" | "REVIEW" | "BLOCK"; auditId: string }> {
   try {
-    const res = await fetch(`${DSG_BASE}/api/dsg/marketplace/audit-packet`, {
+    const res = await fetch(`${dsgBase()}/api/dsg/marketplace/audit-packet`, {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({
@@ -34,7 +52,7 @@ export async function callDsgGate(
 }
 
 export async function dsgRequest(endpoint: string, options?: RequestInit): Promise<unknown> {
-  const res = await fetch(`${DSG_BASE}${endpoint}`, {
+  const res = await fetch(`${dsgBase()}${endpoint}`, {
     ...options,
     headers: { ...authHeaders(), ...(options?.headers ?? {}) },
   });
