@@ -1,0 +1,56 @@
+name: Prepare DSG ONE AWS runtime material
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      AWS_REGION: us-east-1
+      AWS_ROLE_ARN: arn:aws:iam::121205961822:role/dsg-one-v1-github-deploy
+      DSG_ONE_V1_SUPABASE_URL: ${{ vars.DSG_ONE_V1_SUPABASE_URL || secrets.DSG_ONE_V1_SUPABASE_URL || 'https://zeyguilldygozufpgxms.supabase.co' }}
+      DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate runtime material
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DSG_ONE_V1_SUPABASE_URL" == https://*.supabase.co ]] || {
+            echo "READINESS=BLOCKED"
+            echo "BLOCK: DSG_ONE_V1_SUPABASE_URL is missing or invalid"
+            echo "nextAction=Configure the repo-scoped DSG ONE Supabase URL before preparing AWS runtime material."
+            exit 20
+          }
+          test -n "$DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY" || {
+            echo "READINESS=BLOCKED"
+            echo "BLOCK: DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY is missing"
+            echo "nextAction=Configure the existing DSG ONE server-only Supabase service-role secret in GitHub; do not paste it into logs or source."
+            exit 21
+          }
+          echo "::add-mask::$DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY"
+
+      - name: Configure AWS credentials with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Store runtime material in SSM Parameter Store
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ssm put-parameter             --name /dsg/one/prod/supabase-url             --type String             --value "$DSG_ONE_V1_SUPABASE_URL"             --overwrite >/dev/null
+          aws ssm put-parameter             --name /dsg/one/prod/supabase-service-role-key             --type SecureString             --value "$DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY"             --overwrite >/dev/null
+          aws ssm put-parameter             --name /dsg/one/prod/prepared-source-sha             --type String             --value "$GITHUB_SHA"             --overwrite >/dev/null
+          echo "AWS_DSG_ONE_RUNTIME_MATERIAL=PASS"
+          echo "parameters=/dsg/one/prod/supabase-url,/dsg/one/prod/supabase-service-role-key,/dsg/one/prod/prepared-source-sha"
+          echo "Runtime compute was not started."
