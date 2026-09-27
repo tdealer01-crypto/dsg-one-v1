@@ -104,7 +104,7 @@ async def _run_evaluate(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _probe() -> dict[str, Any]:
-    installed = version("agent-framework")
+    installed = version("agent-framework-core")
     storage = InMemoryCheckpointStorage()
     normalize = NormalizeExecutor()
     decide = DecisionExecutor()

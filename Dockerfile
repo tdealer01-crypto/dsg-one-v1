@@ -37,7 +37,7 @@ RUN npm run build
 # self-contained server at .next/standalone that only needs the static
 # and public assets copied alongside it — no full node_modules in the
 # final image.
-FROM node:24-bookworm-slim AS runner
+FROM node:24-trixie-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

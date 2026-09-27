@@ -1,1 +1,2 @@
-agent-framework==1.18.0
+agent-framework-core==1.18.0
+agent-framework-orchestrations==1.1.1
