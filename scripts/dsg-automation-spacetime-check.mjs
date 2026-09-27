@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs';
 
-const req = readFileSync('automation_spacetime/requirements.txt', 'utf8').trim();
-if (req !== 'agent-framework==1.18.0') throw new Error('AUTOMATION_FRAMEWORK_VERSION_NOT_PINNED');
+const req = readFileSync('automation_spacetime/requirements.txt', 'utf8').trim().split(/\r?\n/);
+const expectedFrameworkPackages = [
+  'agent-framework-core==1.18.0',
+  'agent-framework-orchestrations==1.1.1',
+];
+if (JSON.stringify(req) !== JSON.stringify(expectedFrameworkPackages)) {
+  throw new Error('AUTOMATION_FRAMEWORK_VERSION_NOT_PINNED');
+}
 
 const migration = readFileSync('supabase/migrations/202609130001_create_dsg_automation_spacetime.sql', 'utf8');
 const policyMigration = readFileSync('supabase/migrations/20260913111308_harden_dsg_automation_spacetime_policies.sql', 'utf8');
@@ -47,6 +53,7 @@ if (!route.includes('governanceRequired: true')) throw new Error('AUTOMATION_GOV
 
 const engine = readFileSync('automation_spacetime/engine.py', 'utf8');
 if (!engine.includes('name=f"dsg-automation:{run_id}"')) throw new Error('AUTOMATION_WORKFLOW_NAME_NOT_DETERMINISTIC');
+if (!engine.includes('version("agent-framework-core")')) throw new Error('AUTOMATION_FRAMEWORK_PACKAGE_PROBE_MISSING');
 if (!migration.includes('p_previous_checkpoint_id is not null')) throw new Error('AUTOMATION_CHECKPOINT_NEW_ROOT_RULE_MISSING');
 if ((policyMigration.match(/create policy dsg_automation_read/g) ?? []).length !== 6) throw new Error('AUTOMATION_READ_POLICIES_INCOMPLETE');
 if (!policyMigration.includes("public.dsg_has_permission(workspace_id, 'job:read')")) throw new Error('AUTOMATION_READ_POLICY_SCOPE_MISSING');
