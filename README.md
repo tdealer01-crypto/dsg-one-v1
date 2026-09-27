@@ -240,8 +240,8 @@ MARKETPLACE_PASS: locked until full enforcement, review, and approval evidence e
 
 ```text
 1. Apply Supabase migrations on production DB (000001–000003).
-2. Register https://<dsg-one-azure-app>.azurewebsites.net/api/webhooks/stripe in Stripe dashboard
-   → event: checkout.session.completed
+2. After verified AWS HTTPS cutover, register `<verified-dsg-one-runtime>/api/webhooks/stripe` in Stripe
+   → event: checkout.session.completed; do not register a retired Azure endpoint
 3. Add server-side RBAC enforcement tests and cross-org denial tests.
 4. Add entitlement or billing provider proof, quota denial tests, and upgrade-path proof.
 5. Add accessibility review notes for keyboard, semantics, contrast, mobile viewport.
