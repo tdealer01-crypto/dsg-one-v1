@@ -4,8 +4,12 @@ on:
   pull_request:
     paths:
       - "Dockerfile"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.ts"
       - "automation_spacetime/**"
       - "scripts/dsg-one-container-entrypoint.sh"
+      - "app/api/agent/status/route.ts"
       - ".github/workflows/verify-aws-runtime-image.yml"
 
 permissions:
@@ -19,7 +23,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build production runtime image locally
         run: |
-          docker build             --build-arg "DSG_BUILD_SOURCE_SHA=$GITHUB_SHA"             --build-arg "NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL=https://example.supabase.co"             --build-arg "NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY=sb_publishable_test"             -t dsg-one-v1:pr .
+          docker build \
+            --build-arg "DSG_BUILD_SOURCE_SHA=$GITHUB_SHA" \
+            --build-arg "NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL=https://example.supabase.co" \
+            --build-arg "NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY=sb_publishable_test" \
+            -t dsg-one-v1:pr .
       - name: Prove Microsoft Agent Framework startup contract
         shell: bash
         run: |
@@ -27,12 +35,18 @@ jobs:
           cid="$(docker run -d -p 127.0.0.1::8080 dsg-one-v1:pr)"
           trap 'docker logs "$cid" || true; docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
           port="$(docker port "$cid" 8080/tcp | sed 's/.*://')"
+          : > /tmp/status.json
           for attempt in $(seq 1 30); do
-            if curl -fsS "http://127.0.0.1:$port/api/agent/status" >/tmp/status.json; then
+            http_code="$(curl -sS -o /tmp/status.json -w '%{http_code}' "http://127.0.0.1:$port/api/agent/status" || true)"
+            if [[ "$http_code" == "200" || "$http_code" == "503" ]] && test -s /tmp/status.json; then
               break
             fi
             sleep 2
           done
           test -s /tmp/status.json
-          grep -q '1.18.0' /tmp/status.json
+          jq -e '
+            .checks.process == true
+            and .readiness.automationEngine.engine == "microsoft-agent-framework"
+            and .readiness.automationEngine.version == "1.18.0"
+          ' /tmp/status.json
           echo "DSG_ONE_AWS_RUNTIME_IMAGE_SMOKE=PASS"
