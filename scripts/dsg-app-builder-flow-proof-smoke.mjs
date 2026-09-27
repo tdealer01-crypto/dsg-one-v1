@@ -3,7 +3,7 @@
 const appUrl = process.env.APP_URL || process.env.DSG_ONE_V1_PRODUCTION_URL;
 if (!appUrl) {
   console.error(JSON.stringify({
-    readiness: 'BLOCKED',
+    status: 'BLOCKED',
     error: 'APP_URL_REQUIRED',
     nextAction: 'Set APP_URL or DSG_ONE_V1_PRODUCTION_URL to the currently verified DSG ONE HTTPS runtime from AWS cutover evidence.',
   }, null, 2));
@@ -14,7 +14,7 @@ try {
   parsedAppUrl = new URL(appUrl);
 } catch {
   console.error(JSON.stringify({
-    readiness: 'BLOCKED',
+    status: 'BLOCKED',
     error: 'APP_URL_INVALID',
     nextAction: 'Provide a valid absolute HTTPS runtime URL.',
   }, null, 2));
@@ -22,7 +22,7 @@ try {
 }
 if (parsedAppUrl.protocol !== 'https:') {
   console.error(JSON.stringify({
-    readiness: 'BLOCKED',
+    status: 'BLOCKED',
     error: 'APP_URL_HTTPS_REQUIRED',
     nextAction: 'Use the verified HTTPS runtime URL; do not use an unverified Azure fallback.',
   }, null, 2));
