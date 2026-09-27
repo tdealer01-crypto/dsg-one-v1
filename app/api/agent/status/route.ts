@@ -88,8 +88,14 @@ export async function GET() {
   const expectedSourceSha = process.env.DSG_DEPLOYED_SOURCE_SHA?.trim() || null;
   const imageDigest = process.env.DSG_DEPLOYED_IMAGE_DIGEST?.trim() || null;
   const isAzure = Boolean(process.env.WEBSITE_SITE_NAME);
+  const deploymentIdentityRequired =
+    isAzure || process.env.DSG_REQUIRE_DEPLOYMENT_IDENTITY?.trim() === '1';
   const automationEngineVersion = process.env.DSG_AUTOMATION_ENGINE_VERSION?.trim() || null;
   const automationEngineOk = automationEngineVersion === '1.18.0';
+  const automationEngineRequired =
+    isAzure
+    || deploymentIdentityRequired
+    || process.env.DSG_REQUIRE_AUTOMATION_ENGINE?.trim() === '1';
 
   const sourceBound = Boolean(
     buildSourceSha
@@ -99,9 +105,13 @@ export async function GET() {
       && buildSourceSha === expectedSourceSha,
   );
   const digestBound = Boolean(imageDigest && DIGEST_PATTERN.test(imageDigest));
-  const deploymentIdentityOk = isAzure ? sourceBound && digestBound : true;
+  const deploymentIdentityOk = deploymentIdentityRequired ? sourceBound && digestBound : true;
   const [database, automationDatabase] = await Promise.all([checkDatabase(), checkAutomationSchema()]);
-  const ok = deploymentIdentityOk && database.ok && automationDatabase.ok && (!isAzure || automationEngineOk);
+  const ok =
+    deploymentIdentityOk
+    && database.ok
+    && automationDatabase.ok
+    && (!automationEngineRequired || automationEngineOk);
 
   return NextResponse.json(
     {
@@ -126,8 +136,10 @@ export async function GET() {
       readiness: {
         database,
         automationDatabase,
+        deploymentIdentityRequired,
         deploymentIdentityOk,
         automationEngine: {
+          required: automationEngineRequired,
           ok: automationEngineOk,
           engine: 'microsoft-agent-framework',
           version: automationEngineVersion,
