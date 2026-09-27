@@ -15,6 +15,17 @@ function configureAzureIdentity(sourceSha = SOURCE_SHA) {
   vi.stubEnv('DSG_AUTOMATION_ENGINE_VERSION', '1.18.0');
 }
 
+function configureAwsIdentity(sourceSha = SOURCE_SHA, imageDigest = IMAGE_DIGEST) {
+  vi.stubEnv('WEBSITE_SITE_NAME', '');
+  vi.stubEnv('DSG_REQUIRE_DEPLOYMENT_IDENTITY', '1');
+  vi.stubEnv('DSG_BUILD_SOURCE_SHA', sourceSha);
+  vi.stubEnv('DSG_DEPLOYED_SOURCE_SHA', SOURCE_SHA);
+  vi.stubEnv('DSG_DEPLOYED_IMAGE_DIGEST', imageDigest);
+  vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://example.supabase.co');
+  vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'service-role-key');
+  vi.stubEnv('DSG_AUTOMATION_ENGINE_VERSION', '1.18.0');
+}
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -43,10 +54,11 @@ describe('GET /api/agent/status', () => {
       },
       checks: { process: true, db: true, automationDb: true, automationEngine: true },
       readiness: {
+        deploymentIdentityRequired: true,
         deploymentIdentityOk: true,
         database: { ok: true, status: 200 },
         automationDatabase: { ok: true, status: 200 },
-        automationEngine: { ok: true, engine: 'microsoft-agent-framework', version: '1.18.0' },
+        automationEngine: { required: true, ok: true, engine: 'microsoft-agent-framework', version: '1.18.0' },
       },
     });
     expect(fetchMock).toHaveBeenCalledWith(
@@ -109,3 +121,72 @@ describe('GET /api/agent/status', () => {
     });
   });
 });
+
+
+  it('requires exact source and digest binding on the AWS production runtime', async () => {
+    configureAwsIdentity();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })));
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.readiness.deploymentIdentityRequired).toBe(true);
+    expect(body.readiness.deploymentIdentityOk).toBe(true);
+    expect(body.deployment).toMatchObject({
+      buildSourceSha: SOURCE_SHA,
+      expectedSourceSha: SOURCE_SHA,
+      imageDigest: IMAGE_DIGEST,
+      sourceBound: true,
+      digestBound: true,
+    });
+    expect(body.readiness.automationEngine).toMatchObject({
+      required: true,
+      ok: true,
+      version: '1.18.0',
+    });
+  });
+
+  it('fails closed on AWS when the expected source does not match the image build', async () => {
+    configureAwsIdentity(OTHER_SHA);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })));
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.ok).toBe(false);
+    expect(body.deployment.sourceBound).toBe(false);
+    expect(body.readiness.deploymentIdentityOk).toBe(false);
+  });
+
+  it('fails closed on AWS when the immutable image digest is missing', async () => {
+    configureAwsIdentity(SOURCE_SHA, '');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })));
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.ok).toBe(false);
+    expect(body.deployment.digestBound).toBe(false);
+    expect(body.readiness.deploymentIdentityOk).toBe(false);
+  });
+
+  it('fails closed on AWS when the required automation engine version is not present', async () => {
+    configureAwsIdentity();
+    vi.stubEnv('DSG_AUTOMATION_ENGINE_VERSION', 'wrong-version');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })));
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.ok).toBe(false);
+    expect(body.readiness.automationEngine).toMatchObject({
+      required: true,
+      ok: false,
+      version: 'wrong-version',
+    });
+  });
