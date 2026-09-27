@@ -1,15 +1,15 @@
 # DSG ONE V1 — Autonomous Governed Runtime
 > [!IMPORTANT]
-> **Production platform authority — Azure only.** Vercel (retired), Render, Railway, AWS, and Google Cloud are retired for DSG production; legacy URLs, checks, and statuses are not deployment or health evidence.
-> Runtime secrets belong in Azure Key Vault and are resolved by the Azure service Managed Identity. GitHub OIDC may bootstrap or rotate them; `.env.example` is documentation only. Any unresolved Key Vault reference is `BLOCK`.
-> Canonical secret-manager contract: [Control Plane Azure Key Vault operations](https://github.com/tdealer01-crypto/tdealer01-crypto-dsg-control-plane/blob/main/docs/ops/azure-runtime-env-sync.md).
+> **Production migration authority — AWS.** Current production claims must be bound to the AWS release manifest, immutable ECR source-SHA image, provider readback, and fresh E2E evidence. Azure is historical/manual rollback proof only.
+> Current verified container stage: DSG ONE ECR image source `d80efe7aecb34ae8b06e6ac7e1a0417965fcc7e5`, digest `sha256:1b458ccb13b5e8e456b381f2a1faab3802ff64e7db2c78d6a2881b4cfce94a48`, ECR scan COMPLETE with 0 Critical / 3 High.
+> Runtime truth boundary: container security PASS; live AWS runtime E2E NOT_RUN; public HTTPS cutover NOT_DONE; whole-system production NOT_VERIFIED.
 
 DSG ONE V1 is a governed app-builder and autonomous runtime control plane.  
 Includes **DSG SkillGate** — open-source GitHub skill discovery, inspection, verification, lock, and governed-run pipeline.
 
-Production authority: Azure only. Resolve the current hostname from the latest governed deployment receipt; no live hostname is asserted by this README.
+AWS is the active migration target. No public AWS runtime hostname is asserted until cutover evidence exists.
 
-## Current verified production status — 2026-09-13 ICT
+## Historical Azure production evidence — 2026-09-13 ICT
 
 ```text
 Runtime: PASS
@@ -88,16 +88,16 @@ needsApprovalDeniedAtRunGate:   true
 
 ## Overall status
 
-Last verified runtime deployment: **2026-09-13 ICT**
+Current AWS migration checkpoint: **2026-09-27**
 
 ```text
-DSG ONE runtime: PRODUCTION E2E PASS
-Database: PASS
-Automation Spacetime database: PASS
-Automation engine: Microsoft Agent Framework 1.18.0 / PASS
-Exact source + image binding: PASS
-Production workflow: PASS
-Marketplace / certification / independent-audit claims: NOT IMPLIED BY RUNTIME PASS
+DSG ONE immutable ECR image: PASS
+Container security gate: PASS (0 Critical)
+Automation engine contract: Microsoft Agent Framework 1.18.0 / PASS
+Live AWS runtime E2E: NOT_RUN
+Public HTTPS cutover: NOT_DONE
+Whole-system production: NOT_VERIFIED
+Historical Azure E2E: preserved as rollback/history only
 ```
 
 ## Production smoke evidence
@@ -216,7 +216,8 @@ Agent autonomous use (rules in AGENTS.md):
 ## Production verification
 
 ```bash
-export APP_URL="https://<dsg-one-azure-app>.azurewebsites.net"
+# Set this only from current verified AWS/public cutover evidence.
+export APP_URL="https://<verified-dsg-one-runtime>"
 
 npm run smoke:first-value-flow
 npm run smoke:audit-packet
@@ -257,10 +258,10 @@ cd mcp/dsg-one-mcp
 npm install && npm run build
 
 # stdio transport (Claude Desktop, Cursor)
-DSG_APP_URL=https://<dsg-one-azure-app>.azurewebsites.net node ./dist/index.js
+DSG_APP_URL=https://<verified-dsg-one-runtime> node ./dist/index.js
 
 # HTTP/SSE transport (port 3001)
-DSG_APP_URL=https://<dsg-one-azure-app>.azurewebsites.net node ./dist/index.js --http
+DSG_APP_URL=https://<verified-dsg-one-runtime> node ./dist/index.js --http
 ```
 
 Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
@@ -270,7 +271,7 @@ Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_conf
     "dsg-one": {
       "command": "node",
       "args": ["/path/to/mcp/dsg-one-mcp/dist/index.js"],
-      "env": { "DSG_APP_URL": "https://<dsg-one-azure-app>.azurewebsites.net" }
+      "env": { "DSG_APP_URL": "https://<verified-dsg-one-runtime>" }
     }
   }
 }
