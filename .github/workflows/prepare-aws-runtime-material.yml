@@ -38,6 +38,14 @@ jobs:
           }
           echo "::add-mask::$DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY"
 
+          [[ "$DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY" == sb_secret_* ]] || {
+            echo "READINESS=BLOCKED"
+            echo "BLOCK: DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY must be a modern Supabase sb_secret_ key"
+            echo "nextAction=Replace the GitHub secret with the project's server-side sb_secret_ key, then rerun."
+            exit 22
+          }
+          echo "service_role_kind=secret_api_key"
+
       - name: Configure AWS credentials with GitHub OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:

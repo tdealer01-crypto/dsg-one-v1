@@ -22,3 +22,9 @@ def test_runtime_material_workflow_uses_oidc_and_scoped_ssm_paths():
 def test_runtime_material_workflow_never_prints_service_role_value():
     assert 'echo "$DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY"' not in WORKFLOW
     assert "cat <<EOF" not in WORKFLOW
+
+
+def test_runtime_material_requires_modern_server_secret_key():
+    assert '== sb_secret_*' in WORKFLOW
+    assert "must be a modern Supabase sb_secret_ key" in WORKFLOW
+    assert "service_role_kind=secret_api_key" in WORKFLOW
