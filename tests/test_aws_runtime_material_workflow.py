@@ -22,3 +22,10 @@ def test_runtime_material_workflow_uses_oidc_and_scoped_ssm_paths():
 def test_runtime_material_workflow_never_prints_service_role_value():
     assert 'echo "$DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY"' not in WORKFLOW
     assert "cat <<EOF" not in WORKFLOW
+
+
+def test_runtime_material_rejects_anon_or_publishable_key():
+    assert 'key.startswith("sb_secret_")' in WORKFLOW
+    assert 'payload.get("role") == "service_role"' in WORKFLOW
+    assert "is not a service-role/secret API key" in WORKFLOW
+    assert "service_role_kind=$key_kind" in WORKFLOW
