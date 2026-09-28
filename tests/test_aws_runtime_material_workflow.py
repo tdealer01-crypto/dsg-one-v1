@@ -24,8 +24,7 @@ def test_runtime_material_workflow_never_prints_service_role_value():
     assert "cat <<EOF" not in WORKFLOW
 
 
-def test_runtime_material_rejects_anon_or_publishable_key():
-    assert 'key.startswith("sb_secret_")' in WORKFLOW
-    assert 'payload.get("role") == "service_role"' in WORKFLOW
-    assert "is not a service-role/secret API key" in WORKFLOW
-    assert "service_role_kind=$key_kind" in WORKFLOW
+def test_runtime_material_requires_modern_server_secret_key():
+    assert '== sb_secret_*' in WORKFLOW
+    assert "must be a modern Supabase sb_secret_ key" in WORKFLOW
+    assert "service_role_kind=secret_api_key" in WORKFLOW
