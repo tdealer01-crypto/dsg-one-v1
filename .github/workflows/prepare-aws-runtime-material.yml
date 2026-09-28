@@ -38,6 +38,40 @@ jobs:
           }
           echo "::add-mask::$DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY"
 
+          key_kind="$(
+            KEY="$DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY" python3 - <<'PY'
+import base64
+import json
+import os
+
+key = os.environ["KEY"]
+if key.startswith("sb_secret_"):
+    print("secret_api_key")
+    raise SystemExit(0)
+
+parts = key.split(".")
+if len(parts) != 3:
+    print("invalid")
+    raise SystemExit(0)
+
+try:
+    raw = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
+    payload = json.loads(base64.urlsafe_b64decode(raw.encode()).decode())
+except Exception:
+    print("invalid")
+    raise SystemExit(0)
+
+print("legacy_service_role_jwt" if payload.get("role") == "service_role" else "invalid")
+PY
+          )"
+          [[ "$key_kind" != "invalid" ]] || {
+            echo "READINESS=BLOCKED"
+            echo "BLOCK: DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY is not a service-role/secret API key"
+            echo "nextAction=Replace the GitHub secret with a Supabase service_role JWT or sb_secret_ key, then rerun."
+            exit 22
+          }
+          echo "service_role_kind=$key_kind"
+
       - name: Configure AWS credentials with GitHub OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
