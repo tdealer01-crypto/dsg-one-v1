@@ -28,3 +28,11 @@ def test_runtime_material_requires_modern_server_secret_key():
     assert '== sb_secret_*' in WORKFLOW
     assert "must be a modern Supabase sb_secret_ key" in WORKFLOW
     assert "service_role_kind=secret_api_key" in WORKFLOW
+
+
+def test_runtime_material_binds_to_verified_image_identity():
+    assert "/dsg/one/prod/image-source-sha" in WORKFLOW
+    assert "/dsg/one/prod/image-digest" in WORKFLOW
+    assert "aws ecr describe-images" in WORKFLOW
+    assert '--value "$IMAGE_SOURCE_SHA"' in WORKFLOW
+    assert "ECR image identity does not match SSM metadata" in WORKFLOW

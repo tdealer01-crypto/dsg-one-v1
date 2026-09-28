@@ -142,6 +142,26 @@ jobs:
             exit 25
           fi
           echo "AWS_DSG_ONE_ECR_SCAN_GATE=PASS"
+
+      - name: Publish verified image identity to SSM
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIGEST="${{ steps.image.outputs.digest }}"
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "READINESS=BLOCKED"
+            echo "BLOCK: image source SHA is invalid"
+            exit 29
+          }
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "READINESS=BLOCKED"
+            echo "BLOCK: image digest is invalid"
+            exit 30
+          }
+          aws ssm put-parameter             --name /dsg/one/prod/image-source-sha             --type String             --value "$GITHUB_SHA"             --overwrite >/dev/null
+          aws ssm put-parameter             --name /dsg/one/prod/image-digest             --type String             --value "$DIGEST"             --overwrite >/dev/null
+          echo "AWS_DSG_ONE_IMAGE_IDENTITY_METADATA=PASS source_sha=$GITHUB_SHA digest=$DIGEST"
+
       - name: Cost-safe deployment gate
         run: |
           echo "AWS_DSG_ONE_RUNTIME_DEPLOY=BLOCKED_BY_COST_GATE"
