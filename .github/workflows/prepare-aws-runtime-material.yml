@@ -56,9 +56,34 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          IMAGE_SOURCE_SHA="$(aws ssm get-parameter             --name /dsg/one/prod/image-source-sha             --query 'Parameter.Value'             --output text)"
+          IMAGE_DIGEST="$(aws ssm get-parameter             --name /dsg/one/prod/image-digest             --query 'Parameter.Value'             --output text)"
+
+          [[ "$IMAGE_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "READINESS=BLOCKED"
+            echo "BLOCK: verified image source SHA metadata is missing or invalid"
+            exit 23
+          }
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "READINESS=BLOCKED"
+            echo "BLOCK: verified image digest metadata is missing or invalid"
+            exit 24
+          }
+
+          OBSERVED_DIGEST="$(aws ecr describe-images             --repository-name dsg-one-v1-prod             --image-ids imageTag="$IMAGE_SOURCE_SHA"             --query 'imageDetails[0].imageDigest'             --output text)"
+          [[ "$OBSERVED_DIGEST" == "$IMAGE_DIGEST" ]] || {
+            echo "READINESS=BLOCKED"
+            echo "BLOCK: ECR image identity does not match SSM metadata"
+            exit 25
+          }
+
           aws ssm put-parameter             --name /dsg/one/prod/supabase-url             --type String             --value "$DSG_ONE_V1_SUPABASE_URL"             --overwrite >/dev/null
           aws ssm put-parameter             --name /dsg/one/prod/supabase-service-role-key             --type SecureString             --value "$DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY"             --overwrite >/dev/null
-          aws ssm put-parameter             --name /dsg/one/prod/prepared-source-sha             --type String             --value "$GITHUB_SHA"             --overwrite >/dev/null
+          aws ssm put-parameter             --name /dsg/one/prod/prepared-source-sha             --type String             --value "$IMAGE_SOURCE_SHA"             --overwrite >/dev/null
+
           echo "AWS_DSG_ONE_RUNTIME_MATERIAL=PASS"
+          echo "prepared_source_sha=$IMAGE_SOURCE_SHA"
+          echo "prepared_image_digest=$IMAGE_DIGEST"
           echo "parameters=/dsg/one/prod/supabase-url,/dsg/one/prod/supabase-service-role-key,/dsg/one/prod/prepared-source-sha"
           echo "Runtime compute was not started."
