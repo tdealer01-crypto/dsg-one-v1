@@ -50,13 +50,23 @@ describe('DSG access console session bridge', () => {
 
   it('publishes the authenticated access surface and governance boundaries', () => {
     const page = readFileSync(join(root, 'app/dsg/access/page.tsx'), 'utf8');
+    const login = readFileSync(join(root, 'app/login/page.tsx'), 'utf8');
     const workspaceRoute = readFileSync(join(root, 'app/api/dsg/access/workspace/route.ts'), 'utf8');
 
-    for (const name of ['Workroom', 'Spacetime MCP', 'Cinema', 'Azure Browser', 'Agent Repair', 'Status / Evidence']) {
+    for (const name of ['App Builder', 'Governance Controls', 'Runtime Health', 'Spacetime MCP', 'Workroom', 'Cinema / Browser', 'Agent Repair']) {
       expect(page).toContain(name);
     }
     expect(page).toContain('Spacetime remains execution authority');
     expect(page).toContain('Agent Repair is proposal-only');
+    expect(page).toContain("href: '/dsg/app-builder'");
+    expect(page).toContain("href: '/dsg/governance'");
+    expect(page).toContain("href: '/api/agent/status'");
+    expect(page).toContain('https://aws.dsg.pics/mcp');
+    expect(page).toContain("href: null");
+    expect(page).toContain('No verified AWS operator UI route');
+    expect(page).toContain('APP HEALTHY');
+    expect(page).not.toMatch(/azurecontainerapps\\.io|westus3|Azure Key Vault|appdeploy\\.ai/i);
+    expect(login).not.toContain('Azure Key Vault');
     expect(workspaceRoute).toContain('DSG_WORKSPACE_MEMBERSHIP_REQUIRED');
     expect(workspaceRoute).toContain("response.cookies.set('dsg-workspace-id'");
   });
