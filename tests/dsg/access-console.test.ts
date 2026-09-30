@@ -65,7 +65,7 @@ describe('DSG access console session bridge', () => {
     expect(page).toContain("href: null");
     expect(page).toContain('No verified AWS operator UI route');
     expect(page).toContain('APP HEALTHY');
-    expect(page).not.toMatch(/azurecontainerapps\\.io|westus3|Azure Key Vault|appdeploy\\.ai/i);
+    expect(page).not.toMatch(/azurecontainerapps\.io|westus3|Azure Key Vault|appdeploy\.ai/i);
     expect(login).not.toContain('Azure Key Vault');
     expect(workspaceRoute).toContain('DSG_WORKSPACE_MEMBERSHIP_REQUIRED');
     expect(workspaceRoute).toContain("response.cookies.set('dsg-workspace-id'");
