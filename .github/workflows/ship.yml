@@ -12,7 +12,7 @@ jobs:
   ship:
     runs-on: ubuntu-latest
     env:
-      DSG_PRODUCTION_URL: 'https://dsg-one-v1.azurewebsites.net'
+      DSG_PRODUCTION_URL: 'https://dsg.pics'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,6 +40,7 @@ jobs:
         id: status
         run: |
           RESPONSE=$(curl --fail-with-body --silent --show-error "$DSG_PRODUCTION_URL/api/agent/status")
+          echo "$RESPONSE" | jq -e --arg expected "$GITHUB_SHA" '.ok == true and .version == $expected' >/dev/null || { echo 'BLOCK: AWS production status is not bound to exact ship SHA'; exit 28; }
           echo "response=$RESPONSE"
           echo "STATUS_RESPONSE=$RESPONSE" >> "$GITHUB_ENV"
           echo "$RESPONSE"
