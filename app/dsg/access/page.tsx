@@ -13,42 +13,53 @@ type SessionPayload = {
 };
 type RuntimeStatus = { ok?: boolean; version?: string; env?: string; ts?: string };
 
-const toolCards = [
+const toolCards: Array<{
+  name: string;
+  description: string;
+  href: string | null;
+  badge: string;
+}> = [
   {
-    name: 'Workroom',
-    description: 'Primary operator workspace for governed tasks and continuous Core Spin work.',
-    href: 'https://dsg-desktop-ui.greenglacier-493f3f71.westus3.azurecontainerapps.io/',
-    badge: 'Operator surface',
+    name: 'App Builder',
+    description: 'Open the existing DSG ONE app-builder workspace. Runtime execution still requires its normal governance gates.',
+    href: '/dsg/app-builder',
+    badge: 'Authenticated AWS app',
+  },
+  {
+    name: 'Governance Controls',
+    description: 'Inspect the DSG governance control catalog. A catalog view is not evidence that an execution passed.',
+    href: '/dsg/governance',
+    badge: 'Control catalog',
+  },
+  {
+    name: 'Runtime Health',
+    description: 'Inspect the live DSG ONE application status. App health does not establish Cinema or Spacetime execution readiness.',
+    href: '/api/agent/status',
+    badge: 'Read only',
   },
   {
     name: 'Spacetime MCP',
-    description: 'Canonical MCP HTTP governance and execution authority for connected agents.',
-    href: 'https://dsg-spacetime-prod.greenglacier-493f3f71.westus3.azurecontainerapps.io/mcp',
-    badge: 'Governance',
+    description: 'OAuth-protected API: https://aws.dsg.pics/mcp. Use an authenticated MCP client; a browser request without a token returns 401.',
+    href: null,
+    badge: 'Connector only',
   },
   {
-    name: 'Cinema',
-    description: 'Production proof API, plan verification, evidence and replay inspection.',
-    href: 'https://dsg-cinema-production.nicetree-a005fe99.westus3.azurecontainerapps.io/docs',
-    badge: 'Proof',
+    name: 'Workroom',
+    description: 'The historic Azure Workroom URL is intentionally not linked. An equivalent AWS operator UI must pass an independent route and authorization check.',
+    href: null,
+    badge: 'AWS UI not verified',
   },
   {
-    name: 'Azure Browser',
-    description: 'Universal application interface. Browser actions remain plan-bound and governed through Spacetime.',
-    href: 'https://dsg-desktop-ui.greenglacier-493f3f71.westus3.azurecontainerapps.io/',
-    badge: 'Universal interface',
+    name: 'Cinema / Browser',
+    description: 'Cinema browser execution remains plan-bound via Spacetime. A public AWS browser control surface has not passed end-to-end verification.',
+    href: null,
+    badge: 'Approval-gated',
   },
   {
     name: 'Agent Repair',
-    description: 'DSG-Agent-v0 repair.synthesize is proposal-only; deterministic Repair Kernel and Spacetime remain mandatory.',
-    href: 'https://www.dsg.pics/architecture-doc.html',
+    description: 'Repair proposals are not executable authority. Governed runtime binding and result evidence must be verified before offering a direct action.',
+    href: null,
     badge: 'Proposal only',
-  },
-  {
-    name: 'Status / Evidence',
-    description: 'Read live runtime status and inspect bounded production evidence without exposing runtime secrets.',
-    href: 'https://www.dsg.pics/governed-execution-3d.html',
-    badge: 'Read only',
   },
 ];
 
@@ -123,7 +134,7 @@ export default function DsgAccessPage() {
             </div>
             <h1 className="mt-4 text-3xl font-black tracking-tight md:text-5xl">One authenticated entry point.</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-              Email login establishes the DSG session. Workspace role controls governed access; provider credentials remain server-side in Azure Key Vault.
+              Email login establishes a Supabase-backed DSG session. Workspace membership controls access; provider credentials must remain server-side. MCP authorization through Auth0 is separate from this website session.
             </p>
           </div>
           <div className="flex gap-2">
@@ -147,7 +158,7 @@ export default function DsgAccessPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Runtime</div>
-                <div className="mt-2 text-xl font-black">{runtime?.ok ? 'READY' : 'CHECKING'}</div>
+                <div className="mt-2 text-xl font-black">{runtime?.ok ? 'APP HEALTHY' : 'CHECKING'}</div>
               </div>
               {runtime?.ok && <CircleCheck className="h-8 w-8 text-emerald-400" />}
             </div>
@@ -194,12 +205,14 @@ export default function DsgAccessPage() {
                 <div className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-300">{tool.badge}</div>
                 <h3 className="mt-3 text-xl font-black text-white">{tool.name}</h3>
                 <p className="mt-3 flex-1 text-sm leading-6 text-slate-400">{tool.description}</p>
-                {selected ? (
+                {tool.href && selected ? (
                   <a className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-indigo-300 hover:text-indigo-200" href={tool.href} target="_blank" rel="noreferrer">
                     Open {tool.name} <ExternalLink className="h-4 w-4" />
                   </a>
                 ) : (
-                  <span className="mt-5 text-sm font-bold text-slate-600">Select workspace first</span>
+                  <span className="mt-5 text-sm font-bold text-slate-500">
+                    {tool.href ? 'Select workspace first' : 'No verified AWS operator UI route'}
+                  </span>
                 )}
               </article>
             ))}

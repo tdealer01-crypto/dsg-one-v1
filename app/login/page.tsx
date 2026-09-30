@@ -53,7 +53,7 @@ export default function LoginPage() {
             </div>
             <h1 className="mt-6 text-4xl font-black tracking-tight md:text-5xl">Sign in once. Enter the governed workspace.</h1>
             <p className="mt-4 max-w-lg text-sm leading-6 text-slate-400">
-              Email sign-in creates a secure HttpOnly DSG session. Runtime credentials remain server-side in Azure Key Vault and are never exposed to the browser.
+              Email sign-in creates a secure HttpOnly DSG session. Runtime credentials remain server-side and are never exposed to the browser.
             </p>
             <div className="mt-8 rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Next route</p>

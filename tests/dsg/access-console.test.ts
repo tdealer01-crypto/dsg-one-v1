@@ -50,13 +50,34 @@ describe('DSG access console session bridge', () => {
 
   it('publishes the authenticated access surface and governance boundaries', () => {
     const page = readFileSync(join(root, 'app/dsg/access/page.tsx'), 'utf8');
+    const login = readFileSync(join(root, 'app/login/page.tsx'), 'utf8');
     const workspaceRoute = readFileSync(join(root, 'app/api/dsg/access/workspace/route.ts'), 'utf8');
+    const openRouter = readFileSync(join(root, 'lib/dsg/app-builder/adapters/openrouter/openrouter-client.ts'), 'utf8');
+    const services = readFileSync(join(root, 'lib/dsg/agent-runtime/service-registry.ts'), 'utf8');
+    const ship = readFileSync(join(root, '.github/workflows/ship.yml'), 'utf8');
 
-    for (const name of ['Workroom', 'Spacetime MCP', 'Cinema', 'Azure Browser', 'Agent Repair', 'Status / Evidence']) {
+    for (const name of ['App Builder', 'Governance Controls', 'Runtime Health', 'Spacetime MCP', 'Workroom', 'Cinema / Browser', 'Agent Repair']) {
       expect(page).toContain(name);
     }
     expect(page).toContain('Spacetime remains execution authority');
     expect(page).toContain('Agent Repair is proposal-only');
+    expect(page).toContain("href: '/dsg/app-builder'");
+    expect(page).toContain("href: '/dsg/governance'");
+    expect(page).toContain("href: '/api/agent/status'");
+    expect(page).toContain('https://aws.dsg.pics/mcp');
+    expect(page).toContain("href: null");
+    expect(page).toContain('No verified AWS operator UI route');
+    expect(page).toContain('APP HEALTHY');
+    expect(page).not.toMatch(/azurecontainerapps\.io|westus3|Azure Key Vault|appdeploy\.ai/i);
+    expect(login).not.toContain('Azure Key Vault');
+    expect(openRouter).toContain("const DEFAULT_SITE_URL = 'https://dsg.pics'");
+    expect(openRouter).not.toContain('azurewebsites.net');
+    expect(services).toContain("id: 'aws.deployment.proof'");
+    expect(services).not.toContain("id: 'azure.deployment.proof'");
+    expect(services).toContain("status: 'connector_required'");
+    expect(ship).toContain("DSG_PRODUCTION_URL: 'https://dsg.pics'");
+    expect(ship).toContain('BLOCK: AWS production status is not bound to exact ship SHA');
+    expect(ship).not.toContain('azurewebsites.net');
     expect(workspaceRoute).toContain('DSG_WORKSPACE_MEMBERSHIP_REQUIRED');
     expect(workspaceRoute).toContain("response.cookies.set('dsg-workspace-id'");
   });
