@@ -52,6 +52,7 @@ describe('DSG access console session bridge', () => {
     const page = readFileSync(join(root, 'app/dsg/access/page.tsx'), 'utf8');
     const login = readFileSync(join(root, 'app/login/page.tsx'), 'utf8');
     const workspaceRoute = readFileSync(join(root, 'app/api/dsg/access/workspace/route.ts'), 'utf8');
+    const openRouter = readFileSync(join(root, 'lib/dsg/app-builder/adapters/openrouter/openrouter-client.ts'), 'utf8');
 
     for (const name of ['App Builder', 'Governance Controls', 'Runtime Health', 'Spacetime MCP', 'Workroom', 'Cinema / Browser', 'Agent Repair']) {
       expect(page).toContain(name);
@@ -67,6 +68,8 @@ describe('DSG access console session bridge', () => {
     expect(page).toContain('APP HEALTHY');
     expect(page).not.toMatch(/azurecontainerapps\.io|westus3|Azure Key Vault|appdeploy\.ai/i);
     expect(login).not.toContain('Azure Key Vault');
+    expect(openRouter).toContain("const DEFAULT_SITE_URL = 'https://dsg.pics'");
+    expect(openRouter).not.toContain('azurewebsites.net');
     expect(workspaceRoute).toContain('DSG_WORKSPACE_MEMBERSHIP_REQUIRED');
     expect(workspaceRoute).toContain("response.cookies.set('dsg-workspace-id'");
   });
