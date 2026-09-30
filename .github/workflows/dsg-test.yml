@@ -28,6 +28,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Ising MCP regression tests
+        run: npx vitest run tests/dsg/mcp-ising-route.test.ts tests/dsg/nvidia-ising.test.ts
+
       - name: Claim gate
         run: npm run dsg:claim-gate
 
