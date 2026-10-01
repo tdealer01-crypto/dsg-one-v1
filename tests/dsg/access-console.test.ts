@@ -56,11 +56,13 @@ describe('DSG access console session bridge', () => {
     const services = readFileSync(join(root, 'lib/dsg/agent-runtime/service-registry.ts'), 'utf8');
     const ship = readFileSync(join(root, '.github/workflows/ship.yml'), 'utf8');
 
-    for (const name of ['App Builder', 'Governance Controls', 'Runtime Health', 'Spacetime MCP', 'Workroom', 'Cinema / Browser', 'Agent Repair']) {
+    for (const name of ['App Builder', 'Governance Controls', 'Runtime Health', 'Spacetime MCP', 'Workroom', 'Cinema / Browser', 'Agent v0 / NVIDIA Skills', 'Agent Repair']) {
       expect(page).toContain(name);
     }
     expect(page).toContain('Spacetime remains execution authority');
     expect(page).toContain('Agent Repair is proposal-only');
+    expect(page).toContain('Free-only · proposal');
+    expect(page).toContain('fail closed instead of falling back to a paid GPU provider');
     expect(page).toContain("href: '/dsg/app-builder'");
     expect(page).toContain("href: '/dsg/governance'");
     expect(page).toContain("href: '/api/agent/status'");
