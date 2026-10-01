@@ -83,12 +83,8 @@ export function LiveAgentChat() {
     try {
       const res = await fetch('/api/dsg/agent-chat', {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-dsg-workspace-id': 'dsg-one-v1-customer-workspace',
-          'x-dsg-actor-id': 'dsg-agent-chat-user',
-          'x-dsg-actor-role': 'customer',
-        },
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           message: text,
           history,

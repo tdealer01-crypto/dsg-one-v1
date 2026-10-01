@@ -18,11 +18,25 @@ export type AgentPersistentMemoryResult = {
   error?: string;
 };
 
+export type AgentChatVerifiedIdentity = {
+  workspaceId: string;
+  actorId: string;
+  actorRole: string;
+};
+
 function fromHeader(req: Request, name: string) {
   return req.headers.get(name)?.trim() || undefined;
 }
 
-export function getAgentChatMemoryContext(req: Request): DsgMemoryRequestContext {
+export function getAgentChatMemoryContext(req: Request, verifiedIdentity?: AgentChatVerifiedIdentity): DsgMemoryRequestContext {
+  if (verifiedIdentity) {
+    return {
+      workspaceId: verifiedIdentity.workspaceId,
+      actorId: verifiedIdentity.actorId,
+      actorRole: verifiedIdentity.actorRole,
+      permissions: ['memory:write', 'memory:read', 'memory:gate', 'memory:context_pack'],
+    };
+  }
   return {
     workspaceId: fromHeader(req, 'x-dsg-workspace-id') || process.env.DSG_AGENT_MEMORY_WORKSPACE_ID || 'dsg-one-v1-customer-workspace',
     actorId: fromHeader(req, 'x-dsg-actor-id') || process.env.DSG_AGENT_MEMORY_ACTOR_ID || 'dsg-agent-chat-user',
@@ -56,8 +70,8 @@ function classifyKind(text: string): DsgMemoryEvent['memoryKind'] {
   return 'project_context';
 }
 
-export async function loadPersistentAgentMemory(req: Request, message: string): Promise<AgentPersistentMemoryResult> {
-  const ctx = getAgentChatMemoryContext(req);
+export async function loadPersistentAgentMemory(req: Request, message: string, verifiedIdentity?: AgentChatVerifiedIdentity): Promise<AgentPersistentMemoryResult> {
+  const ctx = getAgentChatMemoryContext(req, verifiedIdentity);
   try {
     const recent = await searchMemory(ctx, { limit: 12 });
     const query = compactText(message, 80);
@@ -91,8 +105,8 @@ export async function loadPersistentAgentMemory(req: Request, message: string): 
   }
 }
 
-export async function persistAgentChatTurn(req: Request, input: { userMessage: string; agentReply: string; history?: AgentChatHistoryItem[] }) {
-  const ctx = getAgentChatMemoryContext(req);
+export async function persistAgentChatTurn(req: Request, input: { userMessage: string; agentReply: string; history?: AgentChatHistoryItem[] }, verifiedIdentity?: AgentChatVerifiedIdentity) {
+  const ctx = getAgentChatMemoryContext(req, verifiedIdentity);
   const userText = compactText(input.userMessage);
   const agentText = compactText(input.agentReply);
   const items = [

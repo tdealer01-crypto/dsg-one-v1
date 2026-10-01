@@ -6,7 +6,8 @@ import { DSG_GRAPHIFY_CONTEXT_PROMPT, buildGraphifyInstruction, shouldUseGraphif
 import { DSG_PHASE1_GOVERNANCE_PROMPT, buildPhase1GovernanceInstruction, shouldUsePhase1Governance } from '@/lib/dsg/agent-runtime/phase1-governance-reference';
 import { DSG_GOVERNANCE_DB_PROMPT, buildGovernanceDbInstruction, shouldUseGovernanceDb } from '@/lib/dsg/agent-runtime/governance-db-reference';
 import { loadExternalAgentContext, type ExternalContextResult } from '@/lib/dsg/agent-runtime/external-context-tools';
-import { buildPersistentMemoryPrompt, loadPersistentAgentMemory, persistAgentChatTurn, type AgentChatHistoryItem, type AgentPersistentMemoryResult } from '@/lib/dsg/agent-runtime/persistent-chat-memory';
+import { buildPersistentMemoryPrompt, loadPersistentAgentMemory, persistAgentChatTurn, type AgentChatHistoryItem, type AgentPersistentMemoryResult, type AgentChatVerifiedIdentity } from '@/lib/dsg/agent-runtime/persistent-chat-memory';
+import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
 
 export const runtime = 'nodejs';
 
@@ -149,14 +150,32 @@ function localFallbackReply(message: string, providerError: string, memory: Agen
   return { reply, route };
 }
 
+function authFailure(error: unknown) {
+  const code = error instanceof Error ? error.message : 'DSG_AUTH_FAILED';
+  const status = code === 'DSG_AUTH_REQUIRED' ? 401 : code === 'DSG_CONTEXT_REQUIRED' || code === 'DSG_PERMISSION_DENIED' ? 403 : 500;
+  return NextResponse.json({ ok: false, error: { code, message: code } }, { status });
+}
+
 export async function POST(req: Request) {
+  let verifiedIdentity: AgentChatVerifiedIdentity;
+  try {
+    const actor = await requireVerifiedDsgActor(req.headers, 'job:read');
+    verifiedIdentity = {
+      workspaceId: actor.workspaceId,
+      actorId: actor.actorId,
+      actorRole: actor.role,
+    };
+  } catch (error) {
+    return authFailure(error);
+  }
+
   const body = (await req.json().catch(() => null)) as ChatBody | null;
   if (!body?.message?.trim()) {
     return NextResponse.json({ ok: false, error: { message: 'AGENT_CHAT_MESSAGE_REQUIRED' } }, { status: 400 });
   }
 
   const history = normalizedHistory(body.history);
-  const memory = await loadPersistentAgentMemory(req, body.message);
+  const memory = await loadPersistentAgentMemory(req, body.message, verifiedIdentity);
   const externalContext = await loadExternalAgentContext(body.message);
 
   try {
@@ -166,7 +185,7 @@ export async function POST(req: Request) {
       temperature: 0.25,
     });
     const reply = result.outputText || 'ผมยังตอบไม่ได้จากโมเดลในรอบนี้ ลองพิมพ์รายละเอียดเพิ่มอีกครั้งครับ';
-    const persisted = await persistAgentChatTurn(req, { userMessage: body.message, agentReply: reply, history }).catch((error) => ({
+    const persisted = await persistAgentChatTurn(req, { userMessage: body.message, agentReply: reply, history }, verifiedIdentity).catch((error) => ({
       saved: [],
       errors: [error instanceof Error ? error.message : 'MEMORY_PERSIST_FAILED'],
     }));
@@ -199,7 +218,7 @@ export async function POST(req: Request) {
   } catch (error) {
     const providerError = error instanceof Error ? error.message : 'AGENT_CHAT_MODEL_UNAVAILABLE';
     const fallback = localFallbackReply(body.message, providerError, memory, externalContext);
-    const persisted = await persistAgentChatTurn(req, { userMessage: body.message, agentReply: fallback.reply, history }).catch((persistError) => ({
+    const persisted = await persistAgentChatTurn(req, { userMessage: body.message, agentReply: fallback.reply, history }, verifiedIdentity).catch((persistError) => ({
       saved: [],
       errors: [persistError instanceof Error ? persistError.message : 'MEMORY_PERSIST_FAILED'],
     }));

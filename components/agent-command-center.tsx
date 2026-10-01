@@ -5,11 +5,7 @@ import { ExternalLink, GitBranch, Loader2, Play, Rocket, ShieldCheck } from 'luc
 
 const TOOL_NAME = 'dsg.app_builder.launch_agent_runtime';
 const DEFAULT_COMMAND = 'สร้างแอป PC เสมือนที่มี Windows ต่อเน็ตแล้ว มีจอมอนิเตอร์ในแอป มี remote mouse API ให้ agent จากที่อื่นควบคุมเมาส์ได้ และมี DSG governance ตรวจ invariant ก่อนทุก action พร้อม audit/evidence proof';
-const requestHeaders = {
-  'content-type': 'application/json',
-  'x-dsg-workspace-id': '00000000-0000-4000-8000-000000000001',
-  'x-dsg-actor-id': 'customer',
-};
+const requestHeaders = { 'content-type': 'application/json' };
 
 type RouteResult = {
   intent: string;
@@ -50,6 +46,7 @@ async function apiPost(path: string, body?: unknown) {
   const res = await fetch(path, {
     method: 'POST',
     headers: requestHeaders,
+    credentials: 'include',
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const json = await res.json().catch(() => ({ ok: false, error: { message: 'INVALID_JSON_RESPONSE' } }));
@@ -61,6 +58,7 @@ async function routeCommandRequest(command: string): Promise<RouteResult> {
   const res = await fetch('/api/dsg/agent-runtime/commands', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ command, userBenefit: 'User gets a governed build job instead of another confirmation question.' }),
   });
   const json = await res.json();
@@ -100,7 +98,7 @@ function buildGoalPayload(command: string, route: RouteResult) {
       backend: 'next-api',
       database: 'supabase-postgres',
       auth: 'none',
-      deploy: 'vercel',
+      deploy: 'none',
     },
   };
 }

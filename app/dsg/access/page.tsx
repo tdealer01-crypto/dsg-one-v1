@@ -45,15 +45,15 @@ const toolCards: Array<{
   },
   {
     name: 'Workroom',
-    description: 'The historic Azure Workroom URL is intentionally not linked. An equivalent AWS operator UI must pass an independent route and authorization check.',
-    href: null,
-    badge: 'AWS UI not verified',
+    description: 'Open the native AWS operator Workroom. Website authentication and workspace membership are required; agent chat is context and planning, while Spacetime remains execution authority.',
+    href: '/dsg/workroom',
+    badge: 'Authenticated AWS workroom',
   },
   {
     name: 'Cinema / Browser',
-    description: 'Cinema browser execution remains plan-bound via Spacetime. A public AWS browser control surface has not passed end-to-end verification.',
-    href: null,
-    badge: 'Approval-gated',
+    description: 'Open the verified public AWS Cinema surface. Browser status/action still requires its API-key and approval boundaries; reachability is not execution evidence.',
+    href: 'https://aws.dsg.pics/app',
+    badge: 'Public AWS · execution gated',
   },
   {
     name: 'Agent v0 / NVIDIA Skills',
