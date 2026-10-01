@@ -62,7 +62,7 @@ describe('DSG access console session bridge', () => {
     expect(page).toContain('Spacetime remains execution authority');
     expect(page).toContain('Agent Repair is proposal-only');
     expect(page).toContain('Free Kaggle GPU · proposal');
-    expect(page).toContain('fail closed instead of falling back to a paid GPU provider');
+    expect(page).toContain('fails closed instead of falling back to a paid GPU provider');
     expect(page).toContain('https://www.kaggle.com/code/taraaaa1111/dsg-agent-v0-qwen3-30b-a3b-t4x2');
     expect(page).toContain("href: '/dsg/app-builder'");
     expect(page).toContain("href: '/dsg/governance'");
