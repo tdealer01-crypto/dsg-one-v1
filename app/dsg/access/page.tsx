@@ -56,6 +56,12 @@ const toolCards: Array<{
     badge: 'Approval-gated',
   },
   {
+    name: 'Agent v0 / NVIDIA Skills',
+    description: 'Agent v0 remains proposal-only behind DSG Spacetime. Free-only brain mode is designed to accept the Kaggle NVIDIA worker and fail closed instead of falling back to a paid GPU provider. NVIDIA Skills remain context/workflow guidance, not execution authority or GPU availability proof.',
+    href: null,
+    badge: 'Free-only · proposal',
+  },
+  {
     name: 'Agent Repair',
     description: 'Repair proposals are not executable authority. Governed runtime binding and result evidence must be verified before offering a direct action.',
     href: null,
