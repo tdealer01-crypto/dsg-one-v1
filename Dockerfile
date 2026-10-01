@@ -37,7 +37,7 @@ RUN npm run build
 # self-contained server at .next/standalone that only needs the static
 # and public assets copied alongside it — no full node_modules in the
 # final image.
-FROM node:24-bookworm-slim AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -51,13 +51,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/automation_spacetime ./automation_spacetime
 COPY --from=builder /app/scripts/dsg-one-container-entrypoint.sh /usr/local/bin/dsg-one-container-entrypoint
 
-RUN apt-get update \
-    && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends ca-certificates python3 python3-venv \
+RUN apk add --no-cache ca-certificates python3 py3-pip \
     && python3 -m venv /opt/dsg-automation \
     && /opt/dsg-automation/bin/pip install --no-cache-dir -r /app/automation_spacetime/requirements.txt \
-    && chmod 0755 /usr/local/bin/dsg-one-container-entrypoint \
-    && rm -rf /var/lib/apt/lists/*
+    && chmod 0755 /usr/local/bin/dsg-one-container-entrypoint
 
 ENV DSG_AUTOMATION_PYTHON=/opt/dsg-automation/bin/python \
     DSG_AUTOMATION_ENGINE=/app/automation_spacetime/engine.py \
