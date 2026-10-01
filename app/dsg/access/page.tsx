@@ -57,9 +57,9 @@ const toolCards: Array<{
   },
   {
     name: 'Agent v0 / NVIDIA Skills',
-    description: 'Agent v0 remains proposal-only behind DSG Spacetime. Free-only brain mode is designed to accept the Kaggle NVIDIA worker and fail closed instead of falling back to a paid GPU provider. NVIDIA Skills remain context/workflow guidance, not execution authority or GPU availability proof.',
-    href: null,
-    badge: 'Free-only · proposal',
+    description: 'Open the private-owner Kaggle NVIDIA T4x2 worker notebook. Agent v0 remains proposal-only behind DSG Spacetime; the notebook is ephemeral and must pass its live health/plan proof before it is treated as available. Free-only mode fails closed instead of falling back to a paid GPU provider.',
+    href: 'https://www.kaggle.com/code/taraaaa1111/dsg-agent-v0-qwen3-30b-a3b-t4x2',
+    badge: 'Free Kaggle GPU · proposal',
   },
   {
     name: 'Agent Repair',
