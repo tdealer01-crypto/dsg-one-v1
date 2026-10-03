@@ -12,6 +12,7 @@ export type AgentCommandIntent =
   | 'run_test_coverage'
   | 'run_deploy_monitor'
   | 'run_browser_research'
+  | 'inspect_cinema_browser_status'
   | 'security_gate_check'
   | 'blocked';
 
@@ -59,6 +60,12 @@ function isBuildAppRequest(value: string) {
   return includesAny(value, ['build app', 'create app', 'generate app', 'สร้างแอป', 'ทำแอป', 'แอป']) || isVirtualPcRequest(value);
 }
 
+function isCinemaBrowserStatusRequest(value: string) {
+  return value.includes('cinema')
+    && value.includes('browser')
+    && includesAny(value, ['status', 'ready', 'health', 'สถานะ']);
+}
+
 export function routeAgentCommand(input: AgentCommandInput): AgentCommandRoute {
   const command = input.command.trim();
   if (!command) throw new Error('AGENT_COMMAND_REQUIRED');
@@ -74,6 +81,26 @@ export function routeAgentCommand(input: AgentCommandInput): AgentCommandRoute {
       evidence: ['blockedCommand', 'policyReason'],
       userBenefit: 'The user is protected from unsafe or destructive automation.',
       truthBoundary: 'The command was not executed. It requires human review and a safe redesign.',
+    };
+  }
+
+  if (isCinemaBrowserStatusRequest(value)) {
+    return {
+      intent: 'inspect_cinema_browser_status',
+      status: 'ready',
+      actionLabel: 'Read governed Cinema browser status',
+      endpoint: '/api/dsg/jobs/:jobId/automation',
+      method: 'POST',
+      payload: {
+        taskId: 'cinema-status',
+        capability: 'browser.remote.status',
+        routeId: 'route.cinema-remote.status',
+        action: 'browser.remote.status',
+        arguments: {},
+      },
+      evidence: ['jobId', 'automationRunId', 'decisionHash', 'evidenceHash', 'evidenceChainValid'],
+      userBenefit,
+      truthBoundary: 'This is a low-risk read-only Core Spin action. DSG Spacetime remains the execution and evidence authority; no Cinema provider credential is exposed to the client or model.',
     };
   }
 

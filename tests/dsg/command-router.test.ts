@@ -93,6 +93,30 @@ describe('routeAgentCommand', () => {
     });
   });
 
+  describe('inspect_cinema_browser_status intent', () => {
+    it('routes the exact Cinema status request to Core Spin rather than App Builder', () => {
+      const result = routeAgentCommand({
+        command: 'Report current governed Cinema browser status only. Do not mutate anything.',
+      });
+
+      expect(result.intent).toBe('inspect_cinema_browser_status');
+      expect(result.status).toBe('ready');
+      expect(result.endpoint).toBe('/api/dsg/jobs/:jobId/automation');
+      expect(result.payload).toMatchObject({
+        taskId: 'cinema-status',
+        capability: 'browser.remote.status',
+        routeId: 'route.cinema-remote.status',
+        action: 'browser.remote.status',
+      });
+    });
+
+    it('recognizes a Thai Cinema browser status request as read-only Core Spin work', () => {
+      const result = routeAgentCommand({ command: 'เช็ค Cinema browser สถานะอย่างเดียว ห้ามแก้ไขอะไร' });
+      expect(result.intent).toBe('inspect_cinema_browser_status');
+      expect(result.status).toBe('ready');
+    });
+  });
+
   describe('inspect_services intent', () => {
     it('routes "services" query to services endpoint', () => {
       const result = routeAgentCommand({ command: 'list available services' });
