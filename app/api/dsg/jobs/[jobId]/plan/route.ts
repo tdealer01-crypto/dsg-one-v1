@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
+import { getDsgUserAccessToken, requireVerifiedDsgActor } from '@/lib/dsg/server/context';
 import { createRuntimePlan } from '@/lib/dsg/server/repository';
-import { getBearerToken } from '@/lib/dsg/server/supabase-rpc';
 import type { RuntimeTask } from '@/lib/dsg/runtime/types';
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
@@ -14,7 +13,7 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
 
   try {
     const data = await createRuntimePlan(
-      { workspaceId: actor.workspaceId, actorId: actor.actorId, userAccessToken: getBearerToken(request.headers) },
+      { workspaceId: actor.workspaceId, actorId: actor.actorId, userAccessToken: getDsgUserAccessToken(request.headers) },
       { jobId, tasks: body.tasks },
     );
     return NextResponse.json({ ok: true, data }, { status: 201 });

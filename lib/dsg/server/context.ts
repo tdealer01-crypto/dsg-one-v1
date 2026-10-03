@@ -56,8 +56,12 @@ function getCookieValue(headers: Headers, name: string): string | undefined {
   return undefined;
 }
 
+export function getDsgUserAccessToken(headers: Headers): string | undefined {
+  return getBearerToken(headers) ?? getCookieValue(headers, 'sb-access-token');
+}
+
 export async function resolveVerifiedDsgActor(headers: Headers): Promise<DsgServerActor | null> {
-  const userAccessToken = getBearerToken(headers) ?? getCookieValue(headers, 'sb-access-token');
+  const userAccessToken = getDsgUserAccessToken(headers);
   const workspaceId = headers.get('x-dsg-workspace-id') ?? getCookieValue(headers, 'dsg-workspace-id');
   if (!userAccessToken || !workspaceId) return null;
 
