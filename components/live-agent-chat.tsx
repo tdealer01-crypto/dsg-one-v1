@@ -2,11 +2,21 @@
 
 import { useState } from 'react';
 import { Loader2, Send, Sparkles, Wand2 } from 'lucide-react';
+import { normalizeAgentChatMemoryStatus, normalizeAgentChatReply } from '@/lib/dsg/client/agent-chat-normalize';
 
 type ChatMessage = {
   id: string;
   role: 'user' | 'agent';
   text: string;
+};
+
+type AgentChatApiResponse = {
+  ok?: boolean;
+  error?: { message?: string; code?: string };
+  data?: {
+    reply?: unknown;
+    memory?: { status?: unknown };
+  };
 };
 
 type BuilderDesignDraft = {
@@ -91,10 +101,12 @@ export function LiveAgentChat() {
           context: { surface: 'build_workspace' },
         }),
       });
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error?.message || json.error?.code || `HTTP_${res.status}`);
-      setMemoryStatus(json.data.memory?.status ? `memory ${json.data.memory.status}` : 'memory unknown');
-      const reply = json.data.reply || 'โมเดลตอบกลับว่าง ลองถามใหม่อีกครั้งครับ';
+      const json = await res.json().catch(() => null) as AgentChatApiResponse | null;
+      if (!res.ok || json?.ok !== true) {
+        throw new Error(json?.error?.message || json?.error?.code || `HTTP_${res.status}`);
+      }
+      setMemoryStatus(normalizeAgentChatMemoryStatus(json?.data?.memory?.status));
+      const reply = normalizeAgentChatReply(json?.data?.reply);
       setMessages((current) => [...current, makeMessage('agent', reply)]);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'AGENT_CHAT_FAILED';
