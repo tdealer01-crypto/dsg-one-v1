@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveVerifiedDsgActor } from '@/lib/dsg/server/context';
+import { getDsgUserAccessToken, resolveVerifiedDsgActor } from '@/lib/dsg/server/context';
 
 const root = process.cwd();
 
@@ -10,6 +10,21 @@ describe('DSG access console session bridge', () => {
     vi.restoreAllMocks();
     vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://example.supabase.co');
     vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'service-role-test-key');
+  });
+
+  it('forwards the same cookie-backed user token used by verified actor auth', () => {
+    const headers = new Headers({
+      cookie: 'sb-access-token=user.jwt.token; dsg-workspace-id=workspace-1',
+    });
+    expect(getDsgUserAccessToken(headers)).toBe('user.jwt.token');
+  });
+
+  it('prefers an explicit bearer token over the session cookie', () => {
+    const headers = new Headers({
+      authorization: 'Bearer explicit.jwt.token',
+      cookie: 'sb-access-token=cookie.jwt.token; dsg-workspace-id=workspace-1',
+    });
+    expect(getDsgUserAccessToken(headers)).toBe('explicit.jwt.token');
   });
 
   it('resolves actor and workspace from secure session cookies', async () => {

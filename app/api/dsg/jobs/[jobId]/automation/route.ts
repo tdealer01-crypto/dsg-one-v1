@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { executeGovernedProposal } from '@/lib/dsg/core-spin/governed-execution';
-import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
+import { getDsgUserAccessToken, requireVerifiedDsgActor } from '@/lib/dsg/server/context';
 import { getRuntimeJob } from '@/lib/dsg/server/repository';
-import { getBearerToken } from '@/lib/dsg/server/supabase-rpc';
 import {
   evaluateAutomationRun,
   getAutomationSteps,
@@ -15,7 +14,7 @@ function repositoryContext(actor: { workspaceId: string; actorId: string }, requ
   return {
     workspaceId: actor.workspaceId,
     actorId: actor.actorId,
-    userAccessToken: getBearerToken(request.headers),
+    userAccessToken: getDsgUserAccessToken(request.headers),
   };
 }
 

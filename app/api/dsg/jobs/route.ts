@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
+import { getDsgUserAccessToken, requireVerifiedDsgActor } from '@/lib/dsg/server/context';
 import { createRuntimeJob, listRuntimeJobs } from '@/lib/dsg/server/repository';
-import { getBearerToken } from '@/lib/dsg/server/supabase-rpc';
 
 export async function GET(request: Request) {
   const actor = await requireVerifiedDsgActor(request.headers, 'job:read');
@@ -10,7 +9,7 @@ export async function GET(request: Request) {
     const jobs = await listRuntimeJobs({
       workspaceId: actor.workspaceId,
       actorId: actor.actorId,
-      userAccessToken: getBearerToken(request.headers),
+      userAccessToken: getDsgUserAccessToken(request.headers),
     });
     return NextResponse.json({ ok: true, data: { jobs, source: 'supabase' } });
   } catch (error) {
@@ -41,7 +40,7 @@ export async function POST(request: Request) {
 
   try {
     const data = await createRuntimeJob(
-      { workspaceId: actor.workspaceId, actorId: actor.actorId, userAccessToken: getBearerToken(request.headers) },
+      { workspaceId: actor.workspaceId, actorId: actor.actorId, userAccessToken: getDsgUserAccessToken(request.headers) },
       { goal, successCriteria: body.successCriteria },
     );
     return NextResponse.json({ ok: true, data }, { status: 201 });
