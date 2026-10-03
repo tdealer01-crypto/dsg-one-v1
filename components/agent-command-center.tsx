@@ -34,12 +34,35 @@ type BuildOutput = {
   claimStatus?: string;
 };
 
+type CoreSpinOutput = {
+  jobId: string;
+  runId?: string;
+  taskId: string;
+  state?: string;
+  routeId?: string;
+  decisionVerdict?: string;
+  decisionReason?: string;
+  resultOk?: boolean;
+  connected?: boolean;
+  status?: string;
+  evidenceHash?: string;
+  evidenceChainValid?: boolean;
+};
+
 const initialBuildSteps: BuildStep[] = [
   { label: 'Route requirement', status: 'waiting' },
   { label: 'Create governed plan', status: 'waiting' },
   { label: 'Approve execution', status: 'waiting' },
   { label: 'Prepare runtime handoff', status: 'waiting' },
   { label: 'Generate pull request evidence', status: 'waiting' },
+];
+
+const coreSpinReadSteps: BuildStep[] = [
+  { label: 'Route requirement', status: 'waiting' },
+  { label: 'Create runtime job', status: 'waiting' },
+  { label: 'Create read-only task plan', status: 'waiting' },
+  { label: 'Start Core Spin automation', status: 'waiting' },
+  { label: 'Execute through Spacetime', status: 'waiting' },
 ];
 
 async function apiPost(path: string, body?: unknown) {
@@ -111,6 +134,7 @@ export function AgentCommandCenter() {
   const [result, setResult] = useState<RouteResult | null>(null);
   const [buildSteps, setBuildSteps] = useState<BuildStep[]>(initialBuildSteps);
   const [buildOutput, setBuildOutput] = useState<BuildOutput | null>(null);
+  const [coreSpinOutput, setCoreSpinOutput] = useState<CoreSpinOutput | null>(null);
 
   function markStep(index: number, status: BuildStep['status'], detail?: string) {
     setBuildSteps((current) => current.map((step, stepIndex) => stepIndex === index ? { ...step, status, detail } : step));
@@ -120,6 +144,7 @@ export function AgentCommandCenter() {
     setError('');
     setResult(null);
     setBuildOutput(null);
+    setCoreSpinOutput(null);
     setBuildSteps(initialBuildSteps);
   }
 
@@ -130,7 +155,15 @@ export function AgentCommandCenter() {
       markStep(0, 'running');
       const routed = await routeCommandRequest(command);
       setResult(routed);
-      markStep(0, 'done', `${routed.intent}/${routed.status}`);
+      if (routed.intent === 'inspect_cinema_browser_status') {
+        setBuildSteps(coreSpinReadSteps.map((step, index) => (
+          index === 0
+            ? { ...step, status: 'done' as const, detail: `${routed.intent}/${routed.status}` }
+            : { ...step }
+        )));
+      } else {
+        markStep(0, 'done', `${routed.intent}/${routed.status}`);
+      }
     } catch (err) {
       markStep(0, 'error', 'Failed here');
       setError(err instanceof Error ? err.message : 'Command routing failed');
@@ -187,6 +220,128 @@ export function AgentCommandCenter() {
     }
   }
 
+  async function runCoreSpinRead(routeOverride?: RouteResult) {
+    const activeRoute = routeOverride || result;
+    if (!activeRoute || activeRoute.intent !== 'inspect_cinema_browser_status') return;
+
+    const routePayload = (activeRoute.payload || {}) as Record<string, unknown>;
+    const taskId = typeof routePayload.taskId === 'string' ? routePayload.taskId : 'cinema-status';
+    const capability = typeof routePayload.capability === 'string' ? routePayload.capability : 'browser.remote.status';
+    const routeId = typeof routePayload.routeId === 'string' ? routePayload.routeId : 'route.cinema-remote.status';
+    const action = typeof routePayload.action === 'string' ? routePayload.action : 'browser.remote.status';
+    const argumentsPayload = routePayload.arguments && typeof routePayload.arguments === 'object'
+      ? routePayload.arguments as Record<string, unknown>
+      : {};
+
+    setBuilderBusy(true);
+    setError('');
+    setBuildOutput(null);
+    setCoreSpinOutput(null);
+    setBuildSteps(coreSpinReadSteps.map((step, index) => (
+      index === 0
+        ? { ...step, status: 'done' as const, detail: `${activeRoute.intent}/${activeRoute.status}` }
+        : { ...step }
+    )));
+
+    try {
+      markStep(1, 'running');
+      const created = await apiPost('/api/dsg/jobs', {
+        goal: command,
+        successCriteria: [
+          'Cinema status is read through Core Spin and DSG Spacetime',
+          'No provider mutation occurs',
+          'Spacetime execution evidence is returned and the evidence chain is valid',
+        ],
+      });
+      if (!created?.id) throw new Error('CORE_SPIN_JOB_ID_MISSING');
+      markStep(1, 'done', created.id);
+
+      markStep(2, 'running');
+      const planned = await apiPost(`/api/dsg/jobs/${created.id}/plan`, {
+        tasks: [{
+          id: taskId,
+          title: 'Read governed Cinema browser status',
+          dependsOn: [],
+          riskLevel: 'LOW',
+          toolName: capability,
+          requiresApproval: false,
+          metadata: { routeId, readOnly: true },
+        }],
+      });
+      markStep(2, 'done', planned.planHash || planned.taskPlanId || taskId);
+
+      markStep(3, 'running');
+      const started = await apiPost(`/api/dsg/jobs/${created.id}/automation`, { action: 'START' });
+      const runId = started?.run?.id;
+      if (!runId) throw new Error('CORE_SPIN_AUTOMATION_RUN_ID_MISSING');
+      markStep(3, 'done', runId);
+
+      markStep(4, 'running');
+      const executed = await apiPost(`/api/dsg/jobs/${created.id}/automation`, {
+        action: 'EXECUTE',
+        taskId,
+        capability,
+        routeId,
+        intent: command,
+        assignedAgent: 'dsg-core-spin',
+        payload: { action, arguments: argumentsPayload },
+      });
+
+      const coreResult = executed?.result && typeof executed.result === 'object'
+        ? executed.result as Record<string, unknown>
+        : {};
+      const decision = coreResult.decision && typeof coreResult.decision === 'object'
+        ? coreResult.decision as Record<string, unknown>
+        : {};
+      const providerOuter = coreResult.result && typeof coreResult.result === 'object'
+        ? coreResult.result as Record<string, unknown>
+        : {};
+      const provider = providerOuter.result && typeof providerOuter.result === 'object'
+        ? providerOuter.result as Record<string, unknown>
+        : providerOuter;
+      const evidence = coreResult.evidence && typeof coreResult.evidence === 'object'
+        ? coreResult.evidence as Record<string, unknown>
+        : {};
+      const evidenceChain = coreResult.evidenceChain && typeof coreResult.evidenceChain === 'object'
+        ? coreResult.evidenceChain as Record<string, unknown>
+        : {};
+
+      const state = typeof coreResult.state === 'string' ? coreResult.state : undefined;
+      const verdict = typeof decision.verdict === 'string' ? decision.verdict : undefined;
+      markStep(4, 'done', [state, verdict].filter(Boolean).join(' / ') || 'EXECUTED');
+
+      setCoreSpinOutput({
+        jobId: created.id,
+        runId,
+        taskId,
+        state,
+        routeId: typeof coreResult.routeId === 'string' ? coreResult.routeId : routeId,
+        decisionVerdict: verdict,
+        decisionReason: typeof decision.reason === 'string' ? decision.reason : undefined,
+        resultOk: typeof providerOuter.ok === 'boolean'
+          ? providerOuter.ok
+          : typeof provider.ok === 'boolean'
+            ? provider.ok
+            : undefined,
+        connected: typeof provider.connected === 'boolean' ? provider.connected : undefined,
+        status: typeof provider.status === 'string' ? provider.status : undefined,
+        evidenceHash: typeof evidence.evidence_hash === 'string'
+          ? evidence.evidence_hash
+          : typeof evidence.hash === 'string'
+            ? evidence.hash
+            : undefined,
+        evidenceChainValid: typeof evidenceChain.valid === 'boolean' ? evidenceChain.valid : undefined,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Core Spin governed read failed');
+      setBuildSteps((current) => current.map((step) => (
+        step.status === 'running' ? { ...step, status: 'error' as const, detail: 'Failed here' } : step
+      )));
+    } finally {
+      setBuilderBusy(false);
+    }
+  }
+
   async function buildNow() {
     setBusy(true);
     resetRun();
@@ -196,22 +351,31 @@ export function AgentCommandCenter() {
       setResult(routed);
       markStep(0, 'done', `${routed.intent}/${routed.status}`);
       setBusy(false);
-      await runBuilderRequest(routed);
+      if (routed.intent === 'inspect_cinema_browser_status') {
+        await runCoreSpinRead(routed);
+      } else if (routed.intent === 'build_app' || routed.intent === 'resolve_capability_gap' || routed.status === 'builder_required') {
+        await runBuilderRequest(routed);
+      }
     } catch (err) {
       markStep(0, 'error', 'Failed here');
-      setError(err instanceof Error ? err.message : 'Build Now failed');
+      setError(err instanceof Error ? err.message : 'Governed action failed');
       setBusy(false);
     }
   }
 
-  const canRunBuilder = Boolean(result && result.status !== 'blocked' && (result.intent === 'build_app' || result.intent === 'resolve_capability_gap' || result.status === 'approval_required' || result.status === 'builder_required'));
+  const canRunBuilder = Boolean(
+    result
+      && result.status !== 'blocked'
+      && (result.intent === 'build_app' || result.intent === 'resolve_capability_gap' || result.status === 'builder_required'),
+  );
+  const canRunCoreSpinRead = result?.intent === 'inspect_cinema_browser_status';
   const running = busy || builderBusy;
 
   return (
     <section className="rounded-2xl border border-[#C8A24D] bg-[#071326] p-4 text-[#F5F7FA] shadow-[0_0_36px_rgba(200,162,77,0.18)]">
       <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#E0B95B]">Agent Command Center</p>
-      <h2 className="mt-2 text-xl font-black">Build Governed Virtual PC App</h2>
-      <p className="mt-1 text-sm text-[#D7D9DE]">Build Now routes the requirement, creates the governed plan, approves execution, prepares runtime handoff, and returns PR evidence.</p>
+      <h2 className="mt-2 text-xl font-black">Governed Agent Command Center</h2>
+      <p className="mt-1 text-sm text-[#D7D9DE]">Commands are routed to their exact governed surface. Builder requests use App Builder; low-risk Cinema status reads use Core Spin → DSG Spacetime → provider evidence.</p>
 
       <textarea
         value={command}
@@ -226,7 +390,7 @@ export function AgentCommandCenter() {
           className="inline-flex items-center gap-2 rounded-xl border border-[#C8A24D] bg-[#E0B95B] px-4 py-3 text-sm font-black text-[#071326] disabled:opacity-50"
         >
           {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
-          Build Now
+          Run Governed Action
         </button>
         <button
           onClick={routeCommand}
@@ -237,12 +401,12 @@ export function AgentCommandCenter() {
           Route Only
         </button>
         <button
-          onClick={() => runBuilderRequest()}
-          disabled={!canRunBuilder || running}
+          onClick={() => canRunCoreSpinRead ? runCoreSpinRead() : runBuilderRequest()}
+          disabled={(!canRunBuilder && !canRunCoreSpinRead) || running}
           className="inline-flex items-center gap-2 rounded-xl border border-[#C8A24D] bg-[#0C2340] px-4 py-3 text-sm font-black text-[#E0B95B] disabled:opacity-40"
         >
           {builderBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
-          Run Builder Request
+          {canRunCoreSpinRead ? 'Run Governed Read' : 'Run Builder Request'}
         </button>
       </div>
 
@@ -273,6 +437,23 @@ export function AgentCommandCenter() {
           </div>
         ))}
       </div>
+
+      {coreSpinOutput ? (
+        <div className="mt-4 rounded-xl border border-[#C8A24D]/40 bg-[#0C2340] p-3 text-sm text-[#D7D9DE]">
+          <p className="font-black text-[#E0B95B]">Core Spin Governed Evidence</p>
+          <p>Job: <span className="font-mono">{coreSpinOutput.jobId}</span></p>
+          <p>Run: <span className="font-mono">{coreSpinOutput.runId || 'missing'}</span></p>
+          <p>Task: <span className="font-mono">{coreSpinOutput.taskId}</span></p>
+          <p>State: {coreSpinOutput.state || 'unknown'}</p>
+          <p>Route: <span className="font-mono">{coreSpinOutput.routeId || 'unknown'}</span></p>
+          <p>Spacetime decision: {coreSpinOutput.decisionVerdict || 'unknown'}{coreSpinOutput.decisionReason ? ` · ${coreSpinOutput.decisionReason}` : ''}</p>
+          <p>Provider ok: {coreSpinOutput.resultOk === undefined ? 'unknown' : String(coreSpinOutput.resultOk)}</p>
+          <p>Connected: {coreSpinOutput.connected === undefined ? 'unknown' : String(coreSpinOutput.connected)}</p>
+          <p>Status: {coreSpinOutput.status || 'unknown'}</p>
+          <p>Evidence hash: <span className="break-all font-mono">{coreSpinOutput.evidenceHash || 'missing'}</span></p>
+          <p>Evidence chain valid: {coreSpinOutput.evidenceChainValid === undefined ? 'unknown' : String(coreSpinOutput.evidenceChainValid)}</p>
+        </div>
+      ) : null}
 
       {buildOutput ? (
         <div className="mt-4 rounded-xl border border-[#C8A24D]/40 bg-[#0C2340] p-3 text-sm text-[#D7D9DE]">
