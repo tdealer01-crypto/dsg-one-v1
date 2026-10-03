@@ -41,7 +41,7 @@ describe('XR -> Core Spin adapter', () => {
   it('server-binds owner and creates the strict world.read proposal', () => {
     const proposal = normalizeXrReadIntentToCoreSpin(
       envelope(),
-      { ownerId: 'verified-user-1', workspaceId: 'workspace-1' },
+      { ownerId: 'verified-user-1', principal: 'workspace:workspace-1' },
     );
 
     expect(proposal.planId).toBe('xr-intent-1');
@@ -69,28 +69,28 @@ describe('XR -> Core Spin adapter', () => {
   it('blocks capability escalation', () => {
     expect(() => normalizeXrReadIntentToCoreSpin(
       envelope({ capability_id: 'world.write' }),
-      { ownerId: 'verified-user-1', workspaceId: 'workspace-1' },
+      { ownerId: 'verified-user-1', principal: 'workspace:workspace-1' },
     )).toThrow('XR_CORE_SPIN_CAPABILITY_NOT_ALLOWED');
   });
 
   it('blocks envelope/payload mirror mismatch', () => {
     expect(() => normalizeXrReadIntentToCoreSpin(
       envelope({ payload: { command_id: 'different' } }),
-      { ownerId: 'verified-user-1', workspaceId: 'workspace-1' },
+      { ownerId: 'verified-user-1', principal: 'workspace:workspace-1' },
     )).toThrow('XR_PAYLOAD_ENVELOPE_MISMATCH');
   });
 
   it('blocks extra fields instead of silently passing them to Spacetime', () => {
     expect(() => normalizeXrReadIntentToCoreSpin(
       envelope({ payload: { unexpected: true } }),
-      { ownerId: 'verified-user-1', workspaceId: 'workspace-1' },
+      { ownerId: 'verified-user-1', principal: 'workspace:workspace-1' },
     )).toThrow('XR_WORLD_READ_PAYLOAD_FIELDS_INVALID');
   });
 
   it('blocks non-empty read parameters', () => {
     expect(() => normalizeXrReadIntentToCoreSpin(
       envelope({ payload: { parameters: { mutate: true } } }),
-      { ownerId: 'verified-user-1', workspaceId: 'workspace-1' },
+      { ownerId: 'verified-user-1', principal: 'workspace:workspace-1' },
     )).toThrow('XR_WORLD_READ_PARAMETERS_INVALID');
   });
 });
