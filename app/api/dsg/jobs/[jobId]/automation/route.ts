@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { executeGovernedProposal } from '@/lib/dsg/core-spin/governed-execution';
 import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
+import { getRuntimeJob } from '@/lib/dsg/server/repository';
 import { getBearerToken } from '@/lib/dsg/server/supabase-rpc';
 import {
   evaluateAutomationRun,
@@ -38,7 +40,7 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
   const actor = await requireVerifiedDsgActor(request.headers, 'job:control');
   const { jobId } = await context.params;
   const body = (await request.json().catch(() => ({}))) as {
-    action?: 'START' | 'EVALUATE' | 'STEP';
+    action?: 'START' | 'EVALUATE' | 'STEP' | 'EXECUTE';
     maxRetries?: number;
     taskId?: string;
     expectedStatus?: string;
@@ -46,10 +48,128 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     assignedAgent?: string | null;
     resultRef?: string | null;
     nextRunAt?: string | null;
+    capability?: string;
+    routeId?: string;
+    payload?: Record<string, unknown>;
+    intent?: string;
+    approvalDecision?: 'APPROVE' | 'REJECT';
   };
   try {
     const repo = repositoryContext(actor, request);
     let run = await getLatestAutomationRun(repo, jobId);
+    if (body.action === 'EXECUTE') {
+      if (!run) throw new Error('AUTOMATION_RUN_NOT_FOUND');
+      if (!body.taskId || !body.capability) {
+        throw new Error('CORE_SPIN_TASK_AND_CAPABILITY_REQUIRED');
+      }
+
+      const job = await getRuntimeJob(repo, jobId);
+      let steps = await getAutomationSteps(repo, run.id);
+      let step = steps.find((item) => item.taskId === body.taskId);
+      if (!step) throw new Error('AUTOMATION_STEP_NOT_FOUND');
+
+      const before = await evaluateAutomationRun(repo, run);
+      const ready = Array.isArray(before.ready_step_ids)
+        ? before.ready_step_ids.map(String)
+        : [];
+
+      if (step.status === 'PENDING') {
+        if (!ready.includes(body.taskId)) throw new Error('AUTOMATION_STEP_NOT_READY');
+        await transitionAutomationStep(repo, {
+          runId: run.id,
+          taskId: body.taskId,
+          expectedStatus: 'PENDING',
+          nextStatus: 'READY',
+          assignedAgent: body.assignedAgent ?? 'dsg-core-spin',
+        });
+        steps = await getAutomationSteps(repo, run.id);
+        step = steps.find((item) => item.taskId === body.taskId);
+        if (!step) throw new Error('AUTOMATION_STEP_NOT_FOUND_AFTER_READY');
+      }
+
+      if (step.status === 'WAITING' && !body.approvalDecision) {
+        return NextResponse.json({
+          ok: true,
+          data: {
+            run,
+            state: 'WAITING_APPROVAL',
+            taskId: body.taskId,
+            approvalRequestId: step.resultRef,
+            decision: before,
+            executionAuthority: 'dsg-spacetime',
+          },
+        });
+      }
+
+      if (step.status === 'WAITING') {
+        await transitionAutomationStep(repo, {
+          runId: run.id,
+          taskId: body.taskId,
+          expectedStatus: 'WAITING',
+          nextStatus: 'READY',
+          assignedAgent: body.assignedAgent ?? step.assignedAgent ?? 'dsg-core-spin',
+        });
+        step = { ...step, status: 'READY' };
+      }
+
+      if (step.status !== 'READY') {
+        throw new Error(`AUTOMATION_STEP_NOT_EXECUTABLE:${step.status}`);
+      }
+
+      await transitionAutomationStep(repo, {
+        runId: run.id,
+        taskId: body.taskId,
+        expectedStatus: 'READY',
+        nextStatus: 'RUNNING',
+        assignedAgent: body.assignedAgent ?? step.assignedAgent ?? 'dsg-core-spin',
+      });
+
+      const result = await executeGovernedProposal({
+        taskId: body.taskId,
+        planId: `core-spin:${run.id}:${body.taskId}`,
+        intent: body.intent?.trim() || job.goal,
+        capability: body.capability,
+        routeId: body.routeId,
+        payload: body.payload,
+        agentId: body.assignedAgent?.trim() || 'dsg-core-spin',
+        principal: `workspace:${actor.workspaceId}`,
+        approvalRequestId: step.resultRef ?? undefined,
+        approvalDecision: body.approvalDecision,
+      });
+
+      const nextStatus =
+        result.state === 'COMPLETED' ? 'COMPLETED'
+          : result.state === 'WAITING_APPROVAL' ? 'WAITING'
+            : result.state === 'BLOCKED' ? 'BLOCKED'
+              : 'FAILED';
+      const evidenceRef =
+        result.evidence && typeof result.evidence === 'object'
+          ? String((result.evidence as Record<string, unknown>).evidence_hash ?? '')
+          : '';
+      const resultRef =
+        result.approvalRequestId || evidenceRef || result.reason || result.routeId || null;
+
+      const transition = await transitionAutomationStep(repo, {
+        runId: run.id,
+        taskId: body.taskId,
+        expectedStatus: 'RUNNING',
+        nextStatus,
+        assignedAgent: body.assignedAgent ?? 'dsg-core-spin',
+        resultRef,
+      });
+      const nextDecision = await evaluateAutomationRun(repo, run);
+      return NextResponse.json({
+        ok: result.state === 'COMPLETED' || result.state === 'WAITING_APPROVAL',
+        data: {
+          run,
+          result,
+          transition,
+          nextDecision,
+          executionAuthority: 'dsg-spacetime',
+          directProviderAccess: false,
+        },
+      }, { status: result.state === 'FAILED' ? 502 : 200 });
+    }
     if (body.action === 'STEP') {
       if (!run) throw new Error('AUTOMATION_RUN_NOT_FOUND');
       if (!body.taskId || !body.expectedStatus || !body.nextStatus) throw new Error('AUTOMATION_STEP_INPUT_REQUIRED');
