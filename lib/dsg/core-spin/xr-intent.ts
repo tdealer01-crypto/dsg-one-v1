@@ -17,7 +17,7 @@ export type CoreSpinXrIntentEnvelope = {
 
 export type VerifiedXrActorContext = {
   ownerId: string;
-  workspaceId: string;
+  principal: string;
 };
 
 const XR_WORLD_READ_FIELDS = [
@@ -123,7 +123,7 @@ export function normalizeXrReadIntentToCoreSpin(
   const intentId = requiredText(envelope.intent_id, 'XR_INTENT_ID_INVALID', 160);
   const avatarId = requiredText(envelope.actor_id, 'XR_ACTOR_ID_INVALID', 160);
   const ownerId = requiredText(actor.ownerId, 'XR_VERIFIED_OWNER_REQUIRED', 256);
-  const workspaceId = requiredText(actor.workspaceId, 'XR_VERIFIED_WORKSPACE_REQUIRED', 256);
+  const principal = requiredText(actor.principal, 'XR_VERIFIED_PRINCIPAL_REQUIRED', 256);
 
   if (envelope.capability_id !== XR_WORLD_READ_CAPABILITY) {
     throw new Error('XR_CORE_SPIN_CAPABILITY_NOT_ALLOWED');
@@ -167,7 +167,7 @@ export function normalizeXrReadIntentToCoreSpin(
     routeId: XR_WORLD_READ_ROUTE_ID,
     payload: serverBoundPayload,
     agentId: avatarId,
-    principal: `workspace:${workspaceId}`,
+    principal,
     worldContext: {
       missionId: planId,
       ownerId,

@@ -4,14 +4,8 @@ import {
   normalizeXrReadIntentToCoreSpin,
   type CoreSpinXrIntentEnvelope,
 } from '@/lib/dsg/core-spin/xr-intent';
+import { toXrExecutionReceipt } from '@/lib/dsg/core-spin/xr-receipt';
 import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
-
-function receiptStatus(state: string) {
-  if (state === 'COMPLETED') return { status: 'EXECUTED', verdict: 'ALLOW' };
-  if (state === 'WAITING_APPROVAL') return { status: 'WAITING_APPROVAL', verdict: 'PENDING' };
-  if (state === 'BLOCKED') return { status: 'BLOCK', verdict: 'BLOCK' };
-  return { status: 'FAILED', verdict: 'BLOCK' };
-}
 
 export async function POST(request: Request) {
   let actor;
@@ -30,25 +24,14 @@ export async function POST(request: Request) {
     const envelope = await request.json() as CoreSpinXrIntentEnvelope;
     const proposal = normalizeXrReadIntentToCoreSpin(envelope, {
       ownerId: actor.actorId,
-      workspaceId: actor.workspaceId,
+      principal: `workspace:${actor.workspaceId}`,
     });
     const result = await executeGovernedProposal(proposal);
-    const receipt = receiptStatus(result.state);
 
-    return NextResponse.json({
-      ...receipt,
-      reason: result.reason ?? '',
-      plan_id: proposal.planId,
-      route_id: result.routeId ?? proposal.routeId,
-      approval_request_id: result.approvalRequestId ?? '',
-      result: result.result ?? null,
-      evidence: result.evidence ?? null,
-      execution_authority: 'dsg-spacetime',
-      orchestration_authority: 'dsg-core-spin',
-      direct_provider_access: false,
-    }, {
-      status: result.state === 'FAILED' ? 502 : 200,
-    });
+    return NextResponse.json(
+      toXrExecutionReceipt(proposal, result),
+      { status: result.state === 'FAILED' ? 502 : 200 },
+    );
   } catch (error) {
     const code = error instanceof Error ? error.message : 'XR_CORE_SPIN_REJECTED';
     return NextResponse.json(
