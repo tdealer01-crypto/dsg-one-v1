@@ -15,7 +15,7 @@ export type CoreSpinWorldContext = {
   actorAvatarId: string;
   worldId: string;
   regionId: string;
-  expectedStateVersion?: string;
+  expectedStateVersion?: number;
 };
 
 export type CoreSpinActionProposal = {
@@ -105,18 +105,67 @@ function validateWorldContext(proposal: CoreSpinActionProposal): string | undefi
   ) {
     return 'CORE_SPIN_WORLD_CONTEXT_INCOMPLETE';
   }
+  if (
+    context.expectedStateVersion !== undefined
+    && (
+      !Number.isSafeInteger(context.expectedStateVersion)
+      || context.expectedStateVersion < 0
+    )
+  ) {
+    return 'CORE_SPIN_WORLD_STATE_VERSION_INVALID';
+  }
 
   const payload = proposal.payload;
   if (!payload || typeof payload !== 'object') {
     return 'CORE_SPIN_WORLD_CONTEXT_NOT_BOUND';
   }
+
+  const isXrWorldRoute =
+    proposal.capability === 'world.read'
+    || proposal.capability === 'world.write'
+    || proposal.routeId?.startsWith('route.xr-world.') === true;
+
+  if (isXrWorldRoute) {
+    // XR world schema v1 is a strict top-level payload. Its mission identity is
+    // bound by the Spacetime execution plan id, while owner/avatar/world/region
+    // are bound directly into the adapter payload.
+    if (proposal.planId !== context.missionId) {
+      return 'CORE_SPIN_WORLD_MISSION_PLAN_MISMATCH';
+    }
+    if ('arguments' in payload) {
+      return 'CORE_SPIN_XR_WORLD_PAYLOAD_WRAPPED';
+    }
+
+    const bindings: Array<[string, string | number | undefined, boolean]> = [
+      ['owner_id', context.ownerId, true],
+      ['actor_avatar_id', context.actorAvatarId, true],
+      ['world_id', context.worldId, true],
+      ['region_id', context.regionId, true],
+      ['expected_state_version', context.expectedStateVersion, context.expectedStateVersion !== undefined],
+    ];
+
+    for (const [field, expected, required] of bindings) {
+      if (required && !(field in payload)) {
+        return 'CORE_SPIN_WORLD_CONTEXT_NOT_BOUND';
+      }
+      if (
+        field in payload
+        && expected !== undefined
+        && payload[field] !== expected
+      ) {
+        return 'CORE_SPIN_WORLD_CONTEXT_MISMATCH';
+      }
+    }
+    return undefined;
+  }
+
   const args = payload.arguments;
   if (!args || typeof args !== 'object' || Array.isArray(args)) {
     return 'CORE_SPIN_WORLD_CONTEXT_NOT_BOUND';
   }
 
   const record = args as Record<string, unknown>;
-  const bindings: Array<[string, string | undefined, boolean]> = [
+  const bindings: Array<[string, string | number | undefined, boolean]> = [
     ['mission_id', context.missionId, true],
     ['owner_id', context.ownerId, true],
     ['actor_avatar_id', context.actorAvatarId, true],
