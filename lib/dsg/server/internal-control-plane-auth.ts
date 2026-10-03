@@ -7,7 +7,7 @@ function normalized(value: string | undefined): string | undefined {
 
 export function isDsgInternalControlPlaneAuthorized(
   provided: string | undefined,
-  env: NodeJS.ProcessEnv = process.env,
+  env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
   const expected = normalized(env.DSG_SPACETIME_INTERNAL_API_KEY);
   const actual = normalized(provided);
