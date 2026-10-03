@@ -100,8 +100,34 @@ export async function executeGovernedProposal(
     if (route.bind_payload && !proposal.payload) {
       return { state: 'BLOCKED', routeId: route.route_id, reason: 'CORE_SPIN_BOUND_PAYLOAD_REQUIRED' };
     }
-    if (!route.bind_payload && proposal.payload) {
-      return { state: 'BLOCKED', routeId: route.route_id, reason: 'CORE_SPIN_UNBOUND_PAYLOAD_FORBIDDEN' };
+
+    const browserAction =
+      route.capability === 'browser.remote.execute'
+        ? 'browser.remote.run'
+        : route.capability.startsWith('browser.remote.')
+          ? route.capability
+          : undefined;
+    const executionPayload = proposal.payload ?? (
+      browserAction
+        ? { action: browserAction, arguments: {} }
+        : {}
+    );
+    if (
+      browserAction
+      && (
+        executionPayload.action !== browserAction
+        || (
+          'arguments' in executionPayload
+          && executionPayload.arguments !== null
+          && typeof executionPayload.arguments !== 'object'
+        )
+      )
+    ) {
+      return {
+        state: 'BLOCKED',
+        routeId: route.route_id,
+        reason: 'CORE_SPIN_EXECUTION_PAYLOAD_SCOPE_MISMATCH',
+      };
     }
 
     const agent = { agent_id: proposal.agentId, principal: proposal.principal };
@@ -112,7 +138,7 @@ export async function executeGovernedProposal(
       plan_id: proposal.planId,
       route_id: route.route_id,
       agent,
-      payload: proposal.payload ?? {},
+      payload: executionPayload,
     };
     let planHash: string;
 
