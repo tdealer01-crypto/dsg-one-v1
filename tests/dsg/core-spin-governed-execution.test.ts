@@ -229,4 +229,105 @@ describe('executeGovernedProposal', () => {
       'spacetime_compose',
     );
   });
+
+  it('blocks an incomplete world context before route discovery', async () => {
+    const result = await executeGovernedProposal({
+      ...baseProposal,
+      worldContext: {
+        missionId: 'mission-1',
+        ownerId: 'user-1',
+        actorAvatarId: 'avatar-1',
+        worldId: 'dsg-world',
+        regionId: '',
+      },
+    });
+
+    expect(result).toEqual({
+      state: 'BLOCKED',
+      reason: 'CORE_SPIN_WORLD_CONTEXT_INCOMPLETE',
+    });
+    expect(callSpacetimeTool).not.toHaveBeenCalled();
+  });
+
+  it('blocks payload world fields that disagree with the bound context', async () => {
+    const result = await executeGovernedProposal({
+      ...baseProposal,
+      capability: 'world.read',
+      payload: {
+        action: 'READ_REGION',
+        arguments: {
+          mission_id: 'mission-1',
+          owner_id: 'user-1',
+          actor_avatar_id: 'avatar-1',
+          world_id: 'different-world',
+          region_id: 'commons',
+        },
+      },
+      worldContext: {
+        missionId: 'mission-1',
+        ownerId: 'user-1',
+        actorAvatarId: 'avatar-1',
+        worldId: 'dsg-world',
+        regionId: 'commons',
+      },
+    });
+
+    expect(result).toEqual({
+      state: 'BLOCKED',
+      reason: 'CORE_SPIN_WORLD_CONTEXT_MISMATCH',
+    });
+    expect(callSpacetimeTool).not.toHaveBeenCalled();
+  });
+
+  it('executes a world read when payload and world context are exactly aligned', async () => {
+    callSpacetimeTool
+      .mockResolvedValueOnce({
+        routes: [{
+          route_id: 'route.xr-world.read',
+          source_node: 'node.agent',
+          target_node: 'node.xr-world',
+          capability: 'world.read',
+          approval_required: false,
+          bind_payload: true,
+        }],
+      })
+      .mockResolvedValueOnce({ verdict: 'BOUND', plan_hash: '2'.repeat(64) })
+      .mockResolvedValueOnce({
+        decision: { verdict: 'ALLOW', decision_hash: '3'.repeat(64) },
+        result: { region_id: 'commons' },
+        evidence: { evidence_hash: '4'.repeat(64) },
+      })
+      .mockResolvedValueOnce({ valid: true, records: 1 });
+
+    const payload = {
+      action: 'READ_REGION',
+      arguments: {
+        mission_id: 'mission-1',
+        owner_id: 'user-1',
+        actor_avatar_id: 'avatar-1',
+        world_id: 'dsg-world',
+        region_id: 'commons',
+      },
+    };
+
+    const result = await executeGovernedProposal({
+      ...baseProposal,
+      capability: 'world.read',
+      routeId: 'route.xr-world.read',
+      payload,
+      worldContext: {
+        missionId: 'mission-1',
+        ownerId: 'user-1',
+        actorAvatarId: 'avatar-1',
+        worldId: 'dsg-world',
+        regionId: 'commons',
+      },
+    });
+
+    expect(result.state).toBe('COMPLETED');
+    const executeCall = callSpacetimeTool.mock.calls.find(
+      ([name]) => name === 'spacetime_execute',
+    );
+    expect(executeCall?.[1]).toMatchObject({ payload });
+  });
 });

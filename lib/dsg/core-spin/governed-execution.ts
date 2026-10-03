@@ -9,6 +9,15 @@ export type CoreSpinState =
   | 'BLOCKED'
   | 'FAILED';
 
+export type CoreSpinWorldContext = {
+  missionId: string;
+  ownerId: string;
+  actorAvatarId: string;
+  worldId: string;
+  regionId: string;
+  expectedStateVersion?: string;
+};
+
 export type CoreSpinActionProposal = {
   taskId: string;
   planId: string;
@@ -18,6 +27,7 @@ export type CoreSpinActionProposal = {
   payload?: Record<string, unknown>;
   agentId: string;
   principal: string;
+  worldContext?: CoreSpinWorldContext;
   approvalRequestId?: string;
   approvalDecision?: 'APPROVE' | 'REJECT';
 };
@@ -82,6 +92,57 @@ function approvalRequestIdFrom(result: SpacetimeToolResult): string | undefined 
   return typeof id === 'string' && id ? id : undefined;
 }
 
+function validateWorldContext(proposal: CoreSpinActionProposal): string | undefined {
+  const context = proposal.worldContext;
+  if (!context) return undefined;
+
+  if (
+    !context.missionId
+    || !context.ownerId
+    || !context.actorAvatarId
+    || !context.worldId
+    || !context.regionId
+  ) {
+    return 'CORE_SPIN_WORLD_CONTEXT_INCOMPLETE';
+  }
+
+  const payload = proposal.payload;
+  if (!payload || typeof payload !== 'object') {
+    return 'CORE_SPIN_WORLD_CONTEXT_NOT_BOUND';
+  }
+  const args = payload.arguments;
+  if (!args || typeof args !== 'object' || Array.isArray(args)) {
+    return 'CORE_SPIN_WORLD_CONTEXT_NOT_BOUND';
+  }
+
+  const record = args as Record<string, unknown>;
+  const bindings: Array<[string, string | undefined, boolean]> = [
+    ['mission_id', context.missionId, true],
+    ['owner_id', context.ownerId, true],
+    ['actor_avatar_id', context.actorAvatarId, true],
+    ['world_id', context.worldId, true],
+    ['region_id', context.regionId, true],
+    ['expected_state_version', context.expectedStateVersion, false],
+  ];
+
+  for (const [field, expected, required] of bindings) {
+    if (required && !(field in record)) {
+      return 'CORE_SPIN_WORLD_CONTEXT_NOT_BOUND';
+    }
+    if (
+      field in record
+      && expected !== undefined
+      && record[field] !== expected
+    ) {
+      return 'CORE_SPIN_WORLD_CONTEXT_MISMATCH';
+    }
+    if (field in record && expected === undefined) {
+      return 'CORE_SPIN_WORLD_CONTEXT_MISMATCH';
+    }
+  }
+  return undefined;
+}
+
 export async function executeGovernedProposal(
   proposal: CoreSpinActionProposal,
 ): Promise<CoreSpinExecutionResult> {
@@ -90,6 +151,11 @@ export async function executeGovernedProposal(
   }
   if (!proposal.agentId || !proposal.principal) {
     return { state: 'BLOCKED', reason: 'CORE_SPIN_AGENT_IDENTITY_REQUIRED' };
+  }
+
+  const worldContextError = validateWorldContext(proposal);
+  if (worldContextError) {
+    return { state: 'BLOCKED', reason: worldContextError };
   }
 
   try {
