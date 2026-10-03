@@ -1,4 +1,4 @@
-import { getBearerToken, getDsgSupabaseRpcConfig } from './supabase-rpc';
+import { getBearerToken, getDsgSupabaseRpcConfig, readDsgRest } from './supabase-rpc';
 
 export type DsgServerActor = {
   actorId: string;
@@ -75,23 +75,12 @@ export async function resolveVerifiedDsgActor(headers: Headers): Promise<DsgServ
   const actorId = user.id ?? user.sub;
   if (!actorId) return null;
 
-  const memberUrl = new URL(`${config.url}/rest/v1/dsg_workspace_members`);
-  memberUrl.searchParams.set('workspace_id', `eq.${workspaceId}`);
-  memberUrl.searchParams.set('actor_id', `eq.${actorId}`);
-  memberUrl.searchParams.set('select', 'role');
-  memberUrl.searchParams.set('limit', '1');
-
-  const memberResponse = await fetch(memberUrl, {
-    headers: {
-      apikey: config.key,
-      Authorization: `Bearer ${config.key}`,
-      Accept: 'application/json',
-    },
-    cache: 'no-store',
+  const rows = await readDsgRest<WorkspaceMemberRow[]>(getDsgSupabaseRpcConfig(), 'dsg_workspace_members', {
+    workspace_id: `eq.${workspaceId}`,
+    actor_id: `eq.${actorId}`,
+    select: 'role',
+    limit: '1',
   });
-
-  if (!memberResponse.ok) return null;
-  const rows = (await memberResponse.json()) as WorkspaceMemberRow[];
   const role = rows[0]?.role;
   if (!role || !Object.prototype.hasOwnProperty.call(permissionsByRole, role)) return null;
 
