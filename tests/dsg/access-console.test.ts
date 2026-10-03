@@ -26,6 +26,26 @@ describe('DSG access console session bridge', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('supports Supabase sb_* service keys without sending them as bearer tokens', async () => {
+    vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'sb_secret_test_key');
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'actor-1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ role: 'OWNER' }]), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const actor = await resolveVerifiedDsgActor(new Headers({
+      cookie: 'sb-access-token=user.jwt.token; dsg-workspace-id=workspace-1',
+    }));
+
+    expect(actor).toEqual({ actorId: 'actor-1', workspaceId: 'workspace-1', role: 'OWNER' });
+    const membershipRequest = fetchMock.mock.calls[1];
+    const requestInit = membershipRequest?.[1] as RequestInit | undefined;
+    const headers = requestInit?.headers as Record<string, string> | undefined;
+    expect(headers?.apikey).toBe('sb_secret_test_key');
+    expect(headers?.Authorization).toBeUndefined();
+  });
+
   it('fails closed when the workspace cookie is absent', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
