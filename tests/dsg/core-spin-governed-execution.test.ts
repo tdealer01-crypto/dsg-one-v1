@@ -249,17 +249,57 @@ describe('executeGovernedProposal', () => {
     expect(callSpacetimeTool).not.toHaveBeenCalled();
   });
 
-  it('blocks payload world fields that disagree with the bound context', async () => {
+  it('blocks XR world payload fields that disagree with the bound context', async () => {
     const result = await executeGovernedProposal({
       ...baseProposal,
+      planId: 'mission-1',
       capability: 'world.read',
+      routeId: 'route.xr-world.read',
+      payload: {
+        schema_version: 1,
+        command_id: 'read-1',
+        actor_avatar_id: 'avatar-1',
+        owner_id: 'user-1',
+        world_id: 'different-world',
+        region_id: 'commons',
+        target_id: '*',
+        action_type: 'READ_REGION',
+        parameters: {},
+        expected_state_version: 0,
+        capability_id: 'world.read',
+        policy_id: 'policy-world-read',
+        logical_time: 'E1:T1:S1',
+        idempotency_key: 'read-1',
+      },
+      worldContext: {
+        missionId: 'mission-1',
+        ownerId: 'user-1',
+        actorAvatarId: 'avatar-1',
+        worldId: 'dsg-world',
+        regionId: 'commons',
+        expectedStateVersion: 0,
+      },
+    });
+
+    expect(result).toEqual({
+      state: 'BLOCKED',
+      reason: 'CORE_SPIN_WORLD_CONTEXT_MISMATCH',
+    });
+    expect(callSpacetimeTool).not.toHaveBeenCalled();
+  });
+
+  it('blocks browser-style wrapped payloads for strict XR world routes', async () => {
+    const result = await executeGovernedProposal({
+      ...baseProposal,
+      planId: 'mission-1',
+      capability: 'world.read',
+      routeId: 'route.xr-world.read',
       payload: {
         action: 'READ_REGION',
         arguments: {
-          mission_id: 'mission-1',
           owner_id: 'user-1',
           actor_avatar_id: 'avatar-1',
-          world_id: 'different-world',
+          world_id: 'dsg-world',
           region_id: 'commons',
         },
       },
@@ -274,47 +314,23 @@ describe('executeGovernedProposal', () => {
 
     expect(result).toEqual({
       state: 'BLOCKED',
-      reason: 'CORE_SPIN_WORLD_CONTEXT_MISMATCH',
+      reason: 'CORE_SPIN_XR_WORLD_PAYLOAD_WRAPPED',
     });
     expect(callSpacetimeTool).not.toHaveBeenCalled();
   });
 
-  it('executes a world read when payload and world context are exactly aligned', async () => {
-    callSpacetimeTool
-      .mockResolvedValueOnce({
-        routes: [{
-          route_id: 'route.xr-world.read',
-          source_node: 'node.agent',
-          target_node: 'node.xr-world',
-          capability: 'world.read',
-          approval_required: false,
-          bind_payload: true,
-        }],
-      })
-      .mockResolvedValueOnce({ verdict: 'BOUND', plan_hash: '2'.repeat(64) })
-      .mockResolvedValueOnce({
-        decision: { verdict: 'ALLOW', decision_hash: '3'.repeat(64) },
-        result: { region_id: 'commons' },
-        evidence: { evidence_hash: '4'.repeat(64) },
-      })
-      .mockResolvedValueOnce({ valid: true, records: 1 });
-
-    const payload = {
-      action: 'READ_REGION',
-      arguments: {
-        mission_id: 'mission-1',
+  it('binds XR mission identity to the Spacetime plan id', async () => {
+    const result = await executeGovernedProposal({
+      ...baseProposal,
+      planId: 'plan-different-from-mission',
+      capability: 'world.read',
+      routeId: 'route.xr-world.read',
+      payload: {
         owner_id: 'user-1',
         actor_avatar_id: 'avatar-1',
         world_id: 'dsg-world',
         region_id: 'commons',
       },
-    };
-
-    const result = await executeGovernedProposal({
-      ...baseProposal,
-      capability: 'world.read',
-      routeId: 'route.xr-world.read',
-      payload,
       worldContext: {
         missionId: 'mission-1',
         ownerId: 'user-1',
@@ -324,7 +340,74 @@ describe('executeGovernedProposal', () => {
       },
     });
 
+    expect(result).toEqual({
+      state: 'BLOCKED',
+      reason: 'CORE_SPIN_WORLD_MISSION_PLAN_MISMATCH',
+    });
+    expect(callSpacetimeTool).not.toHaveBeenCalled();
+  });
+
+  it('executes a strict top-level XR world read when context is exactly aligned', async () => {
+    callSpacetimeTool
+      .mockResolvedValueOnce({
+        routes: [{
+          route_id: 'route.xr-world.read',
+          source_node: 'node.xr',
+          target_node: 'node.xr-world',
+          capability: 'world.read',
+          approval_required: false,
+          bind_payload: true,
+        }],
+      })
+      .mockResolvedValueOnce({ verdict: 'BOUND', plan_hash: '2'.repeat(64) })
+      .mockResolvedValueOnce({
+        decision: { verdict: 'ALLOW', decision_hash: '3'.repeat(64) },
+        result: { world_id: 'dsg-world', region_id: 'commons', state_version: 0, objects: {} },
+        evidence: { evidence_hash: '4'.repeat(64) },
+      })
+      .mockResolvedValueOnce({ valid: true, records: 1 });
+
+    const payload = {
+      schema_version: 1,
+      command_id: 'read-1',
+      actor_avatar_id: 'avatar-1',
+      owner_id: 'user-1',
+      world_id: 'dsg-world',
+      region_id: 'commons',
+      target_id: '*',
+      action_type: 'READ_REGION',
+      parameters: {},
+      expected_state_version: 0,
+      capability_id: 'world.read',
+      policy_id: 'policy-world-read',
+      logical_time: 'E1:T1:S1',
+      idempotency_key: 'read-1',
+    };
+
+    const result = await executeGovernedProposal({
+      ...baseProposal,
+      planId: 'mission-1',
+      capability: 'world.read',
+      routeId: 'route.xr-world.read',
+      payload,
+      worldContext: {
+        missionId: 'mission-1',
+        ownerId: 'user-1',
+        actorAvatarId: 'avatar-1',
+        worldId: 'dsg-world',
+        regionId: 'commons',
+        expectedStateVersion: 0,
+      },
+    });
+
     expect(result.state).toBe('COMPLETED');
+    const composeCall = callSpacetimeTool.mock.calls.find(
+      ([name]) => name === 'spacetime_compose',
+    );
+    expect(composeCall?.[1]).toMatchObject({
+      plan_id: 'mission-1',
+      routes: [{ payload }],
+    });
     const executeCall = callSpacetimeTool.mock.calls.find(
       ([name]) => name === 'spacetime_execute',
     );
