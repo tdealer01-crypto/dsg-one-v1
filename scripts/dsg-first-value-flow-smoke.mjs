@@ -53,13 +53,42 @@ const routes = [
   '/api/dsg/marketplace/audit-packet',
   '/api/dsg/marketplace/readiness-score',
 ];
+const protectedRoutes = new Set([
+  '/dsg/app-builder',
+  '/enterprise/readiness',
+  '/enterprise/terms',
+  '/enterprise/privacy',
+  '/enterprise/security',
+  '/enterprise/support',
+  '/enterprise/entitlement',
+  '/enterprise/security-rbac',
+  '/enterprise/accessibility',
+  '/enterprise/market',
+]);
+
 const results = [];
 
 for (const route of routes) {
   const url = new URL(route, baseUrl);
   try {
     const response = await fetch(url, { redirect: 'manual' });
-    results.push({ route, status: response.status, ok: response.status >= 200 && response.status < 300 });
+    const is2xx = response.status >= 200 && response.status < 300;
+    const location = response.headers.get('location');
+    let authBoundary = false;
+
+    if (protectedRoutes.has(route) && response.status === 307 && location) {
+      const redirectUrl = new URL(location, baseUrl);
+      authBoundary =
+        redirectUrl.pathname === '/login'
+        && redirectUrl.searchParams.get('next') === route;
+    }
+
+    results.push({
+      route,
+      status: response.status,
+      ok: is2xx || authBoundary,
+      ...(authBoundary ? { boundary: 'AUTH_REQUIRED', location } : {}),
+    });
   } catch (error) {
     results.push({ route, status: 0, ok: false, error: error instanceof Error ? error.message : String(error) });
   }

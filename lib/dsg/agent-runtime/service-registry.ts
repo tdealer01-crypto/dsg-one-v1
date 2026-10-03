@@ -32,7 +32,9 @@ export type AgentRuntimeService = {
 };
 
 function remoteBrowserContractStatus(): AgentRuntimeServiceStatus {
-  return process.env.DSG_REMOTE_BROWSER_ENABLED === 'true' ? 'connector_required' : 'connector_required';
+  const spacetimeUrl = process.env.DSG_SPACETIME_MCP_URL?.trim();
+  const spacetimeToken = process.env.DSG_SPACETIME_INTERNAL_API_KEY?.trim();
+  return spacetimeUrl && spacetimeToken ? 'approval_required' : 'connector_required';
 }
 
 function openAIAdapterServiceStatus(): AgentRuntimeServiceStatus {
@@ -108,14 +110,15 @@ export function listAgentRuntimeServices(): AgentRuntimeService[] {
     {
       id: 'remote.browser.session',
       label: 'Remote browser session',
-      description: 'Manus-style remote browser automation contract for future executor integration.',
+      description: 'Governed remote browser execution through DSG Spacetime and the production Cinema adapter.',
       status: remoteBrowserContractStatus(),
-      implementation: 'not_implemented_in_repo',
-      action: 'Connect a real remote browser executor before enabling autonomous browsing.',
-      requiredSecrets: ['DSG_REMOTE_BROWSER_ENABLED', 'REMOTE_BROWSER_ENDPOINT_OR_VENDOR_TOKEN'],
-      evidence: ['browser-session-id', 'screenshot-url', 'navigation-log', 'task-result'],
-      userBenefit: 'Once connected, the agent can inspect web pages and return browser proof without the user manually clicking through.',
-      truthBoundary: 'Remote browser contract and APIs exist, but autonomous browser control remains connector-required until a verified provider adapter is wired.',
+      implementation: 'server_runtime_contract',
+      action: 'Submit a plan-bound browser capability through the Core Spin automation endpoint.',
+      endpoint: '/api/dsg/jobs/:jobId/automation',
+      requiredSecrets: ['DSG_SPACETIME_MCP_URL', 'DSG_SPACETIME_INTERNAL_API_KEY'],
+      evidence: ['spacetime-decision-hash', 'spacetime-evidence-hash', 'evidence-chain-verification'],
+      userBenefit: 'The agent can use Cinema through Spacetime without holding provider credentials or bypassing approval.',
+      truthBoundary: 'Execution is available only when the internal Spacetime binding is configured and the exact route/payload passes Spacetime governance. High-risk browser routes still require exact-request approval.',
     },
     {
       id: 'dsg.agent.orchestrator',
