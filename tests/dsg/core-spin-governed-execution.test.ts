@@ -54,6 +54,42 @@ describe('executeGovernedProposal', () => {
       'spacetime_execute',
       'spacetime_verify_evidence',
     ]);
+    const executeCall = callSpacetimeTool.mock.calls.find(
+      ([name]) => name === 'spacetime_execute',
+    );
+    expect(executeCall?.[1]).toMatchObject({
+      payload: {
+        action: 'browser.remote.status',
+        arguments: {},
+      },
+    });
+  });
+
+  it('rejects an execution envelope whose action does not match the discovered route', async () => {
+    callSpacetimeTool.mockResolvedValueOnce({
+      routes: [{
+        route_id: 'route.cinema-remote.status',
+        source_node: 'node.agent',
+        target_node: 'node.cinema-remote',
+        capability: 'browser.remote.status',
+        approval_required: false,
+        bind_payload: false,
+      }],
+    });
+
+    const result = await executeGovernedProposal({
+      ...baseProposal,
+      payload: {
+        action: 'browser.remote.connect',
+        arguments: {},
+      },
+    });
+
+    expect(result).toMatchObject({
+      state: 'BLOCKED',
+      reason: 'CORE_SPIN_EXECUTION_PAYLOAD_SCOPE_MISMATCH',
+    });
+    expect(callSpacetimeTool).toHaveBeenCalledTimes(1);
   });
 
   it('stops at exact-request approval before a high-risk route executes', async () => {
@@ -98,6 +134,40 @@ describe('executeGovernedProposal', () => {
       'spacetime_execute',
       expect.anything(),
     );
+  });
+
+  it('accepts the Cinema run action for the browser execute capability', async () => {
+    callSpacetimeTool
+      .mockResolvedValueOnce({
+        routes: [{
+          route_id: 'route.cinema-remote.execute',
+          source_node: 'node.agent',
+          target_node: 'node.cinema-remote',
+          capability: 'browser.remote.execute',
+          approval_required: true,
+          signed_approval_required: true,
+          bind_payload: true,
+        }],
+      })
+      .mockResolvedValueOnce({ verdict: 'BOUND', plan_hash: '9'.repeat(64) })
+      .mockResolvedValueOnce({
+        verdict: 'PENDING',
+        approval: { approval_request_id: 'approval-run' },
+      });
+
+    const result = await executeGovernedProposal({
+      ...baseProposal,
+      capability: 'browser.remote.execute',
+      payload: {
+        action: 'browser.remote.run',
+        arguments: {},
+      },
+    });
+
+    expect(result).toMatchObject({
+      state: 'WAITING_APPROVAL',
+      approvalRequestId: 'approval-run',
+    });
   });
 
   it('resumes an approved request and passes the ephemeral approval token to execute', async () => {
