@@ -1,6 +1,6 @@
 # First Value Flow Checklist
 
-Use this checklist with `APP_URL="https://dsg-one-v1.vercel.app" npm run smoke:first-value-flow`.
+Use this checklist with `APP_URL="<verified AWS origin>" npm run smoke:first-value-flow`.
 
 ## Routes that must return 2xx
 
