@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { ArrowRight, LockKeyhole, ShieldCheck } from 'lucide-react';
 
 function safeNextPath(value: string | null): string {
@@ -9,11 +9,16 @@ function safeNextPath(value: string | null): string {
   return value;
 }
 
+const subscribeNever = () => () => {};
+
 export default function LoginPage() {
-  const [nextPath] = useState<string>(() => {
-    if (typeof window === 'undefined') return '/dsg/access';
-    return safeNextPath(new URLSearchParams(window.location.search).get('next'));
-  });
+  // Server renders the default; the client re-renders with the real ?next= after hydration,
+  // so the displayed route always matches where sign-in will redirect.
+  const nextPath = useSyncExternalStore(
+    subscribeNever,
+    () => safeNextPath(new URLSearchParams(window.location.search).get('next')),
+    () => '/dsg/access',
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
@@ -57,7 +62,7 @@ export default function LoginPage() {
             </p>
             <div className="mt-8 rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Next route</p>
-              <p className="mt-2 break-all font-mono text-sm text-indigo-200" suppressHydrationWarning>{nextPath}</p>
+              <p className="mt-2 break-all font-mono text-sm text-indigo-200">{nextPath}</p>
             </div>
           </div>
 
