@@ -1,8 +1,10 @@
 # Enterprise Smoke Evidence Packet
 
+> Historical evidence (2026-05-11). The Vercel origin it was captured against has been retired (owner directive 2026-10-05: AWS-only); it is shown as a label, not a live link. This packet is not evidence about the current AWS runtime. Re-run the smokes against the verified AWS origin.
+
 Date: 2026-05-11
 Source: operator-supplied Termux screenshots in ChatGPT session
-Production base URL shown: `https://dsg-one-v1.vercel.app`
+Production base URL shown: `[retired Vercel origin]`
 
 ## Evidence boundary
 
@@ -30,7 +32,7 @@ Observed from screenshot:
 Observed from screenshot:
 
 ```bash
-BASE="https://dsg-one-v1.vercel.app"
+BASE="[retired Vercel origin]"
 ```
 
 Manual route checks returned:
@@ -51,7 +53,7 @@ npm run smoke:accessibility-qa
 Observed result:
 
 - `PASS: accessibility QA endpoint responded with a valid evidence report`
-- endpoint: `https://dsg-one-v1.vercel.app/api/dsg/marketplace/accessibility-qa`
+- endpoint: `[retired Vercel origin]/api/dsg/marketplace/accessibility-qa`
 - verdict: `BLOCKED`
 - checks: `4`
 - pass: `0`
@@ -71,7 +73,7 @@ npm run smoke:marketplace-readiness
 Observed result:
 
 - `PASS: marketplace readiness endpoint responded with a valid audit report`
-- endpoint: `https://dsg-one-v1.vercel.app/api/dsg/marketplace/readiness`
+- endpoint: `[retired Vercel origin]/api/dsg/marketplace/readiness`
 - verdict: `REVIEW`
 - gates: `6`
 - pass: `0`
@@ -112,14 +114,14 @@ Interpretation: the app-builder proof is behaving safely. It proves the system f
 Command shown after setting `APP_URL`:
 
 ```bash
-export APP_URL="https://dsg-one-v1.vercel.app"
+export APP_URL="[retired Vercel origin]"
 npm run smoke:entitlement
 ```
 
 Observed result:
 
 - `PASS: entitlement endpoint responded with a valid evidence report`
-- endpoint: `https://dsg-one-v1.vercel.app/api/dsg/marketplace/entitlement`
+- endpoint: `[retired Vercel origin]/api/dsg/marketplace/entitlement`
 - verdict: `BLOCKED`
 - checks: `4`
 - pass: `0`
@@ -133,14 +135,14 @@ Interpretation: entitlement endpoint/schema smoke passed. The entitlement eviden
 Command shown after setting `APP_URL`:
 
 ```bash
-export APP_URL="https://dsg-one-v1.vercel.app"
+export APP_URL="[retired Vercel origin]"
 npm run smoke:security-rbac
 ```
 
 Observed result:
 
 - `PASS: security RBAC endpoint responded with a valid evidence report`
-- endpoint: `https://dsg-one-v1.vercel.app/api/dsg/marketplace/security-rbac`
+- endpoint: `[retired Vercel origin]/api/dsg/marketplace/security-rbac`
 - verdict: `BLOCKED`
 - checks: `4`
 - pass: `0`
@@ -160,7 +162,7 @@ Interpretation: security RBAC endpoint/schema smoke passed. The security evidenc
 ## Recommended next command set
 
 ```bash
-export APP_URL="https://dsg-one-v1.vercel.app"
+export APP_URL="[retired Vercel origin]"
 
 npm run smoke:entitlement
 npm run smoke:security-rbac

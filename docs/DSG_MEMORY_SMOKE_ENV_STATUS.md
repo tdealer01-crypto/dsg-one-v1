@@ -34,7 +34,7 @@ trustBoundary=development-header-context
 The smoke can only be claimed after:
 
 ```text
-APP_URL=https://dsg-one-v1.vercel.app npm run smoke:memory-api
+APP_URL=<verified AWS origin> npm run smoke:memory-api
 ```
 
 returns:

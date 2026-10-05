@@ -97,7 +97,7 @@ npm run build:termux
 After deploy:
 
 ```bash
-BASE="https://dsg-one-v1.vercel.app"
+BASE="${APP_URL:?set APP_URL to the verified AWS origin}"
 
 for p in /dsg/autonomous-level /api/dsg/autonomous-level/status /dsg/flow-studio /api/dsg/flow-studio/config; do
   code=$(curl -L -s -o /tmp/dsg-runtime-check.html -w "%{http_code}" "$BASE$p")
