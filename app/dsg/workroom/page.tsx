@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { ExternalLink, RefreshCw, ShieldCheck } from 'lucide-react';
 import { LiveAgentChat } from '@/components/live-agent-chat';
@@ -162,8 +163,8 @@ export default function DsgWorkroomPage() {
             </section>
 
             <div className="grid gap-3 md:grid-cols-3">
-              <a href="/dsg/app-builder" className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">App Builder <ExternalLink className="ml-2 inline h-4 w-4" /></a>
-              <a href="/dsg/governance" className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">Governance <ExternalLink className="ml-2 inline h-4 w-4" /></a>
+              <Link href="/dsg/app-builder" className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">App Builder <ExternalLink className="ml-2 inline h-4 w-4" /></Link>
+              <Link href="/dsg/governance" className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">Governance <ExternalLink className="ml-2 inline h-4 w-4" /></Link>
               <a href="https://aws.dsg.pics/docs" target="_blank" rel="noreferrer" className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">Runtime Docs <ExternalLink className="ml-2 inline h-4 w-4" /></a>
             </div>
 
