@@ -116,8 +116,13 @@ describe('DSG access console session bridge', () => {
     expect(services).toContain("id: 'aws.deployment.proof'");
     expect(services).not.toContain("id: 'azure.deployment.proof'");
     expect(services).toContain("status: 'connector_required'");
-    expect(ship).toContain("DSG_PRODUCTION_URL: 'https://dsg.pics'");
-    expect(ship).toContain('BLOCK: AWS production status is not bound to exact ship SHA');
+    expect(ship).toContain('DSG_PRODUCTION_URL: https://dsg.pics');
+    expect(ship).toContain('RELEASE_SOURCE_AND_CI=PASS');
+    expect(ship).toContain('BLOCK=EC2_NOT_RUNNING');
+    expect(ship).toContain('BLOCK=PUBLIC_SERVING_SHA_MISMATCH');
+    expect(ship).toContain('RELEASE=ROLLBACK_ATTEMPTED');
+    expect(ship).toContain('DSG_ONE_ON_HOST_RELEASE=PASS');
+    expect(ship).not.toContain('aws ec2 start-instances');
     expect(ship).not.toContain('azurewebsites.net');
     expect(workspaceRoute).toContain('DSG_WORKSPACE_MEMBERSHIP_REQUIRED');
     expect(workspaceRoute).toContain("response.cookies.set('dsg-workspace-id'");
