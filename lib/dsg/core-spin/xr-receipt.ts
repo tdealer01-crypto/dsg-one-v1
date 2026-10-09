@@ -20,6 +20,7 @@ export function toXrExecutionReceipt(
     ...receiptState(result.state),
     reason: result.reason ?? '',
     plan_id: proposal.planId,
+    plan_hash: result.planHash ?? null,
     route_id: result.routeId ?? proposal.routeId ?? '',
     approval_request_id: result.approvalRequestId ?? '',
     result: result.result ?? null,
