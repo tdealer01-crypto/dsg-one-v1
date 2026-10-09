@@ -17,6 +17,7 @@ type LinkResponse = {
 export default function DsgIdentityBridge() {
   const authClient = useRef<Auth0Client | null>(null);
   const [busy, setBusy] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
   const [status, setStatus] = useState('CHECKING_EXISTING_DSG_SESSION');
   const [actorId, setActorId] = useState<string | null>(null);
   const [auth0Sub, setAuth0Sub] = useState<string | null>(null);
@@ -61,6 +62,7 @@ export default function DsgIdentityBridge() {
         });
         if (cancelled) return;
         authClient.current = client;
+        setAuthReady(true);
         const params = new URLSearchParams(window.location.search);
         if (params.has('error')) {
           setStatus('AUTH0_LOGIN_DENIED');
@@ -130,7 +132,7 @@ export default function DsgIdentityBridge() {
         <p className="mt-3 break-all font-mono text-xs text-slate-500">DSG actor: {actorId || 'NOT_VERIFIED'}</p>
         <p className="mt-1 break-all font-mono text-xs text-slate-500">Auth0 subject: {auth0Sub || 'NOT_LINKED'}</p>
       </div>
-      <button onClick={() => void connect()} disabled={busy || !authClient.current}
+      <button onClick={() => void connect()} disabled={busy || !authReady}
         className="mt-4 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-700">
         {busy ? 'Checking…' : auth0Sub ? 'Re-authenticate with Auth0' : 'Link via Auth0 (PKCE)'}
       </button>
