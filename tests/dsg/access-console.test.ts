@@ -120,8 +120,10 @@ describe('DSG access console session bridge', () => {
     expect(ship).toContain('RELEASE_SOURCE_AND_CI=PASS');
     expect(ship).toContain('BLOCK=EC2_NOT_RUNNING');
     expect(ship).toContain('BLOCK=PUBLIC_SERVING_SHA_MISMATCH');
-    expect(ship).toContain('RELEASE=ROLLBACK_ATTEMPTED');
-    expect(ship).toContain('DSG_ONE_ON_HOST_RELEASE=PASS');
+    expect(ship).toContain('DSG-ONE-Existing-EC2-Release-v1');
+    expect(ship).toContain('BLOCK=RELEASE_DOCUMENT_DRIFT');
+    expect(ship).toContain('BLOCK=PROVIDER_RELEASE_FAILED');
+    expect(ship).not.toContain('--document-name AWS-RunShellScript');
     expect(ship).not.toContain('aws ec2 start-instances');
     expect(ship).not.toContain('azurewebsites.net');
     expect(workspaceRoute).toContain('DSG_WORKSPACE_MEMBERSHIP_REQUIRED');
