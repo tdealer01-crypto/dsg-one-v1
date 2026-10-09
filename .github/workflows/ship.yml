@@ -102,104 +102,26 @@ jobs:
           RELEASE_DIGEST: ${{ steps.preflight.outputs.digest }}
         run: |
           set -euo pipefail
-          # Idempotent recovery: do not recreate a healthy, already-bound release.
-          if curl -fsS --max-time 10 "$DSG_PRODUCTION_URL/api/agent/status" | jq -e --arg sha "$RELEASE_SHA" '.ok==true and .version==$sha and .deployment.sourceBound==true and .deployment.digestBound==true' >/dev/null; then
+          # Idempotence: the exact healthy image requires no container restart.
+          if curl -fsS --max-time 10 "$DSG_PRODUCTION_URL/api/agent/status" |
+             jq -e --arg sha "$RELEASE_SHA" --arg digest "$RELEASE_DIGEST" '.ok==true and .version==$sha and .deployment.imageDigest==$digest and .deployment.sourceBound==true and .deployment.digestBound==true' >/dev/null; then
             echo "DSG_ONE_RELEASE=ALREADY_DEPLOYED_VERIFIED sha=$RELEASE_SHA"
             exit 0
           fi
-          # Send only bounded, non-secret code/identities. Host keeps its
-          # existing runtime credentials, Compose service and project.
-          cat > /tmp/dsg-one-release.sh <<'SCRIPT'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          SHA="$1"
-          DIGEST="$2"
-          [[ "$SHA" =~ ^[a-f0-9]{40}$ ]] || exit 41
-          [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]] || exit 42
-          REG=121205961822.dkr.ecr.us-east-1.amazonaws.com
-          IMAGE="$REG/dsg-one-v1-prod@$DIGEST"
-          WORK="/opt/dsg/operator/rollouts/ship-$SHA"
-          test ! -e "$WORK" || { echo 'BLOCK=RELEASE_WORKDIR_EXISTS'; exit 43; }
-          mkdir -m 700 -p "$WORK"
-          STARTED=0
-          VERIFIED=0
-          PREVIOUS_SHA=""
-          rollback() {
-            echo "RELEASE=ROLLBACK_ATTEMPTED"
-            if docker compose -p aws -f "$WORK/previous.json" up -d --no-deps --force-recreate dsg-one-v1 >/dev/null 2>&1; then
-              for i in $(seq 1 12); do
-                if curl -fsS -m 5 http://127.0.0.1:8080/api/agent/status |
-                   jq -e --arg sha "$PREVIOUS_SHA" '.ok==true and .version==$sha' >/dev/null 2>&1; then
-                  echo 'ROLLBACK_VERIFIED=YES'
-                  return
-                fi
-                sleep 5
-              done
-            fi
-            echo 'ROLLBACK_VERIFIED=NO'
-          }
-          finish() {
-            code=$?
-            trap - EXIT
-            if [[ "$STARTED" == 1 && "$VERIFIED" == 0 ]]; then rollback; fi
-            rm -rf -- "$WORK"
-            exit "$code"
-          }
-          trap finish EXIT
-          aws ecr describe-images --repository-name dsg-one-v1-prod --image-ids imageTag="$SHA" --query 'imageDetails[0].imageDigest' --output text | grep -Fx "$DIGEST" >/dev/null
-          CURRENT="$(curl -fsS -m 8 http://127.0.0.1:8080/api/agent/status)"
-          jq -e '.ok==true and .deployment.sourceBound==true and .deployment.digestBound==true' <<< "$CURRENT" >/dev/null ||
-            { echo 'BLOCK=UNBOUND_PREVIOUS_RUNTIME'; exit 44; }
-          PREVIOUS_SHA="$(jq -r .version <<< "$CURRENT")"
-          [[ "$PREVIOUS_SHA" =~ ^[a-f0-9]{40}$ ]] || exit 45
-          aws ecr get-login-password --region us-east-1 |
-            docker login --username AWS --password-stdin "$REG" >/dev/null
-          docker pull "$IMAGE" >/dev/null
-          docker image inspect "$IMAGE" >/dev/null
-          python3 - "$WORK" "$SHA" "$DIGEST" "$IMAGE" <<'PY'
-          import json, subprocess, pathlib, sys
-          work,sha,digest,image=sys.argv[1:]
-          container=json.loads(subprocess.check_output(['docker','inspect','aws-dsg-one-v1-1']))[0]
-          assert container['Config']['Labels'].get('com.docker.compose.service') == 'dsg-one-v1', 'unexpected service'
-          old=container['Config']['Image']
-          assert old.startswith('121205961822.dkr.ecr.us-east-1.amazonaws.com/dsg-one-v1-prod'), 'unexpected previous image'
-          assert 'aws_dsg-internal' in container['NetworkSettings']['Networks'], 'unexpected network'
-          env=dict(item.split('=',1) for item in container['Config']['Env'] if '=' in item)
-          def spec(im,override):
-              e=dict(env);e.update(override)
-              return {'name':'aws','services':{'dsg-one-v1':{
-                  'image':im,'restart':'unless-stopped','environment':e,
-                  'ports':['127.0.0.1:8080:8080'],
-                  'healthcheck':{'test':['CMD-SHELL','node -e "fetch(\'http://127.0.0.1:8080/api/agent/status\').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"'],'interval':'15s','timeout':'5s','retries':8,'start_period':'30s'},
-                  'networks':['dsg-internal']}},
-                  'networks':{'dsg-internal':{'external':True,'name':'aws_dsg-internal'}}}
-          items={'previous.json':spec(old,{}),'candidate.json':spec(image,{'DSG_BUILD_SOURCE_SHA':sha,'DSG_DEPLOYED_SOURCE_SHA':sha,'DSG_DEPLOYED_IMAGE_DIGEST':digest})}
-          for name,data in items.items():
-              path=pathlib.Path(work)/name
-              path.write_text(json.dumps(data),encoding='utf-8')
-              path.chmod(0o600)
-          PY
-          docker compose -p aws -f "$WORK/candidate.json" config --quiet
-          echo 'RELEASE_PREFLIGHT=PASS ROLLBACK_PREPARED=YES'
-          STARTED=1
-          docker compose -p aws -f "$WORK/candidate.json" up -d --no-deps --force-recreate dsg-one-v1 >/dev/null
-          for i in $(seq 1 18); do
-            if curl -fsS -m 5 http://127.0.0.1:8080/api/agent/status |
-               jq -e --arg sha "$SHA" --arg dig "$DIGEST" '.ok==true and .version==$sha and .deployment.buildSourceSha==$sha and .deployment.imageDigest==$dig and .deployment.sourceBound==true and .deployment.digestBound==true' >/dev/null 2>&1; then
-              VERIFIED=1
-              echo "DSG_ONE_ON_HOST_RELEASE=PASS sha=$SHA digest=$DIGEST"
-              break
-            fi
-            sleep 5
-          done
-          test "$VERIFIED" -eq 1 || { echo 'BLOCK=POST_DEPLOY_LOCAL_HEALTH'; exit 46; }
-          SCRIPT
-          CODE="$(base64 -w0 /tmp/dsg-one-release.sh)"
-          jq -n --arg code "$CODE" --arg sha "$RELEASE_SHA" --arg digest "$RELEASE_DIGEST" \
-            '{commands:[("printf %s " + $code + " | base64 -d | bash -s -- " + $sha + " " + $digest)]}' > /tmp/ssm.json
-          ID="$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript \
-            --parameters file:///tmp/ssm.json --timeout-seconds 600 \
-            --comment 'DSG ONE exact-main guarded release on existing EC2' --query 'Command.CommandId' --output text)"
+          # Pin the pre-reviewed AWS-owned command document, rather than granting
+          # the GitHub build identity arbitrary RunShellScript on the EC2 host.
+          DOCUMENT=DSG-ONE-Existing-EC2-Release-v1
+          REQUIRED_HASH=09cbb90a2d374754c67568f402ef1faa2febc7106319819f2e3edd80c13baa65
+          ACTUAL_HASH="$(aws ssm describe-document --name "$DOCUMENT" --query 'Document.Hash' --output text)"
+          [[ "$ACTUAL_HASH" == "$REQUIRED_HASH" ]] ||
+            { echo 'BLOCK=RELEASE_DOCUMENT_DRIFT'; echo 'nextAction=Review changed SSM document and pin the verified hash'; exit 51; }
+          jq -n --arg sha "$RELEASE_SHA" --arg digest "$RELEASE_DIGEST" \
+            '{SourceSha:[$sha],ImageDigest:[$digest]}' > /tmp/ship-parameters.json
+          ID="$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name "$DOCUMENT" \
+            --document-version 1 --parameters file:///tmp/ship-parameters.json \
+            --timeout-seconds 600 --comment 'DSG ONE immutable exact-source existing-EC2 release' \
+            --query 'Command.CommandId' --output text)"
+          STATE=""
           for attempt in $(seq 1 90); do
             STATE="$(aws ssm get-command-invocation --command-id "$ID" --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || true)"
             case "$STATE" in
@@ -211,9 +133,9 @@ jobs:
           jq -r '.StandardOutputContent // ""' /tmp/ship-invocation.json
           jq -r '.StandardErrorContent // ""' /tmp/ship-invocation.json >&2
           if [[ "$STATE" != Success ]] || ! jq -e --arg sha "$RELEASE_SHA" \
-            '.StandardOutputContent | contains("DSG_ONE_ON_HOST_RELEASE=PASS sha="+$sha)' /tmp/ship-invocation.json >/dev/null; then
+             '.StandardOutputContent | contains("DSG_ONE_ON_HOST_RELEASE=PASS sha="+$sha)' /tmp/ship-invocation.json >/dev/null; then
             echo "BLOCK=PROVIDER_RELEASE_FAILED ssm_command_id=$ID"
-            echo 'nextAction=Inspect bounded SSM invocation and on-host rollback, then retry from the failed boundary'
+            echo 'nextAction=Inspect SSM invocation and on-host rollback result; retry only after the exact error is corrected'
             exit 59
           fi
           echo "DSG_ONE_RELEASE=DEPLOYED command_id=$ID"
