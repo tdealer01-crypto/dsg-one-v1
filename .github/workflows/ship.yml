@@ -102,6 +102,11 @@ jobs:
           RELEASE_DIGEST: ${{ steps.preflight.outputs.digest }}
         run: |
           set -euo pipefail
+          # Idempotent recovery: do not recreate a healthy, already-bound release.
+          if curl -fsS --max-time 10 "$DSG_PRODUCTION_URL/api/agent/status" | jq -e --arg sha "$RELEASE_SHA" '.ok==true and .version==$sha and .sourceBound==true and .digestBound==true' >/dev/null; then
+            echo "DSG_ONE_RELEASE=ALREADY_DEPLOYED_VERIFIED sha=$RELEASE_SHA"
+            exit 0
+          fi
           # Send only bounded, non-secret code/identities. Host keeps its
           # existing runtime credentials, Compose service and project.
           cat > /tmp/dsg-one-release.sh <<'SCRIPT'
