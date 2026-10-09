@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/build-aws-dsg-one.yml"
+      - ".github/workflows/ship.yml"
       - "Dockerfile"
       - "package.json"
       - "package-lock.json"
@@ -162,8 +163,9 @@ jobs:
           aws ssm put-parameter             --name /dsg/one/prod/image-digest             --type String             --value "$DIGEST"             --overwrite >/dev/null
           echo "AWS_DSG_ONE_IMAGE_IDENTITY_METADATA=PASS source_sha=$GITHUB_SHA digest=$DIGEST"
 
-      - name: Cost-safe deployment gate
+      - name: Cost-safe handoff to governed Ship
         run: |
-          echo "AWS_DSG_ONE_RUNTIME_DEPLOY=BLOCKED_BY_COST_GATE"
-          echo "This workflow publishes/verifies the immutable image only."
-          echo "It does not start EC2, ECS/Fargate, ALB, NAT Gateway, App Runner, or GPU compute."
+          echo "AWS_DSG_ONE_IMAGE_PUBLISH=PASS"
+          echo "NEXT_STAGE=SHIP_PENDING_EXACT_MAIN_CI"
+          echo "The Ship workflow performs the guarded existing-EC2 release only after the same source passes all required CI."
+          echo "This image-build step starts no EC2, ECS/Fargate, ALB, NAT Gateway, App Runner, or GPU compute."

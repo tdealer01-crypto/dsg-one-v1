@@ -1,58 +1,167 @@
 name: Ship
 
+# One governed production handoff on an already-running EC2 host.
+# The immutable image build remains the security/scan gate; Ship verifies it
+# and performs no EC2 start, capacity creation, billing change or IAM mutation.
 on:
   workflow_dispatch:
     inputs:
       reason:
-        description: 'Reason for shipping'
+        description: Reason for shipping the current main
         required: false
-        default: 'agent-initiated ship'
+        default: operator-approved release
+  workflow_run:
+    workflows: ["Build DSG ONE V1 production image on AWS"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: dsg-one-v1-production-ship
+  cancel-in-progress: false
 
 jobs:
   ship:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     env:
-      DSG_PRODUCTION_URL: 'https://dsg.pics'
+      AWS_REGION: us-east-1
+      AWS_ROLE_ARN: arn:aws:iam::121205961822:role/dsg-one-v1-github-deploy
+      INSTANCE_ID: i-01a2ee90890a558c3
+      REGISTRY: 121205961822.dkr.ecr.us-east-1.amazonaws.com
+      REPO: dsg-one-v1-prod
+      DSG_PRODUCTION_URL: https://dsg.pics
+      RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          ref: ${{ env.RELEASE_SHA }}
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npx eslint .
-
-      - name: Type check
-        run: npx tsc --noEmit
-
-      - name: Test
-        id: test
-        run: npm test
-
-      - name: Verify production status
-        id: status
+      - name: Verify source and post-merge CI
+        shell: bash
         run: |
-          RESPONSE=$(curl --fail-with-body --silent --show-error "$DSG_PRODUCTION_URL/api/agent/status")
-          echo "$RESPONSE" | jq -e --arg expected "$GITHUB_SHA" '.ok == true and .version == $expected' >/dev/null || { echo 'BLOCK: AWS production status is not bound to exact ship SHA'; exit 28; }
-          echo "response=$RESPONSE"
-          echo "STATUS_RESPONSE=$RESPONSE" >> "$GITHUB_ENV"
-          echo "$RESPONSE"
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo 'BLOCK=INVALID_SHA'; exit 20; }
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA" || { echo 'BLOCK=SOURCE_MISMATCH'; exit 21; }
+          MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          test "$MAIN_SHA" = "$RELEASE_SHA" || { echo 'BLOCK=SUPERSEDED_SOURCE'; echo 'nextAction=Release latest main only'; exit 22; }
+          # An image build finishing first must not skip parallel CI on the same main SHA.
+          for attempt in $(seq 1 40); do
+            RUNS="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=main&per_page=100")"
+            if jq -e --arg sha "$RELEASE_SHA" '
+              [.workflow_runs[] | select(.head_sha == $sha)] as $runs |
+              ["DSG Verify","DSG Full Test Suite","DSG App Builder CI","ccvs-evidence",
+               "Build DSG ONE V1 production image on AWS"] |
+              all(. as $name | any($runs[]; .name == $name and .status == "completed" and .conclusion == "success"))
+            ' <<< "$RUNS" >/dev/null; then
+              echo "RELEASE_SOURCE_AND_CI=PASS sha=$RELEASE_SHA"
+              exit 0
+            fi
+            if (( attempt == 40 )); then
+              echo 'BLOCK=EXACT_MAIN_CI_INCOMPLETE'
+              echo 'nextAction=Inspect the five workflows for this exact SHA; do not deploy an unverified image'
+              exit 23
+            fi
+            sleep 15
+          done
 
-      - name: Write step summary
+      - name: Assume existing least-privilege AWS deploy role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify immutable source, scan and already-running EC2
+        id: preflight
+        shell: bash
         run: |
-          echo "## Ship Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| **Reason** | ${{ github.event.inputs.reason }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| **Commit SHA** | ${{ github.sha }} |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| **Test result** | passed |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| **Production URL** | \`$DSG_PRODUCTION_URL\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| **Status endpoint response** | \`$STATUS_RESPONSE\` |" >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          SSM_SHA="$(aws ssm get-parameter --name /dsg/one/prod/image-source-sha --query Parameter.Value --output text)"
+          SSM_DIGEST="$(aws ssm get-parameter --name /dsg/one/prod/image-digest --query Parameter.Value --output text)"
+          [[ "$SSM_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo 'BLOCK=INVALID_SSM_DIGEST'; exit 24; }
+          test "$SSM_SHA" = "$RELEASE_SHA" || { echo 'BLOCK=IMAGE_SOURCE_STALE'; echo 'nextAction=Build exact current main image'; exit 25; }
+          ECR_DIGEST="$(aws ecr describe-images --repository-name "$REPO" --image-ids imageTag="$RELEASE_SHA" --query 'imageDetails[0].imageDigest' --output text)"
+          test "$ECR_DIGEST" = "$SSM_DIGEST" || { echo 'BLOCK=IMAGE_DIGEST_MISMATCH'; exit 26; }
+          SCAN="$(aws ecr describe-image-scan-findings --repository-name "$REPO" --image-id imageDigest="$ECR_DIGEST" --output json)"
+          jq -e '.imageScanStatus.status=="COMPLETE" and ((.imageScanFindings.findingSeverityCounts.CRITICAL//0)==0)' <<< "$SCAN" >/dev/null ||
+            { echo 'BLOCK=IMAGE_SECURITY_SCAN'; exit 27; }
+          STATE="$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --query 'Reservations[0].Instances[0].State.Name' --output text)"
+          test "$STATE" = running ||
+            { echo "BLOCK=EC2_NOT_RUNNING state=$STATE"; echo 'nextAction=No automatic start or paid resource creation'; exit 28; }
+          echo "digest=$ECR_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "RELEASE_PREFLIGHT=PASS source=$RELEASE_SHA digest=$ECR_DIGEST host=existing-running"
+
+      - name: Promote only DSG ONE on the existing host with rollback
+        shell: bash
+        env:
+          RELEASE_DIGEST: ${{ steps.preflight.outputs.digest }}
+        run: |
+          set -euo pipefail
+          # Idempotence: the exact healthy image requires no container restart.
+          if curl -fsS --max-time 10 "$DSG_PRODUCTION_URL/api/agent/status" |
+             jq -e --arg sha "$RELEASE_SHA" --arg digest "$RELEASE_DIGEST" '.ok==true and .version==$sha and .deployment.imageDigest==$digest and .deployment.sourceBound==true and .deployment.digestBound==true' >/dev/null; then
+            echo "DSG_ONE_RELEASE=ALREADY_DEPLOYED_VERIFIED sha=$RELEASE_SHA"
+            exit 0
+          fi
+          # Pin the pre-reviewed AWS-owned command document, rather than granting
+          # the GitHub build identity arbitrary RunShellScript on the EC2 host.
+          DOCUMENT=DSG-ONE-Existing-EC2-Release-v1
+          REQUIRED_HASH=09cbb90a2d374754c67568f402ef1faa2febc7106319819f2e3edd80c13baa65
+          ACTUAL_HASH="$(aws ssm describe-document --name "$DOCUMENT" --query 'Document.Hash' --output text)"
+          [[ "$ACTUAL_HASH" == "$REQUIRED_HASH" ]] ||
+            { echo 'BLOCK=RELEASE_DOCUMENT_DRIFT'; echo 'nextAction=Review changed SSM document and pin the verified hash'; exit 51; }
+          jq -n --arg sha "$RELEASE_SHA" --arg digest "$RELEASE_DIGEST" \
+            '{SourceSha:[$sha],ImageDigest:[$digest]}' > /tmp/ship-parameters.json
+          ID="$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name "$DOCUMENT" \
+            --document-version 1 --parameters file:///tmp/ship-parameters.json \
+            --timeout-seconds 600 --comment 'DSG ONE immutable exact-source existing-EC2 release' \
+            --query 'Command.CommandId' --output text)"
+          STATE=""
+          for attempt in $(seq 1 90); do
+            STATE="$(aws ssm get-command-invocation --command-id "$ID" --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || true)"
+            case "$STATE" in
+              Success|Failed|TimedOut|Cancelled) break ;;
+            esac
+            sleep 5
+          done
+          aws ssm get-command-invocation --command-id "$ID" --instance-id "$INSTANCE_ID" --output json > /tmp/ship-invocation.json
+          jq -r '.StandardOutputContent // ""' /tmp/ship-invocation.json
+          jq -r '.StandardErrorContent // ""' /tmp/ship-invocation.json >&2
+          if [[ "$STATE" != Success ]] || ! jq -e --arg sha "$RELEASE_SHA" \
+             '.StandardOutputContent | contains("DSG_ONE_ON_HOST_RELEASE=PASS sha="+$sha)' /tmp/ship-invocation.json >/dev/null; then
+            echo "BLOCK=PROVIDER_RELEASE_FAILED ssm_command_id=$ID"
+            echo 'nextAction=Inspect SSM invocation and on-host rollback result; retry only after the exact error is corrected'
+            exit 59
+          fi
+          echo "DSG_ONE_RELEASE=DEPLOYED command_id=$ID"
+
+      - name: Independently verify public serving SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            if curl -fsS --max-time 10 "$DSG_PRODUCTION_URL/api/agent/status" |
+               jq -e --arg sha "$RELEASE_SHA" '.ok==true and .version==$sha and .deployment.sourceBound==true and .deployment.digestBound==true' >/dev/null; then
+              echo "DSG_ONE_PUBLIC_SERVING=VERIFIED_COMPLETED sha=$RELEASE_SHA"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'BLOCK=PUBLIC_SERVING_SHA_MISMATCH'
+          echo 'nextAction=Inspect external HTTPS serving and revert only if live provider readback proves a regression'
+          exit 60
+
+      - name: Show release result
+        if: always()
+        shell: bash
+        run: |
+          echo "## DSG ONE production release" >> "$GITHUB_STEP_SUMMARY"
+          echo "Source SHA: $RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "Existing EC2 only; no new cloud resources were started." >> "$GITHUB_STEP_SUMMARY"
+          echo "Status: Deduced from exact steps above; PASS only if all release and public serving checks passed." >> "$GITHUB_STEP_SUMMARY"
+          echo "See failed step for BLOCK, nextAction and SSM command ID." >> "$GITHUB_STEP_SUMMARY"
