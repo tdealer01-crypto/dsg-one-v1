@@ -1,4 +1,5 @@
 import { evaluateDsgAutonomousLevelGate } from '@/lib/dsg/autonomous-level/capability-gate';
+import DsgIdentityBridge from './identity-bridge';
 
 function badge(status: string) {
   if (status === 'PASS') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
@@ -25,6 +26,8 @@ export default function DsgAutonomousLevelPage() {
             <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs text-slate-500">proof hash</p><p className="break-all font-mono text-xs">{gate.proofHash}</p></div>
           </div>
         </section>
+
+        <DsgIdentityBridge />
 
         <section className="grid gap-4 lg:grid-cols-2">
           {gate.capabilities.map((capability) => (
