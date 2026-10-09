@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/build-aws-dsg-one.yml"
+      - ".github/workflows/ship.yml"
       - "Dockerfile"
       - "package.json"
       - "package-lock.json"
