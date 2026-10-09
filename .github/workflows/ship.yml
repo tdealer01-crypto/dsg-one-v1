@@ -103,7 +103,7 @@ jobs:
         run: |
           set -euo pipefail
           # Idempotent recovery: do not recreate a healthy, already-bound release.
-          if curl -fsS --max-time 10 "$DSG_PRODUCTION_URL/api/agent/status" | jq -e --arg sha "$RELEASE_SHA" '.ok==true and .version==$sha and .sourceBound==true and .digestBound==true' >/dev/null; then
+          if curl -fsS --max-time 10 "$DSG_PRODUCTION_URL/api/agent/status" | jq -e --arg sha "$RELEASE_SHA" '.ok==true and .version==$sha and .deployment.sourceBound==true and .deployment.digestBound==true' >/dev/null; then
             echo "DSG_ONE_RELEASE=ALREADY_DEPLOYED_VERIFIED sha=$RELEASE_SHA"
             exit 0
           fi
@@ -116,55 +116,83 @@ jobs:
           DIGEST="$2"
           [[ "$SHA" =~ ^[a-f0-9]{40}$ ]] || exit 41
           [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]] || exit 42
-          NAME=aws-dsg-one-v1-1
-          SERVICE=dsg-one-v1
-          REGISTRY=121205961822.dkr.ecr.us-east-1.amazonaws.com
-          TARGET="$REGISTRY/dsg-one-v1-prod@$DIGEST"
-          test "$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.service" }}' "$NAME")" = "$SERVICE"
-          FILES="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.config_files" }}' "$NAME")"
-          PROJECT="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$NAME")"
-          IFS=',' read -r BASE IGNORE <<< "$FILES"
-          [[ "$BASE" == /opt/dsg/operator/rollouts/*/candidate.json ]] ||
-            { echo 'BLOCK=UNSUPPORTED_COMPOSE_FILE'; exit 43; }
-          [[ "$PROJECT" =~ ^[a-zA-Z0-9_-]+$ ]] || exit 44
-          test -f "$BASE"
-          jq -e --arg svc "$SERVICE" '.services[$svc].image | type=="string"' "$BASE" >/dev/null
-          PREVIOUS="$(docker inspect -f '{{.Config.Image}}' "$NAME")"
-          [[ "$PREVIOUS" == "$REGISTRY/dsg-one-v1-prod"* ]] ||
-            { echo 'BLOCK=UNEXPECTED_PREVIOUS_IMAGE'; exit 45; }
-          DIR="$(dirname "$BASE")"
-          OVERLAY="$DIR/ship-$SHA.override.json"
-          ROLLBACK="$DIR/ship-$SHA.rollback.json"
-          jq -n --arg image "$TARGET" '{services:{"dsg-one-v1":{image:$image}}}' > "$OVERLAY"
-          jq -n --arg image "$PREVIOUS" '{services:{"dsg-one-v1":{image:$image}}}' > "$ROLLBACK"
-          chmod 600 "$OVERLAY" "$ROLLBACK"
-          changed=0
+          REG=121205961822.dkr.ecr.us-east-1.amazonaws.com
+          IMAGE="$REG/dsg-one-v1-prod@$DIGEST"
+          WORK="/opt/dsg/operator/rollouts/ship-$SHA"
+          test ! -e "$WORK" || { echo 'BLOCK=RELEASE_WORKDIR_EXISTS'; exit 43; }
+          mkdir -m 700 -p "$WORK"
+          STARTED=0
+          VERIFIED=0
+          PREVIOUS_SHA=""
           rollback() {
-            if [[ "$changed" == 1 ]]; then
-              echo "RELEASE=ROLLBACK_ATTEMPTED"
-              docker compose -p "$PROJECT" -f "$BASE" -f "$ROLLBACK" up -d --no-deps --force-recreate "$SERVICE" || true
+            echo "RELEASE=ROLLBACK_ATTEMPTED"
+            if docker compose -p aws -f "$WORK/previous.json" up -d --no-deps --force-recreate dsg-one-v1 >/dev/null 2>&1; then
+              for i in $(seq 1 12); do
+                if curl -fsS -m 5 http://127.0.0.1:8080/api/agent/status |
+                   jq -e --arg sha "$PREVIOUS_SHA" '.ok==true and .version==$sha' >/dev/null 2>&1; then
+                  echo 'ROLLBACK_VERIFIED=YES'
+                  return
+                fi
+                sleep 5
+              done
             fi
+            echo 'ROLLBACK_VERIFIED=NO'
           }
-          trap rollback ERR
-          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin "$REGISTRY" >/dev/null
-          docker pull "$TARGET" >/dev/null
-          changed=1
-          docker compose -p "$PROJECT" -f "$BASE" -f "$OVERLAY" up -d --no-deps --force-recreate "$SERVICE"
-          ok=0
-          for attempt in $(seq 1 30); do
-            if curl -fsS --max-time 5 http://127.0.0.1:8080/api/agent/status |
-                 jq -e --arg sha "$SHA" '.ok==true and .version==$sha and .sourceBound==true and .digestBound==true' >/dev/null; then
-              ok=1
+          finish() {
+            code=$?
+            trap - EXIT
+            if [[ "$STARTED" == 1 && "$VERIFIED" == 0 ]]; then rollback; fi
+            rm -rf -- "$WORK"
+            exit "$code"
+          }
+          trap finish EXIT
+          aws ecr describe-images --repository-name dsg-one-v1-prod --image-ids imageTag="$SHA" --query 'imageDetails[0].imageDigest' --output text | grep -Fx "$DIGEST" >/dev/null
+          CURRENT="$(curl -fsS -m 8 http://127.0.0.1:8080/api/agent/status)"
+          jq -e '.ok==true and .deployment.sourceBound==true and .deployment.digestBound==true' <<< "$CURRENT" >/dev/null ||
+            { echo 'BLOCK=UNBOUND_PREVIOUS_RUNTIME'; exit 44; }
+          PREVIOUS_SHA="$(jq -r .version <<< "$CURRENT")"
+          [[ "$PREVIOUS_SHA" =~ ^[a-f0-9]{40}$ ]] || exit 45
+          aws ecr get-login-password --region us-east-1 |
+            docker login --username AWS --password-stdin "$REG" >/dev/null
+          docker pull "$IMAGE" >/dev/null
+          docker image inspect "$IMAGE" >/dev/null
+          python3 - "$WORK" "$SHA" "$DIGEST" "$IMAGE" <<'PY'
+          import json, subprocess, pathlib, sys
+          work,sha,digest,image=sys.argv[1:]
+          container=json.loads(subprocess.check_output(['docker','inspect','aws-dsg-one-v1-1']))[0]
+          assert container['Config']['Labels'].get('com.docker.compose.service') == 'dsg-one-v1', 'unexpected service'
+          old=container['Config']['Image']
+          assert old.startswith('121205961822.dkr.ecr.us-east-1.amazonaws.com/dsg-one-v1-prod'), 'unexpected previous image'
+          assert 'aws_dsg-internal' in container['NetworkSettings']['Networks'], 'unexpected network'
+          env=dict(item.split('=',1) for item in container['Config']['Env'] if '=' in item)
+          def spec(im,override):
+              e=dict(env);e.update(override)
+              return {'name':'aws','services':{'dsg-one-v1':{
+                  'image':im,'restart':'unless-stopped','environment':e,
+                  'ports':['127.0.0.1:8080:8080'],
+                  'healthcheck':{'test':['CMD-SHELL','node -e "fetch(\'http://127.0.0.1:8080/api/agent/status\').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"'],'interval':'15s','timeout':'5s','retries':8,'start_period':'30s'},
+                  'networks':['dsg-internal']}},
+                  'networks':{'dsg-internal':{'external':True,'name':'aws_dsg-internal'}}}
+          items={'previous.json':spec(old,{}),'candidate.json':spec(image,{'DSG_BUILD_SOURCE_SHA':sha,'DSG_DEPLOYED_SOURCE_SHA':sha,'DSG_DEPLOYED_IMAGE_DIGEST':digest})}
+          for name,data in items.items():
+              path=pathlib.Path(work)/name
+              path.write_text(json.dumps(data),encoding='utf-8')
+              path.chmod(0o600)
+          PY
+          docker compose -p aws -f "$WORK/candidate.json" config --quiet
+          echo 'RELEASE_PREFLIGHT=PASS ROLLBACK_PREPARED=YES'
+          STARTED=1
+          docker compose -p aws -f "$WORK/candidate.json" up -d --no-deps --force-recreate dsg-one-v1 >/dev/null
+          for i in $(seq 1 18); do
+            if curl -fsS -m 5 http://127.0.0.1:8080/api/agent/status |
+               jq -e --arg sha "$SHA" --arg dig "$DIGEST" '.ok==true and .version==$sha and .deployment.buildSourceSha==$sha and .deployment.imageDigest==$dig and .deployment.sourceBound==true and .deployment.digestBound==true' >/dev/null 2>&1; then
+              VERIFIED=1
+              echo "DSG_ONE_ON_HOST_RELEASE=PASS sha=$SHA digest=$DIGEST"
               break
             fi
-            sleep 2
+            sleep 5
           done
-          if [[ "$ok" != 1 ]]; then
-            echo 'BLOCK=POST_DEPLOY_LOCAL_HEALTH'
-            false
-          fi
-          changed=0
-          echo "DSG_ONE_ON_HOST_RELEASE=PASS sha=$SHA digest=$DIGEST"
+          test "$VERIFIED" -eq 1 || { echo 'BLOCK=POST_DEPLOY_LOCAL_HEALTH'; exit 46; }
           SCRIPT
           CODE="$(base64 -w0 /tmp/dsg-one-release.sh)"
           jq -n --arg code "$CODE" --arg sha "$RELEASE_SHA" --arg digest "$RELEASE_DIGEST" \
@@ -196,7 +224,7 @@ jobs:
           set -euo pipefail
           for attempt in $(seq 1 12); do
             if curl -fsS --max-time 10 "$DSG_PRODUCTION_URL/api/agent/status" |
-               jq -e --arg sha "$RELEASE_SHA" '.ok==true and .version==$sha and .sourceBound==true and .digestBound==true' >/dev/null; then
+               jq -e --arg sha "$RELEASE_SHA" '.ok==true and .version==$sha and .deployment.sourceBound==true and .deployment.digestBound==true' >/dev/null; then
               echo "DSG_ONE_PUBLIC_SERVING=VERIFIED_COMPLETED sha=$RELEASE_SHA"
               exit 0
             fi
