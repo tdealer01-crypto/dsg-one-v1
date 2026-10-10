@@ -2,6 +2,7 @@
 
 import { createAuth0Client, type Auth0Client } from '@auth0/auth0-spa-js';
 import { useEffect, useRef, useState } from 'react';
+import { verifiedGovernedReadProof } from '@/lib/dsg/user-bound/read-proof';
 
 const callback = 'https://dsg.pics/dsg/autonomous-level';
 
@@ -10,6 +11,7 @@ type LinkResponse = {
   linked?: boolean;
   actorId?: string;
   auth0Sub?: string;
+  workspaceRole?: 'OWNER' | 'ADMIN' | 'OPERATOR' | 'AUDITOR' | 'VIEWER';
   principal?: { sub: string; issuer: string; verifiedAt: string } | null;
   error?: string;
 };
@@ -28,8 +30,10 @@ export default function DsgIdentityBridge() {
   const [status, setStatus] = useState('CHECKING_EXISTING_DSG_SESSION');
   const [actorId, setActorId] = useState<string | null>(null);
   const [auth0Sub, setAuth0Sub] = useState<string | null>(null);
+  const [workspaceRole, setWorkspaceRole] = useState<LinkResponse['workspaceRole']>(undefined);
   const [e2eBusy, setE2eBusy] = useState(false);
-  const [e2eStatus, setE2eStatus] = useState('USER_BOUND_READ_E2E_NOT_VERIFIED');
+  const [e2eStatus, setE2eStatus] = useState<'PASS' | 'REVIEW' | 'BLOCKED'>('REVIEW');
+  const [e2eNextAction, setE2eNextAction] = useState('Sign in to DSG ONE, verify Auth0, and run a governed read only with an eligible workspace role.');
   const [e2eProof, setE2eProof] = useState<string | null>(null);
   const [message, setMessage] = useState('Validating the DSG workspace session before requesting Auth0 sign-in.');
 
@@ -50,6 +54,7 @@ export default function DsgIdentityBridge() {
         }
         if (cancelled) return;
         setActorId(data.actorId ?? null);
+        setWorkspaceRole(data.workspaceRole);
         if (data.linked && data.principal) {
           setAuth0Sub(data.principal.sub);
           setStatus('AUTH0_ACCOUNT_LINKED');
@@ -100,6 +105,7 @@ export default function DsgIdentityBridge() {
           }
           setActorId(linked.actorId ?? data.actorId ?? null);
           setAuth0Sub(linked.auth0Sub ?? null);
+          setWorkspaceRole(linked.workspaceRole ?? data.workspaceRole);
           setStatus('AUTH0_ACCOUNT_LINKED');
           setMessage('Both signed Auth0 token and Supabase workspace actor were verified and linked by the backend. N2N access remains governed.');
         }
@@ -132,10 +138,11 @@ export default function DsgIdentityBridge() {
   }
 
   async function verifyGovernedRead() {
-    if (!authClient.current || !auth0Sub || busy) return;
+    if (!authClient.current || !auth0Sub || busy || !workspaceRole || workspaceRole === 'VIEWER') return;
     setE2eBusy(true);
     setE2eProof(null);
-    setE2eStatus('VERIFYING_USER_BOUND_GOVERNED_READ');
+    setE2eStatus('REVIEW');
+    setE2eNextAction('Wait for the exact AWS provider receipt and independently checked evidence chain.');
     try {
       // The Auth0 SPA SDK retains the user's token in memory only. Never
       // substitute the website session, Site bridge, or owner credential.
@@ -155,30 +162,18 @@ export default function DsgIdentityBridge() {
         return body;
       }
       const read = await tool('spacetime_read_public_repo');
-      const decision = read.receipt?.decision as Record<string, unknown> | undefined;
-      if (decision?.verdict !== 'ALLOW' || read.receipt?.principal_binding !== 'VERIFIED_OAUTH_SUBJECT' ||
-          typeof read.receipt?.plan_hash !== 'string' || !read.receipt?.evidence || !read.receipt?.result) {
-        throw new Error('GOVERNED_PROVIDER_READ_NOT_VERIFIED');
-      }
       const chain = await tool('spacetime_verify_evidence');
-      if (!chain.evidenceVerified || chain.receipt?.valid !== true) {
-        throw new Error('EVIDENCE_CHAIN_INVALID_OR_UNAVAILABLE');
-      }
-      const receipt = read.receipt.evidence as Record<string, unknown>;
-      // The read proves a delegated principal-bound provider operation and
-      // evidence-chain integrity, not an approval-required or mobile MCP flow.
-      setE2eProof(JSON.stringify({
-        plan_hash: read.receipt.plan_hash,
-        route_id: read.receipt.route_id,
-        decision: decision.verdict,
-        evidence_hash: receipt.hash ?? receipt.record_hash ?? null,
-        evidence_chain_valid: true,
-        auth0_principal: 'VERIFIED_USER_SUBJECT',
-      }, null, 2));
-      setE2eStatus('USER_BOUND_READ_E2E_VERIFIED');
+      const proof = verifiedGovernedReadProof(read, chain);
+      if (!proof) throw new Error('GOVERNED_PROVIDER_EVIDENCE_BINDING_NOT_VERIFIED');
+      // PASS proves only this user-initiated, no-approval read and its hashed
+      // evidence. It does not grant approval for future provider mutations.
+      setE2eProof(JSON.stringify(proof, null, 2));
+      setE2eStatus('PASS');
+      setE2eNextAction('The read-only provider proof passed. Request a separately bound human approval before any protected write.');
     } catch (error) {
-      setE2eStatus('USER_BOUND_READ_E2E_BLOCKED');
+      setE2eStatus('BLOCKED');
       setE2eProof(error instanceof Error ? error.message : 'UNVERIFIED');
+      setE2eNextAction('Check the DSG workspace role, memory-only Auth0 session, and AWS MCP receipt. Retry only after the reported failure is resolved.');
     } finally {
       setE2eBusy(false);
     }
@@ -205,11 +200,12 @@ export default function DsgIdentityBridge() {
           Calls the existing production read-only public repository route with your verified Auth0 subject.
           AWS creates and executes its own plan, then verifies the evidence chain. This does not approve mutations.
         </p>
-        <button onClick={() => void verifyGovernedRead()} disabled={busy || e2eBusy || !auth0Sub || !authReady}
+        <button onClick={() => void verifyGovernedRead()} disabled={busy || e2eBusy || !auth0Sub || !authReady || !workspaceRole || workspaceRole === 'VIEWER'}
           className="mt-4 rounded-xl border border-indigo-400/50 px-4 py-2 text-sm font-bold text-indigo-200 disabled:opacity-40">
           {e2eBusy ? 'Verifying…' : 'Run user-bound governed read E2E'}
         </button>
         <p role="status" className="mt-3 font-mono text-xs text-amber-200">{e2eStatus}</p>
+        <p className="mt-2 text-xs text-slate-300">Next action: {workspaceRole === 'VIEWER' ? 'Ask your workspace administrator for the replay:verify permission. No provider read has been started.' : e2eNextAction}</p>
         {e2eProof && <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-words text-xs text-slate-300">{e2eProof}</pre>}
       </div>
       <p className="mt-3 text-xs text-amber-200">Autonomous Level readout and this account link are not proof that governed N2N execution has succeeded.</p>
