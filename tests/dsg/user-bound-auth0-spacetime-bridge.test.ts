@@ -3,7 +3,8 @@ import { NextRequest } from 'next/server';
 import { resolveVerifiedDsgActor } from '@/lib/dsg/server/context';
 import { verifyDsgAuth0Principal } from '@/lib/dsg/server/auth0-identity';
 import { getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
-import { POST, toolArgumentsBoundToUser } from '../../app/api/dsg/spacetime/user-tools/route';
+import { POST } from '../../app/api/dsg/spacetime/user-tools/route';
+import { toolArgumentsBoundToUser } from '@/lib/dsg/user-bound/tool-args';
 
 vi.mock('@/lib/dsg/server/context', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/dsg/server/context')>();
