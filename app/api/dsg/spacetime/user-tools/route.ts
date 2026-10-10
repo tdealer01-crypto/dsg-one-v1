@@ -60,6 +60,49 @@ async function readBoundedJson(request: NextRequest): Promise<unknown> {
   return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
 }
 
+// MCP streamable HTTP permits JSON or an SSE stream. Read a bounded response
+// and only accept the JSON-RPC result matching our one request ID.
+const MAX_MCP_RESPONSE = 256_000;
+async function parseMcpEnvelope(response: Response, requestId: string): Promise<unknown> {
+  if (!response.body) throw new Error('MCP_EMPTY_BODY');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  let total = 0;
+  let raw = '';
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      total += chunk.value.byteLength;
+      if (total > MAX_MCP_RESPONSE) throw new Error('MCP_RESPONSE_TOO_LARGE');
+      raw += decoder.decode(chunk.value, { stream: true });
+    }
+    raw += decoder.decode();
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+  if (contentType.includes('application/json')) return JSON.parse(raw);
+  if (!contentType.includes('text/event-stream')) throw new Error('MCP_UNEXPECTED_CONTENT_TYPE');
+  for (const frame of raw.split(/\r?\n\r?\n/)) {
+    const lines = frame.split(/\r?\n/);
+    const eventType = lines.find((line) => line.startsWith('event:'))?.slice(6).trim();
+    if (eventType && eventType !== 'message') continue;
+    const data = lines.filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart()).join('\n');
+    if (!data) continue;
+    try {
+      const message: unknown = JSON.parse(data);
+      if (isObject(message) && message.id === requestId) return message;
+    } catch {
+      // Continue only over nonmatching event frames; a matching JSON-RPC
+      // response must still be well formed or the request fails closed.
+    }
+  }
+  throw new Error('MCP_SSE_MATCHING_RESULT_NOT_FOUND');
+}
+
 async function linkedSubject(actorId: string): Promise<string | null> {
   const serviceKey = process.env.DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY ??
     process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -170,6 +213,7 @@ export async function POST(request: NextRequest) {
   // Verify once more at the provider. AWS only accepts real RS256 Auth0 JWTs,
   // never a Site owner/service token or a website session cookie.
   try {
+    const requestId = randomUUID();
     const upstream = await fetch(AWS_MCP, {
       method: 'POST',
       redirect: 'error',
@@ -183,18 +227,14 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: randomUUID(),
+        id: requestId,
         method: 'tools/call',
         params: { name: body.tool, arguments: body.arguments },
       }),
     });
     if (upstream.status === 401) return result(401, { ok: false, error: 'AWS_USER_OAUTH_REJECTED' });
     if (!upstream.ok) return result(502, { ok: false, error: 'AWS_MCP_HTTP_ERROR', http_status: upstream.status });
-    const contentType = upstream.headers.get('content-type') ?? '';
-    if (!contentType.includes('application/json')) {
-      return result(502, { ok: false, error: 'AWS_MCP_RESPONSE_FORMAT_UNEXPECTED' });
-    }
-    const envelope: unknown = await upstream.json();
+    const envelope: unknown = await parseMcpEnvelope(upstream, requestId);
     if (!isObject(envelope) || isObject(envelope.error)) {
       return result(502, { ok: false, error: 'AWS_MCP_RPC_REJECTED' });
     }
