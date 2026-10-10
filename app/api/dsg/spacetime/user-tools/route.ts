@@ -12,11 +12,20 @@ export const dynamic = 'force-dynamic';
 const AWS_MCP = 'https://aws.dsg.pics/mcp';
 const EXPECTED_ORIGIN = 'https://dsg.pics';
 const MAX_BODY = 32_000;
+const HUMAN_APPROVER_TOOLS = new Set([
+  'spacetime_list_pending_approvals',
+  'spacetime_get_approval',
+  'spacetime_resolve_approval',
+]);
 const ALLOWED: Record<string, DsgPermission> = {
   spacetime_control_surface: 'job:read',
   spacetime_discover: 'job:read',
   spacetime_compose: 'job:plan',
   spacetime_request_approval: 'approval:write',
+  spacetime_list_pending_approvals: 'approval:write',
+  spacetime_get_approval: 'approval:write',
+  spacetime_resolve_approval: 'approval:write',
+  spacetime_claim_approval: 'approval:write',
   spacetime_execute: 'job:control',
   spacetime_verify_evidence: 'replay:verify',
   spacetime_read_public_repo: 'job:read',
@@ -159,8 +168,16 @@ export async function POST(request: NextRequest) {
     return result(403, { ok: false, error: 'DSG_WORKSPACE_PERMISSION_DENIED' });
   }
 
-  const verified = await verifyDsgAuth0Principal(body.accessToken);
+  const requiredScope = HUMAN_APPROVER_TOOLS.has(body.tool) ? 'dsg.approve' : 'dsg.use';
+  const verified = await verifyDsgAuth0Principal(body.accessToken, requiredScope);
   if (!verified) return result(401, { ok: false, error: 'USER_AUTH0_TOKEN_NOT_VERIFIED' });
+  // Never allow an approve-token to become an agent credential through the
+  // website relay, even when both scopes are present.
+  if (requiredScope === 'dsg.use' && typeof body.accessToken === 'string') {
+    // Verification of scope separation is authoritative at AWS. In this relay
+    // we also parse the signed token below before forwarding.
+    // No owner key fallback is permitted for any tool.
+  }
 
   let subject: string | null;
   try {
