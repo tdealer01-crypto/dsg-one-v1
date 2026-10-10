@@ -12,6 +12,12 @@ type SessionPayload = {
   error?: string;
 };
 type RuntimeStatus = { ok?: boolean; version?: string; env?: string; ts?: string };
+type IntegrationStatus = {
+  authority: string;
+  user_oauth_e2e: string;
+  provider_execution_e2e: string;
+  surfaces: { workroom: { state: string }; goal_first_lab: { state: string }; execution_evidence: { state: string }; spacetime: { state: string }; dsg_one: { state: string } };
+};
 
 const toolCards: Array<{
   name: string;
@@ -72,6 +78,7 @@ const toolCards: Array<{
 export default function DsgAccessPage() {
   const [session, setSession] = useState<SessionPayload | null>(null);
   const [runtime, setRuntime] = useState<RuntimeStatus | null>(null);
+  const [integrations, setIntegrations] = useState<IntegrationStatus | null>(null);
   const [busyWorkspace, setBusyWorkspace] = useState<string | null>(null);
   const [message, setMessage] = useState('Loading authenticated DSG session…');
 
@@ -87,6 +94,16 @@ export default function DsgAccessPage() {
     const nextSession = await sessionResponse.json() as SessionPayload;
     setSession(nextSession);
     if (runtimeResponse.ok) setRuntime(await runtimeResponse.json() as RuntimeStatus);
+    if (nextSession.selected) {
+      try {
+        const integrationResponse = await fetch('/api/dsg/integrations/status', { cache: 'no-store', credentials: 'include' });
+        setIntegrations(integrationResponse.ok ? await integrationResponse.json() as IntegrationStatus : null);
+      } catch {
+        setIntegrations(null);
+      }
+    } else {
+      setIntegrations(null);
+    }
     setMessage(nextSession.selected ? 'Authenticated DSG session is ready.' : 'Select a workspace to activate governed access.');
   }, []);
 
@@ -173,6 +190,39 @@ export default function DsgAccessPage() {
               Open runtime status <ExternalLink className="h-4 w-4" />
             </a>
           </div>
+        </section>
+
+        <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6">
+          <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Unified DSG integration status</div>
+          <h2 className="mt-2 text-2xl font-black">One system, separate verified identities</h2>
+          <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-400">
+            Goal-first Lab and Execution Evidence are companion ChatGPT app surfaces. Workroom and AWS Spacetime are the existing runtime.
+            A green network check never means user OAuth, an approved execution, or evidence verification passed.
+          </p>
+          {integrations ? (
+            <>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                {([
+                  ['DSG ONE', integrations.surfaces.dsg_one.state],
+                  ['AWS Spacetime metadata', integrations.surfaces.spacetime.state],
+                  ['Workroom session', integrations.surfaces.workroom.state],
+                  ['Goal-first Lab', integrations.surfaces.goal_first_lab.state],
+                  ['Execution Evidence', integrations.surfaces.execution_evidence.state],
+                ] as const).map(([name, state]) => (
+                  <div key={name} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+                    <div className="text-sm font-bold text-slate-200">{name}</div>
+                    <div className="mt-2 break-words font-mono text-xs text-indigo-300">{state}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+                User OAuth E2E: {integrations.user_oauth_e2e} · Provider execution E2E: {integrations.provider_execution_e2e}.
+                Never substitute Site/Owner service credentials for the signed-in user&apos;s Auth0 identity.
+              </div>
+            </>
+          ) : (
+            <p className="mt-4 text-sm text-slate-400">Select an authenticated workspace to run the read-only integration checks.</p>
+          )}
         </section>
 
         <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6">
