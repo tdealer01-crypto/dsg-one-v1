@@ -217,7 +217,7 @@ export default function DsgAccessPage() {
               </div>
               <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
                 User OAuth E2E: {integrations.user_oauth_e2e} · Provider execution E2E: {integrations.provider_execution_e2e}.
-                Never substitute Site/Owner service credentials for the signed-in user's Auth0 identity.
+                Never substitute Site/Owner service credentials for the signed-in user&apos;s Auth0 identity.
               </div>
             </>
           ) : (
