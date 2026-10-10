@@ -171,7 +171,7 @@ export default function DsgIdentityBridge() {
       try {
         const candidate = await authClient.current.getTokenSilently();
         if (typeof candidate !== 'string' || candidate.length === 0) {
-          throw { error: 'missing_refresh_token' };
+          throw new Error('AUTH0_NO_DELEGATED_TOKEN');
         }
         accessToken = candidate;
       } catch (error) {
