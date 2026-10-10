@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { sha256Json } from '@/lib/dsg/runtime/hash';
 import { callDsgRpc, getDsgSupabaseRpcConfig, readDsgRest } from './supabase-rpc';
-import type { DsgRepositoryContext } from './repository';
+import type { DsgRepositoryContext, DsgRuntimeJobRecord } from './repository';
 
 const ENGINE_VERSION = '1.18.0';
 const DEFAULT_PYTHON = '/opt/dsg-automation/bin/python';
@@ -324,4 +324,122 @@ export async function acquireAutomationLease(
     p_owner_id: input.ownerId,
     p_ttl_seconds: input.ttlSeconds ?? 60,
   });
+}
+
+
+// A spatial Work/Quest READ MODEL of existing durable automation data.
+// No second Mission Registry, identity grant, provider call, or state mutation.
+const WORK_QUEST_STEP_STATES = [
+  'PENDING', 'READY', 'RUNNING', 'WAITING', 'RETRYING',
+  'COMPLETED', 'BLOCKED', 'FAILED', 'KILLED',
+] as const;
+const WORK_QUEST_RUN_STATES = new Set([
+  'CREATED', 'RUNNING', 'WAITING', 'RETRYING', 'PAUSED',
+  'VERIFYING', 'COMPLETED', 'BLOCKED', 'FAILED', 'KILLED',
+]);
+const WORK_QUEST_JOB_STATES = new Set([
+  'QUEUED', 'GOAL_LOCKED', 'INSPECTING', 'PLANNING',
+  'WAITING_PERMISSION', 'WAITING_APPROVAL', 'RUNNING',
+  'VERIFYING', 'PASSED', 'BLOCKED', 'FAILED', 'KILLED',
+  'COMPLETED', 'RESET',
+]);
+
+export type AutomationWorkQuestView = {
+  schema: 'dsg.spacetime.work-quest-view.v1';
+  source: 'dsg_automation_runs' | 'dsg_runtime_jobs';
+  jobId: string;
+  runId: string | null;
+  goal: string | null;
+  creatorIsViewer: boolean;
+  displayState: string;
+  reportedJobStatus: string;
+  reportedRunStatus: string | null;
+  stepCounts: Record<string, number>;
+  avatarBinding: 'NOT_BOUND';
+  delegatedPrincipalBinding: 'NOT_VERIFIED';
+  missionCompletion: 'NOT_VERIFIED';
+  completionEvidence: 'NOT_INDEPENDENTLY_VERIFIED';
+  executionAllowed: false;
+};
+
+export function projectAutomationWorkQuest(input: {
+  job: DsgRuntimeJobRecord;
+  run: AutomationRunRecord | null;
+  steps: AutomationStepRecord[];
+  viewer: { actorId: string; workspaceId: string };
+}): AutomationWorkQuestView {
+  const { job, run, steps, viewer } = input;
+  if (!viewer?.actorId || !viewer.workspaceId) {
+    throw new Error('WORK_QUEST_VERIFIED_ACTOR_REQUIRED');
+  }
+  if (!job?.id || !job.createdBy || !job.workspaceId || job.workspaceId !== viewer.workspaceId) {
+    throw new Error('WORK_QUEST_WORKSPACE_MISMATCH');
+  }
+  if (!WORK_QUEST_JOB_STATES.has(job.status)) {
+    throw new Error('WORK_QUEST_JOB_STATUS_UNRECOGNIZED');
+  }
+  if (run && run.jobId !== job.id) {
+    throw new Error('WORK_QUEST_JOB_MISMATCH');
+  }
+  if (run && (run.workspaceId !== viewer.workspaceId || !run.id ||
+       !run.planHash || !run.taskPlanId || !run.wavePlanId)) {
+    throw new Error('WORK_QUEST_WORKSPACE_MISMATCH');
+  }
+  if (run && !WORK_QUEST_RUN_STATES.has(run.status)) {
+    throw new Error('WORK_QUEST_RUN_STATUS_UNRECOGNIZED');
+  }
+  if (!run && steps.length) {
+    throw new Error('WORK_QUEST_STEPS_WITHOUT_RUN');
+  }
+  const stepCounts: Record<string, number> = Object.fromEntries(
+    WORK_QUEST_STEP_STATES.map(status => [status, 0]),
+  );
+  for (const step of steps) {
+    if (!step.taskId || !Object.hasOwn(stepCounts, step.status)) {
+      throw new Error('WORK_QUEST_STEP_STATUS_UNRECOGNIZED');
+    }
+    stepCounts[step.status] += 1;
+  }
+
+  // Stored status/resultRef is not independent provider/evidence verification.
+  let displayState = 'NOT_STARTED';
+  if (job.status === 'COMPLETED' || run?.status === 'COMPLETED' ||
+      job.status === 'PASSED') {
+    displayState = 'VERIFYING_EVIDENCE';
+  } else if (job.status === 'BLOCKED' || run?.status === 'BLOCKED' ||
+      stepCounts.BLOCKED || stepCounts.FAILED || stepCounts.KILLED) {
+    displayState = 'BLOCKED';
+  } else if (job.status === 'FAILED' || job.status === 'KILLED' ||
+      run?.status === 'FAILED' || run?.status === 'KILLED') {
+    displayState = 'FAILED_OR_KILLED';
+  } else if (job.status === 'WAITING_APPROVAL') {
+    displayState = 'WAITING_APPROVAL';
+  } else if (job.status === 'WAITING_PERMISSION') {
+    displayState = 'WAITING_PERMISSION';
+  } else if (run && (stepCounts.WAITING || run.status === 'WAITING')) {
+    displayState = 'WAITING';
+  } else if (run && (stepCounts.RUNNING || run.status === 'RUNNING')) {
+    displayState = 'EXECUTING';
+  } else if (run) {
+    displayState = 'IN_PROGRESS';
+  }
+
+  const creatorIsViewer = job.createdBy === viewer.actorId;
+  return {
+    schema: 'dsg.spacetime.work-quest-view.v1',
+    source: run ? 'dsg_automation_runs' : 'dsg_runtime_jobs',
+    jobId: job.id,
+    runId: run?.id ?? null,
+    goal: creatorIsViewer ? job.goal : null,
+    creatorIsViewer,
+    displayState,
+    reportedJobStatus: job.status,
+    reportedRunStatus: run?.status ?? null,
+    stepCounts,
+    avatarBinding: 'NOT_BOUND',
+    delegatedPrincipalBinding: 'NOT_VERIFIED',
+    missionCompletion: 'NOT_VERIFIED',
+    completionEvidence: 'NOT_INDEPENDENTLY_VERIFIED',
+    executionAllowed: false,
+  };
 }
