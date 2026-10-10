@@ -56,7 +56,10 @@ jobs:
         run: npm run dsg:product-ready
 
       - name: Build
-        run: npm run build 2>&1 | tee dsg-build.log
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build 2>&1 | tee dsg-build.log
 
       - name: Upload build log
         if: always()
