@@ -143,8 +143,10 @@ describe('DSG User-bound Auth0 → AWS Spacetime bridge', () => {
   });
 
   it('sends only verified delegated bearer credential on a fixed AWS endpoint and returns real receipt', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      jsonrpc: '2.0', id: 'upstream', result: {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const { id } = JSON.parse(init.body as string) as { id: string };
+      return new Response(JSON.stringify({
+      jsonrpc: '2.0', id, result: {
         isError: false,
         structuredContent: {
           decision: { verdict: 'ALLOW' },
@@ -154,7 +156,8 @@ describe('DSG User-bound Auth0 → AWS Spacetime bridge', () => {
           evidence: { hash: 'evidence-hash-1' },
         },
       },
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
     vi.stubGlobal('fetch', fetchMock);
     const response = await POST(request());
     const data = await response.json();
@@ -174,15 +177,27 @@ describe('DSG User-bound Auth0 → AWS Spacetime bridge', () => {
   });
 
   it('reports evidence verification separately; a successful HTTP response is not proof', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () =>
-      new Response(JSON.stringify({ result: { isError: false, structuredContent: { valid: false, records: 3 } } }), {
-        status: 200, headers: { 'Content-Type': 'application/json' },
-      })));
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+      const { id } = JSON.parse(init.body as string) as { id: string };
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0', id, result: { isError: false, structuredContent: { valid: false, records: 3 } },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }));
     const response = await POST(request('spacetime_verify_evidence'));
     const data = await response.json();
     expect(data.ok).toBe(true);
     expect(data.evidenceVerified).toBe(false);
     expect(data.receipt.valid).toBe(false);
+  });
+
+  it('fails closed on a mismatched JSON-RPC response ID even when provider receipt claims success', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      jsonrpc: '2.0', id: 'unrelated-request',
+      result: { isError: false, structuredContent: { valid: true, records: 4 } },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    const response = await POST(request('spacetime_verify_evidence'));
+    expect(response.status).toBe(502);
+    expect((await response.json()).error).toBe('AWS_MCP_RPC_ID_MISMATCH');
   });
 
   it('parses bounded MCP SSE and matches the exact JSON-RPC call id', async () => {
