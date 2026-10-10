@@ -2,7 +2,7 @@
 const RENEWAL_ERRORS = new Set([
   'missing_refresh_token', 'invalid_grant', 'login_required',
   'consent_required', 'interaction_required', 'invalid_refresh_token',
-  'invalid_client', 'missing_transaction',
+  'missing_transaction',
 ]);
 
 export type Auth0SessionFailure = 'AUTH0_REFRESH_NOT_AVAILABLE' | 'AUTH0_IDENTITY_UNAVAILABLE';
