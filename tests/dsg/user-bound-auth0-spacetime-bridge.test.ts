@@ -4,7 +4,7 @@ import { resolveVerifiedDsgActor } from '@/lib/dsg/server/context';
 import { verifyDsgAuth0Principal } from '@/lib/dsg/server/auth0-identity';
 import { getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
 import { POST } from '../../app/api/dsg/spacetime/user-tools/route';
-import { toolArgumentsBoundToUser } from '@/lib/dsg/user-bound/tool-args';
+import { toolArgumentsBoundToUser } from '@/lib/dsg/user-bound/tool-arguments';
 
 vi.mock('@/lib/dsg/server/context', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/dsg/server/context')>();
@@ -122,12 +122,12 @@ describe('DSG User-bound Auth0 → AWS Spacetime bridge', () => {
     expect(toolArgumentsBoundToUser('spacetime_execute', { agent: correct, plan_id: 'p', plan_hash: 'h', route_id: 'r' }, subject)).toBe(true);
   });
 
-  it('prohibits general customer approval resolution via delegated bridge', async () => {
+  it('prohibits resolving an approval with an agent-class OAuth credential', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     const response = await POST(request('spacetime_resolve_approval', { approval_request_id: 'request-1', decision: 'APPROVE' }));
     expect(response.status).toBe(403);
-    expect((await response.json()).error).toBe('TOOL_NOT_EXPOSED_TO_USER_BRIDGE');
+    expect((await response.json()).error).toBe('APPROVER_SCOPE_REQUIRED');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

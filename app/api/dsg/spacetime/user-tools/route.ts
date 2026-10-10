@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { assertDsgPermission, resolveVerifiedDsgActor, type DsgPermission } from '@/lib/dsg/server/context';
 import { verifyDsgAuth0Principal, DSG_AUTH0_CLIENT_ID, DSG_AUTH0_ISSUER } from '@/lib/dsg/server/auth0-identity';
 import { getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
-import { toolArgumentsBoundToUser } from '@/lib/dsg/user-bound/tool-args';
+import { toolArgumentsBoundToUser } from '@/lib/dsg/user-bound/tool-arguments';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,11 +12,20 @@ export const dynamic = 'force-dynamic';
 const AWS_MCP = 'https://aws.dsg.pics/mcp';
 const EXPECTED_ORIGIN = 'https://dsg.pics';
 const MAX_BODY = 32_000;
+const HUMAN_APPROVER_TOOLS = new Set([
+  'spacetime_list_pending_approvals',
+  'spacetime_get_approval',
+  'spacetime_resolve_approval',
+]);
 const ALLOWED: Record<string, DsgPermission> = {
   spacetime_control_surface: 'job:read',
   spacetime_discover: 'job:read',
   spacetime_compose: 'job:plan',
   spacetime_request_approval: 'approval:write',
+  spacetime_list_pending_approvals: 'approval:write',
+  spacetime_get_approval: 'approval:write',
+  spacetime_resolve_approval: 'approval:write',
+  spacetime_claim_approval: 'approval:write',
   spacetime_execute: 'job:control',
   spacetime_verify_evidence: 'replay:verify',
   spacetime_read_public_repo: 'job:read',
@@ -159,8 +168,14 @@ export async function POST(request: NextRequest) {
     return result(403, { ok: false, error: 'DSG_WORKSPACE_PERMISSION_DENIED' });
   }
 
-  const verified = await verifyDsgAuth0Principal(body.accessToken);
+  const requiredScope = HUMAN_APPROVER_TOOLS.has(body.tool) ? 'dsg.approve' : 'dsg.use';
+  const verified = await verifyDsgAuth0Principal(body.accessToken, requiredScope);
   if (!verified) return result(401, { ok: false, error: 'USER_AUTH0_TOKEN_NOT_VERIFIED' });
+  if (verified.scope !== requiredScope) return result(403, { ok: false, error: 'APPROVER_SCOPE_REQUIRED' });
+  // A verified approve-class credential cannot be used for agent tools.
+  if (requiredScope === 'dsg.use' && verified.hasApprovalScope) {
+    return result(403, { ok: false, error: 'APPROVER_TOKEN_NOT_AGENT_CREDENTIAL' });
+  }
 
   let subject: string | null;
   try {

@@ -1,8 +1,5 @@
-// Kept outside Next.js route.ts: route modules may only export HTTP handlers
-// and supported route configuration. Validate delegated principal/arguments
-// without weakening the fail-closed gate.
-
 type Json = Record<string, unknown>;
+
 function isObject(value: unknown): value is Json {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
@@ -40,10 +37,19 @@ export function toolArgumentsBoundToUser(name: string, args: unknown, subject: s
         typeof args.plan_id === 'string' &&
         typeof args.plan_hash === 'string' &&
         typeof args.route_id === 'string';
+    case 'spacetime_list_pending_approvals':
+      return Object.keys(args).length === 0;
+    case 'spacetime_get_approval':
+    case 'spacetime_claim_approval':
+      return Object.keys(args).length === 1 &&
+        typeof args.approval_request_id === 'string' &&
+        args.approval_request_id.length > 0 && args.approval_request_id.length <= 192;
+    case 'spacetime_resolve_approval':
+      return Object.keys(args).length === 2 &&
+        typeof args.approval_request_id === 'string' &&
+        args.approval_request_id.length > 0 && args.approval_request_id.length <= 192 &&
+        (args.decision === 'APPROVE' || args.decision === 'REJECT');
     default:
-      // In particular, NEVER relay spacetime_resolve_approval through this
-      // bridge: AWS runtime currently stamps a general customer principal.
-      // Human approval resolution needs a separate end-to-end user-aware gate.
       return false;
   }
 }
