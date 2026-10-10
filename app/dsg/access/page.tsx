@@ -44,6 +44,12 @@ const toolCards: Array<{
     badge: 'Read only',
   },
   {
+    name: 'User-bound Auth0 Bridge',
+    description: 'Connect the existing DSG ONE workspace actor to the verified Auth0 subject, then perform a governed, read-only Spacetime proof with evidence. Never uses Site/Owner credentials.',
+    href: '/dsg/autonomous-level',
+    badge: 'Signed-in user · OAuth governed',
+  },
+  {
     name: 'Spacetime MCP',
     description: 'OAuth-protected API: https://aws.dsg.pics/mcp. Use an authenticated MCP client; a browser request without a token returns 401.',
     href: null,

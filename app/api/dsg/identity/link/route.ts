@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     const existing = await readLink(actor.actorId);
     return NextResponse.json({
       ok: true, linked: Boolean(existing),
-      actorId: actor.actorId, workspaceId: actor.workspaceId,
+      actorId: actor.actorId, workspaceId: actor.workspaceId, workspaceRole: actor.role,
       principal: existing ? { sub: existing.auth0_sub, issuer: existing.auth0_issuer, verifiedAt: existing.verified_at } : null,
       n2nApprovalGranted: false,
     }, { headers: { 'Cache-Control': 'no-store' } });
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
           existing.auth0_client_id !== DSG_AUTH0_CLIENT_ID) {
         return NextResponse.json({ ok: false, error: 'ACTOR_ALREADY_LINKED_TO_DIFFERENT_IDENTITY' }, { status: 409 });
       }
-      return NextResponse.json({ ok: true, linked: true, alreadyLinked: true, actorId: actor.actorId, auth0Sub: principal.subject, n2nApprovalGranted: false });
+      return NextResponse.json({ ok: true, linked: true, alreadyLinked: true, actorId: actor.actorId, auth0Sub: principal.subject, workspaceRole: actor.role, n2nApprovalGranted: false });
     }
 
     const config = serviceConfig();
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: true, linked: true, alreadyLinked: false,
       actorId: actor.actorId, auth0Sub: principal.subject,
-      workspaceId: actor.workspaceId, n2nApprovalGranted: false,
+      workspaceId: actor.workspaceId, workspaceRole: actor.role, n2nApprovalGranted: false,
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch {
     return NextResponse.json({ ok: false, error: 'IDENTITY_LINK_UNAVAILABLE' }, { status: 503 });
