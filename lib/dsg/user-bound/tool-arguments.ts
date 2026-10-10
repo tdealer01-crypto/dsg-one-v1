@@ -37,10 +37,19 @@ export function toolArgumentsBoundToUser(name: string, args: unknown, subject: s
         typeof args.plan_id === 'string' &&
         typeof args.plan_hash === 'string' &&
         typeof args.route_id === 'string';
+    case 'spacetime_list_pending_approvals':
+      return Object.keys(args).length === 0;
+    case 'spacetime_get_approval':
+    case 'spacetime_claim_approval':
+      return Object.keys(args).length === 1 &&
+        typeof args.approval_request_id === 'string' &&
+        args.approval_request_id.length > 0 && args.approval_request_id.length <= 192;
+    case 'spacetime_resolve_approval':
+      return Object.keys(args).length === 2 &&
+        typeof args.approval_request_id === 'string' &&
+        args.approval_request_id.length > 0 && args.approval_request_id.length <= 192 &&
+        (args.decision === 'APPROVE' || args.decision === 'REJECT');
     default:
-      // In particular, NEVER relay spacetime_resolve_approval through this
-      // bridge: AWS runtime currently stamps a general customer principal.
-      // Human approval resolution needs a separate end-to-end user-aware gate.
       return false;
   }
 }
