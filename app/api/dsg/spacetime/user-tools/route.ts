@@ -83,7 +83,13 @@ async function parseMcpEnvelope(response: Response, requestId: string): Promise<
     reader.releaseLock();
   }
   const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
-  if (contentType.includes('application/json')) return JSON.parse(raw);
+  if (contentType.includes('application/json')) {
+    const envelope: unknown = JSON.parse(raw);
+    if (!isObject(envelope) || envelope.jsonrpc !== '2.0' || envelope.id !== requestId) {
+      throw new Error('MCP_JSON_RPC_ID_MISMATCH');
+    }
+    return envelope;
+  }
   if (!contentType.includes('text/event-stream')) throw new Error('MCP_UNEXPECTED_CONTENT_TYPE');
   for (const frame of raw.split(/\r?\n\r?\n/)) {
     const lines = frame.split(/\r?\n/);
@@ -254,7 +260,10 @@ export async function POST(request: NextRequest) {
       // TOOL_RETURNED is not VERIFIED_COMPLETED. User must prove the provider
       // postcondition independently and approval must come from human authority.
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'MCP_JSON_RPC_ID_MISMATCH') {
+      return result(502, { ok: false, error: 'AWS_MCP_RPC_ID_MISMATCH' });
+    }
     return result(503, { ok: false, error: 'AWS_MCP_UNREACHABLE' });
   }
 }
