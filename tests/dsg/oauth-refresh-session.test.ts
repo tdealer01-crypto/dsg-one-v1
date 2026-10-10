@@ -24,6 +24,10 @@ describe('DSG memory-only Auth0 token renewal without reconnect loop', () => {
     expect(bridge).toContain('async function connect()');
     expect(bridge).not.toContain('window.location.assign(');
     expect(bridge).not.toContain('setTimeout(');
+    const connect = bridge.split('async function connect()')[1]?.split('async function verifyGovernedRead()')[0] ?? '';
+    expect(connect).not.toContain('setTokenReady(false)');
+    expect(bridge).toContain("setStatus('AUTH0_TOKEN_UNAVAILABLE')");
+    expect(bridge).toContain('setMessage(\'The delegated Auth0 token could not be renewed.');
   });
 
   it('classifies a revoked/missing refresh token without leaking provider messages', () => {
@@ -35,6 +39,8 @@ describe('DSG memory-only Auth0 token renewal without reconnect loop', () => {
     expect(classifyAuth0SessionFailure({ error: 'network_error', error_description: 'secret-value' }))
       .toBe('AUTH0_IDENTITY_UNAVAILABLE');
     expect(classifyAuth0SessionFailure(new Error('token=secret-value')))
+      .toBe('AUTH0_IDENTITY_UNAVAILABLE');
+    expect(classifyAuth0SessionFailure({ error: 'invalid_client' }))
       .toBe('AUTH0_IDENTITY_UNAVAILABLE');
   });
 
