@@ -171,12 +171,9 @@ export async function POST(request: NextRequest) {
   const requiredScope = HUMAN_APPROVER_TOOLS.has(body.tool) ? 'dsg.approve' : 'dsg.use';
   const verified = await verifyDsgAuth0Principal(body.accessToken, requiredScope);
   if (!verified) return result(401, { ok: false, error: 'USER_AUTH0_TOKEN_NOT_VERIFIED' });
-  // Never allow an approve-token to become an agent credential through the
-  // website relay, even when both scopes are present.
-  if (requiredScope === 'dsg.use' && typeof body.accessToken === 'string') {
-    // Verification of scope separation is authoritative at AWS. In this relay
-    // we also parse the signed token below before forwarding.
-    // No owner key fallback is permitted for any tool.
+  // A verified approve-class credential cannot be used for agent tools.
+  if (requiredScope === 'dsg.use' && verified.hasApprovalScope) {
+    return result(403, { ok: false, error: 'APPROVER_TOKEN_NOT_AGENT_CREDENTIAL' });
   }
 
   let subject: string | null;
