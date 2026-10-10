@@ -185,6 +185,36 @@ describe('DSG User-bound Auth0 → AWS Spacetime bridge', () => {
     expect(data.receipt.valid).toBe(false);
   });
 
+  it('parses bounded MCP SSE and matches the exact JSON-RPC call id', async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const rpc = JSON.parse(init.body as string) as { id: string };
+      const frame = 'event: message\\ndata: ' + JSON.stringify({
+        jsonrpc: '2.0', id: rpc.id,
+        result: { isError: false, structuredContent: { valid: true, records: 2 } },
+      }) + '\\n\\n';
+      return new Response(frame.replaceAll('\\n', '\n'), {
+        status: 200, headers: { 'Content-Type': 'text/event-stream' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await POST(request('spacetime_verify_evidence'));
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.evidenceVerified).toBe(true);
+    expect(data.receipt.valid).toBe(true);
+  });
+
+  it('rejects SSE frames unrelated to the requested JSON-RPC id', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      'event: message\\ndata: {"jsonrpc":"2.0","id":"other-call","result":{"structuredContent":{"valid":true}}}\\n\\n'
+        .replaceAll('\\n', '\n'),
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+    )));
+    const res = await POST(request('spacetime_verify_evidence'));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe('AWS_MCP_UNREACHABLE');
+  });
+
   it('fails closed when AWS rejects the real delegated bearer', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('unauthorized', { status: 401 })));
     const response = await POST(request());
