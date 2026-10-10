@@ -64,5 +64,11 @@ replacement, do not send credentials in chat):
   report host errors separately from AWS server OAuth.
 - Source PR + CI != production deployment or E2E proof.
 
-Status: SOURCE_STAGED; provider settings, production build and live E2E
-must be verified independently.
+Status: REVIEW — source and tests require full exact-head CI plus review
+before merge. Provider/client settings and live refresh E2E are NOT_VERIFIED.
+
+nextAction: Verify the existing DSG ONE Auth0 SPA application's Refresh
+Token grant, rotation, offline_access and exact callback/origin; then perform
+one login → access expiry → transparent refresh → user-bound governed read
+test on a real mobile browser. Inspect ChatGPT's separate connector
+registration/redirect and renewal failure before modifying it.
