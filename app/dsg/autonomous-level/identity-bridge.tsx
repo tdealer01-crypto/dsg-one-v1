@@ -3,6 +3,7 @@
 import { createAuth0Client, type Auth0Client } from '@auth0/auth0-spa-js';
 import { useEffect, useRef, useState } from 'react';
 import { verifiedGovernedReadProof } from '@/lib/dsg/user-bound/read-proof';
+import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
 
 const callback = 'https://dsg.pics/dsg/autonomous-level';
 
@@ -27,6 +28,7 @@ export default function DsgIdentityBridge() {
   const authClient = useRef<Auth0Client | null>(null);
   const [busy, setBusy] = useState(true);
   const [authReady, setAuthReady] = useState(false);
+  const [tokenReady, setTokenReady] = useState(false);
   const [status, setStatus] = useState('CHECKING_EXISTING_DSG_SESSION');
   const [actorId, setActorId] = useState<string | null>(null);
   const [auth0Sub, setAuth0Sub] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export default function DsgIdentityBridge() {
         if (data.linked && data.principal) {
           setAuth0Sub(data.principal.sub);
           setStatus('AUTH0_ACCOUNT_LINKED');
-          setMessage('An Auth0 subject is bound to the verified DSG actor. Runtime approvals remain separate.');
+          setMessage('An Auth0 subject is bound to the verified DSG actor. A fresh delegated token is still required after reopening this page.');
         } else {
           setStatus('AUTH0_NOT_LINKED');
           setMessage('Use the Auth0 sign-in button to bind this DSG workspace actor to the same tenant used by Spacetime.');
@@ -70,10 +72,11 @@ export default function DsgIdentityBridge() {
           authorizationParams: {
             redirect_uri: callback,
             audience: 'https://aws.dsg.pics',
-            scope: 'openid profile email dsg.use',
+            scope: 'openid profile email dsg.use offline_access',
           },
           cacheLocation: 'memory',
-          useRefreshTokens: false,
+          useRefreshTokens: true,
+          useRefreshTokensFallback: false,
         });
         if (cancelled) return;
         authClient.current = client;
@@ -81,7 +84,8 @@ export default function DsgIdentityBridge() {
         const params = new URLSearchParams(window.location.search);
         if (params.has('error')) {
           setStatus('AUTH0_LOGIN_DENIED');
-          setMessage('Auth0 returned an authentication error. DSG privileges are unchanged.');
+          setTokenReady(false);
+          setMessage('Auth0 returned an authentication error. Use the sign-in button once; no automatic redirect will be triggered. DSG privileges are unchanged.');
           window.history.replaceState(null, '', callback);
           return;
         }
@@ -106,13 +110,27 @@ export default function DsgIdentityBridge() {
           setActorId(linked.actorId ?? data.actorId ?? null);
           setAuth0Sub(linked.auth0Sub ?? null);
           setWorkspaceRole(linked.workspaceRole ?? data.workspaceRole);
+          setTokenReady(true);
           setStatus('AUTH0_ACCOUNT_LINKED');
-          setMessage('Both signed Auth0 token and Supabase workspace actor were verified and linked by the backend. N2N access remains governed.');
+          setMessage('Auth0 token verified for this session. The SDK refreshes through a rotating refresh token when the Auth0 client allows offline_access. N2N remains governed.');
+        } else {
+          // Linked account != live delegated authorization. Never present a stored
+          // Auth0 subject as an authenticated connector/session after a reload.
+          const authenticated = await client.isAuthenticated();
+          setTokenReady(authenticated);
+          if (!authenticated && data.linked) {
+            setStatus('AUTH0_REAUTH_REQUIRED');
+            setMessage('Your DSG identity remains linked but this browser has no usable delegated Auth0 token. Select Re-authenticate once. Automatic redirect loops are disabled.');
+          }
         }
-      } catch {
+      } catch (error) {
         if (!cancelled) {
-          setStatus('IDENTITY_LINK_NOT_VERIFIED');
-          setMessage('The identity backend or Auth0 service could not be verified. Existing DSG access remains unchanged.');
+          setTokenReady(false);
+          const reason = classifyAuth0SessionFailure(error);
+          setStatus(reason === 'AUTH0_REFRESH_NOT_AVAILABLE' ? 'AUTH0_REAUTH_REQUIRED' : 'IDENTITY_LINK_NOT_VERIFIED');
+          setMessage(reason === 'AUTH0_REFRESH_NOT_AVAILABLE'
+            ? 'Auth0 session renewal is unavailable or revoked. Re-authenticate once; never retry redirects automatically.'
+            : 'The identity backend or Auth0 service could not be verified. Existing DSG access remains unchanged.');
         }
       } finally {
         if (!cancelled) setBusy(false);
@@ -125,7 +143,8 @@ export default function DsgIdentityBridge() {
   async function connect() {
     if (!authClient.current) return;
     setBusy(true);
-    setMessage('Redirecting to the shared Auth0 Universal Login (PKCE)...');
+    setTokenReady(false);
+    setMessage('Redirecting to the shared Auth0 Universal Login (PKCE) once, at your request...');
     try {
       await authClient.current.loginWithRedirect({
         authorizationParams: { redirect_uri: callback },
@@ -146,7 +165,19 @@ export default function DsgIdentityBridge() {
     try {
       // The Auth0 SPA SDK retains the user's token in memory only. Never
       // substitute the website session, Site bridge, or owner credential.
-      const accessToken = await authClient.current.getTokenSilently();
+      // The SDK refreshes short-lived access tokens using its memory-only
+      // refresh-token cache. No JWT or refresh token is persisted by DSG.
+      let accessToken: string;
+      try {
+        accessToken = await authClient.current.getTokenSilently();
+      } catch (error) {
+        setTokenReady(false);
+        if (classifyAuth0SessionFailure(error) === 'AUTH0_REFRESH_NOT_AVAILABLE') {
+          setStatus('AUTH0_REAUTH_REQUIRED');
+          throw new Error('AUTH0_REAUTH_REQUIRED');
+        }
+        throw new Error('AUTH0_DELEGATED_TOKEN_UNAVAILABLE');
+      }
       async function tool(toolName: string): Promise<ToolBridgeResponse> {
         const response = await fetch('/api/dsg/spacetime/user-tools', {
           method: 'POST',
@@ -192,7 +223,7 @@ export default function DsgIdentityBridge() {
       </div>
       <button onClick={() => void connect()} disabled={busy || !authReady}
         className="mt-4 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-700">
-        {busy ? 'Checking…' : auth0Sub ? 'Re-authenticate with Auth0' : 'Link via Auth0 (PKCE)'}
+        {busy ? 'Checking…' : tokenReady ? 'Re-authenticate with Auth0' : auth0Sub ? 'Resume Auth0 session (PKCE)' : 'Link via Auth0 (PKCE)'}
       </button>
       <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-950 p-4">
         <p className="text-sm font-bold text-indigo-200">User-bound AWS Spacetime E2E — read only</p>
@@ -200,7 +231,7 @@ export default function DsgIdentityBridge() {
           Calls the existing production read-only public repository route with your verified Auth0 subject.
           AWS creates and executes its own plan, then verifies the evidence chain. This does not approve mutations.
         </p>
-        <button onClick={() => void verifyGovernedRead()} disabled={busy || e2eBusy || !auth0Sub || !authReady || !workspaceRole || workspaceRole === 'VIEWER'}
+        <button onClick={() => void verifyGovernedRead()} disabled={busy || e2eBusy || !tokenReady || !auth0Sub || !authReady || !workspaceRole || workspaceRole === 'VIEWER'}
           className="mt-4 rounded-xl border border-indigo-400/50 px-4 py-2 text-sm font-bold text-indigo-200 disabled:opacity-40">
           {e2eBusy ? 'Verifying…' : 'Run user-bound governed read E2E'}
         </button>
@@ -208,6 +239,7 @@ export default function DsgIdentityBridge() {
         <p className="mt-2 text-xs text-slate-300">Next action: {workspaceRole === 'VIEWER' ? 'Ask your workspace administrator for the replay:verify permission. No provider read has been started.' : e2eNextAction}</p>
         {e2eProof && <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-words text-xs text-slate-300">{e2eProof}</pre>}
       </div>
+      <p className="mt-3 text-xs text-slate-400">Refresh is automatic while this browser session retains its memory-only token and the Auth0 client allows rotating refresh tokens. Closing/reloading the page or revoking the grant may require one explicit sign-in. ChatGPT's own plugin connection is separate.</p>
       <p className="mt-3 text-xs text-amber-200">Autonomous Level readout and this account link are not proof that governed N2N execution has succeeded.</p>
     </section>
   );
