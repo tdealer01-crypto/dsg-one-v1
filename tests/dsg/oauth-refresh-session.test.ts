@@ -27,6 +27,7 @@ describe('DSG memory-only Auth0 token renewal without reconnect loop', () => {
   });
 
   it('classifies a revoked/missing refresh token without leaking provider messages', () => {
+    expect(classifyAuth0SessionFailure(new Error('AUTH0_NO_DELEGATED_TOKEN'))).toBe('AUTH0_REFRESH_NOT_AVAILABLE');
     for (const error of ['invalid_grant', 'missing_refresh_token', 'login_required', 'consent_required']) {
       expect(classifyAuth0SessionFailure({ error, error_description: 'secret-value' }))
         .toBe('AUTH0_REFRESH_NOT_AVAILABLE');
