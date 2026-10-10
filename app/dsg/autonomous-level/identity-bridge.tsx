@@ -169,7 +169,11 @@ export default function DsgIdentityBridge() {
       // refresh-token cache. No JWT or refresh token is persisted by DSG.
       let accessToken: string;
       try {
-        accessToken = await authClient.current.getTokenSilently();
+        const candidate = await authClient.current.getTokenSilently();
+        if (typeof candidate !== 'string' || candidate.length === 0) {
+          throw { error: 'missing_refresh_token' };
+        }
+        accessToken = candidate;
       } catch (error) {
         setTokenReady(false);
         if (classifyAuth0SessionFailure(error) === 'AUTH0_REFRESH_NOT_AVAILABLE') {
