@@ -13,6 +13,7 @@ export type VerifiedAuth0Principal = {
   issuer: string;
   clientId: string;
   scope: 'dsg.use' | 'dsg.approve';
+  hasApprovalScope: boolean;
 };
 
 export async function verifyDsgAuth0Principal(token: unknown, requiredScope: 'dsg.use' | 'dsg.approve' = 'dsg.use'): Promise<VerifiedAuth0Principal | null> {
@@ -29,7 +30,7 @@ export async function verifyDsgAuth0Principal(token: unknown, requiredScope: 'ds
     if (payload.azp !== DSG_AUTH0_CLIENT_ID) return null;
     if (!payload.exp || !payload.iat || payload.iat > Date.now() / 1000 + 5) return null;
     if (typeof payload.scope !== 'string' || !payload.scope.split(' ').includes(requiredScope)) return null;
-    return { subject: payload.sub, issuer: DSG_AUTH0_ISSUER, clientId: DSG_AUTH0_CLIENT_ID, scope: requiredScope };
+    return { subject: payload.sub, issuer: DSG_AUTH0_ISSUER, clientId: DSG_AUTH0_CLIENT_ID, scope: requiredScope, hasApprovalScope: payload.scope.split(' ').includes('dsg.approve') };
   } catch {
     return null;
   }
