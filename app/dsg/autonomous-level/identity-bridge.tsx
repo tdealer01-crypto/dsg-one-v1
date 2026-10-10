@@ -243,7 +243,7 @@ export default function DsgIdentityBridge() {
         <p className="mt-2 text-xs text-slate-300">Next action: {workspaceRole === 'VIEWER' ? 'Ask your workspace administrator for the replay:verify permission. No provider read has been started.' : e2eNextAction}</p>
         {e2eProof && <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-words text-xs text-slate-300">{e2eProof}</pre>}
       </div>
-      <p className="mt-3 text-xs text-slate-400">Refresh is automatic while this browser session retains its memory-only token and the Auth0 client allows rotating refresh tokens. Closing/reloading the page or revoking the grant may require one explicit sign-in. ChatGPT's own plugin connection is separate.</p>
+      <p className="mt-3 text-xs text-slate-400">Refresh is automatic while this browser session retains its memory-only token and the Auth0 client allows rotating refresh tokens. Closing/reloading the page or revoking the grant may require one explicit sign-in. The ChatGPT plugin connection is separate.</p>
       <p className="mt-3 text-xs text-amber-200">Autonomous Level readout and this account link are not proof that governed N2N execution has succeeded.</p>
     </section>
   );
