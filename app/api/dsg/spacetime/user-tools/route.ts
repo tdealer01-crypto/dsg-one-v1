@@ -171,6 +171,7 @@ export async function POST(request: NextRequest) {
   const requiredScope = HUMAN_APPROVER_TOOLS.has(body.tool) ? 'dsg.approve' : 'dsg.use';
   const verified = await verifyDsgAuth0Principal(body.accessToken, requiredScope);
   if (!verified) return result(401, { ok: false, error: 'USER_AUTH0_TOKEN_NOT_VERIFIED' });
+  if (verified.scope !== requiredScope) return result(403, { ok: false, error: 'APPROVER_SCOPE_REQUIRED' });
   // A verified approve-class credential cannot be used for agent tools.
   if (requiredScope === 'dsg.use' && verified.hasApprovalScope) {
     return result(403, { ok: false, error: 'APPROVER_TOKEN_NOT_AGENT_CREDENTIAL' });
