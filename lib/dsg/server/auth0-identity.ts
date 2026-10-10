@@ -12,10 +12,11 @@ export type VerifiedAuth0Principal = {
   subject: string;
   issuer: string;
   clientId: string;
-  scope: 'dsg.use';
+  scope: 'dsg.use' | 'dsg.approve';
+  hasApprovalScope?: boolean;
 };
 
-export async function verifyDsgAuth0Principal(token: unknown): Promise<VerifiedAuth0Principal | null> {
+export async function verifyDsgAuth0Principal(token: unknown, requiredScope: 'dsg.use' | 'dsg.approve' = 'dsg.use'): Promise<VerifiedAuth0Principal | null> {
   if (typeof token !== 'string' || token.length < 100 || token.length > 15000) return null;
   try {
     const { payload } = await jwtVerify(token, jwks, {
@@ -28,8 +29,10 @@ export async function verifyDsgAuth0Principal(token: unknown): Promise<VerifiedA
     // Audience alone is not sufficient when multiple websites share the same Auth0 tenant.
     if (payload.azp !== DSG_AUTH0_CLIENT_ID) return null;
     if (!payload.exp || !payload.iat || payload.iat > Date.now() / 1000 + 5) return null;
-    if (typeof payload.scope !== 'string' || !payload.scope.split(' ').includes('dsg.use')) return null;
-    return { subject: payload.sub, issuer: DSG_AUTH0_ISSUER, clientId: DSG_AUTH0_CLIENT_ID, scope: 'dsg.use' };
+    if (typeof payload.scope !== 'string') return null;
+    if (requiredScope === 'dsg.use' && !payload.scope.split(' ').includes('dsg.use')) return null;
+    if (requiredScope === 'dsg.approve' && !payload.scope.split(' ').includes('dsg.approve')) return null;
+    return { subject: payload.sub, issuer: DSG_AUTH0_ISSUER, clientId: DSG_AUTH0_CLIENT_ID, scope: requiredScope, hasApprovalScope: payload.scope.split(' ').includes('dsg.approve') };
   } catch {
     return null;
   }
