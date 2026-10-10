@@ -143,7 +143,7 @@ export default function DsgIdentityBridge() {
   async function connect() {
     if (!authClient.current) return;
     setBusy(true);
-    setTokenReady(false);
+    // A failed redirect must not revoke a still-valid memory-only token.
     setMessage('Redirecting to the shared Auth0 Universal Login (PKCE) once, at your request...');
     try {
       await authClient.current.loginWithRedirect({
@@ -152,7 +152,7 @@ export default function DsgIdentityBridge() {
     } catch {
       setBusy(false);
       setStatus('AUTH0_REDIRECT_FAILED');
-      setMessage('Auth0 redirect could not be started. No account link was written.');
+      setMessage('Auth0 redirect could not be started. Existing valid delegated tokens remain usable; no account link was written.');
     }
   }
 
@@ -178,8 +178,11 @@ export default function DsgIdentityBridge() {
         setTokenReady(false);
         if (classifyAuth0SessionFailure(error) === 'AUTH0_REFRESH_NOT_AVAILABLE') {
           setStatus('AUTH0_REAUTH_REQUIRED');
+          setMessage('The delegated Auth0 token could not be renewed. Resume the session once with the Auth0 button; the existing DSG account link is preserved.');
           throw new Error('AUTH0_REAUTH_REQUIRED');
         }
+        setStatus('AUTH0_TOKEN_UNAVAILABLE');
+        setMessage('The Auth0 delegated token is unavailable. Check the existing Auth0 application configuration and connectivity; repeated login attempts will not repair invalid_client.');
         throw new Error('AUTH0_DELEGATED_TOKEN_UNAVAILABLE');
       }
       async function tool(toolName: string): Promise<ToolBridgeResponse> {
