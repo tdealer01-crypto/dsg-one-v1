@@ -51,12 +51,14 @@ describe('Unified DSG integration read-only gateway', () => {
     expect(data.user_oauth_e2e).toBe('NOT_VERIFIED');
     expect(data.provider_execution_e2e).toBe('NOT_VERIFIED');
     expect(data.historical_readonly_e2e).toMatchObject({
-      state: 'HISTORICAL_VERIFIED',
+      state: 'REVIEW',
+      historical_result: 'PASS',
       accepted_on: '2026-10-11',
       provider_route: 'route.github-public.repo-metadata-read',
       approval_required: false,
-      evidence_chain_at_acceptance: 139,
+      evidence_chain_observed_20261011: 140,
     });
+    expect(data.historical_readonly_e2e.nextAction).toContain('fresh signed-in website');
     expect(data.historical_readonly_e2e.does_not_prove).toContain('whole_system_e2e');
     expect(data.historical_readonly_e2e.does_not_prove).toContain('cinema_remote_connect_execute');
     expect(data.owner_service_credential_substitution).toBe('FORBIDDEN');
