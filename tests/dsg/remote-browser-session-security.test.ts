@@ -5,6 +5,7 @@ import {
   getRemoteBrowserSession,
   appendRemoteBrowserNavigation,
   addRemoteBrowserArtifact,
+  addRemoteBrowserCheckpoint,
   resolveRemoteBrowserCheckpoint,
 } from '../../lib/dsg/remote-browser/session-store';
 import {GET as listSessions, POST as createSession} from '../../app/api/dsg/remote-browser/sessions/route';
@@ -55,6 +56,28 @@ describe('DSG remote-browser draft session security', () => {
     expect(() => resolveRemoteBrowserCheckpoint({
       sessionId: session.id, owner, checkpointId: session.checkpoints[0]!.id,
     })).toThrow('REMOTE_BROWSER_PROVIDER_EXECUTION_NOT_VERIFIED');
+  });
+
+  it('keeps blocked navigations and manually authored notes distinct from real provider evidence', () => {
+    const session = createRemoteBrowserSession({
+      goal: 'a real browser state must be proven', startUrl: 'https://example.com', providerId: 'playwright',
+    }, owner);
+    appendRemoteBrowserNavigation({
+      sessionId: session.id, owner, action: 'navigate', status: 'blocked',
+      url: 'https://example.com/not-visited', detail: 'approval missing',
+    });
+    expect(getRemoteBrowserSession(session.id, owner).currentUrl).toBe('https://example.com');
+    addRemoteBrowserArtifact({
+      sessionId: session.id, owner, type: 'manual_note', status: 'available',
+      title: 'human observation', detail: 'not an executor screenshot',
+    });
+    const latest = getRemoteBrowserSession(session.id, owner).navigationLog.at(-1);
+    expect(latest?.action).toBe('note');
+    expect(latest?.status).toBe('completed');
+    expect(() => addRemoteBrowserCheckpoint({
+      sessionId: session.id, owner, type: 'takeover', state: 'resolved',
+      instruction: 'pretend approval completed',
+    })).toThrow('REMOTE_BROWSER_CHECKPOINT_RESOLUTION_NOT_VERIFIED');
   });
 
   it('rejects unauthenticated access before reading or mutating any session endpoint', async () => {
