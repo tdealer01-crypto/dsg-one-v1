@@ -17,8 +17,9 @@ type IntegrationStatus = {
   user_oauth_e2e: string;
   provider_execution_e2e: string;
   historical_readonly_e2e: {
-    state: string; scope: string; accepted_on: string; provider_route: string;
-    evidence_chain_at_acceptance: number; source: string; does_not_prove: string[];
+    state: 'REVIEW'; historical_result: 'PASS'; nextAction: string;
+    scope: string; accepted_on: string; provider_route: string;
+    evidence_chain_observed_20261011: number; source: string; does_not_prove: string[];
   };
   surfaces: { workroom: { state: string }; goal_first_lab: { state: string }; execution_evidence: { state: string }; spacetime: { state: string }; dsg_one: { state: string } };
 };
@@ -230,7 +231,7 @@ export default function DsgAccessPage() {
                 These are not verified by anonymous metadata probes. Never substitute Site/Owner service credentials for the signed-in user&apos;s Auth0 identity.
               </div>
               <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
-                <div className="font-bold">Previously verified signed read-only production E2E · {integrations.historical_readonly_e2e.accepted_on}</div>
+                <div className="font-bold">Previously verified signed read-only production E2E · {integrations.historical_readonly_e2e.historical_result} (dated {integrations.historical_readonly_e2e.accepted_on})</div>
                 <div className="mt-1 text-xs leading-5">Scope: {integrations.historical_readonly_e2e.scope}. This is a dated verified acceptance, not a fresh OAuth operation in this website session. Cinema Connect/Execute, Quest/Unity and whole-system E2E are NOT VERIFIED.</div>
                 <a href={integrations.historical_readonly_e2e.source} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex text-xs font-bold underline underline-offset-2">Read public evidence</a>
               </div>
