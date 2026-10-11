@@ -88,12 +88,15 @@ export async function GET(request: Request) {
     // Independently verified earlier production acceptance, explicitly separate
     // from the live/current-session metadata probes and high-risk Cinema routes.
     historical_readonly_e2e: {
-      state: 'HISTORICAL_VERIFIED',
+      state: 'REVIEW',
+      historical_result: 'PASS',
+      nextAction: 'Only a fresh signed-in website user/provider execution can upgrade current-session OAuth; the previously verified low-risk read-only acceptance is already complete.',
       scope: 'real user OAuth → governed GitHub public metadata READ-ONLY → signed Provider v2 Ed25519 receipt',
       accepted_on: '2026-10-11',
       provider_route: 'route.github-public.repo-metadata-read',
       approval_required: false,
-      evidence_chain_at_acceptance: 139,
+      evidence_chain_observed_20261011: 140,
+      evidence_chain_note: 'Signed execution acceptance advanced 137 to 139; authenticated readback subsequently observed valid chain at 140 records.',
       source: 'https://dsg-3.gitbook.io/dsg-docs/control-plane/',
       does_not_prove: ['current_website_session_oauth', 'cinema_remote_connect_execute', 'unity_quest_runtime', 'whole_system_e2e'],
     },
