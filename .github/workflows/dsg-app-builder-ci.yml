@@ -17,7 +17,8 @@ permissions:
   actions: read
 
 concurrency:
-  group: dsg-app-builder-ci
+  # Keep pull-request and main builds independent; cancel superseded runs only on the same ref.
+  group: dsg-app-builder-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
