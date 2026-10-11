@@ -32,7 +32,10 @@ describe('public closure live proof boundary', () => {
     expect(states['xr-governance-component']).toBe('HISTORICAL_VERIFIED');
     expect(states['unity-runtime']).toBe('NOT_VERIFIED');
     expect(states['quest-hands']).toBe('NOT_VERIFIED');
-    expect(states['user-oauth']).toBe('NOT_VERIFIED');
+    expect(states['user-oauth']).toBe('HISTORICAL_VERIFIED');
+    const signedRead = body.checks.find((c: {id: string}) => c.id === 'user-oauth');
+    expect(signedRead.source).toContain('/actions/runs/38140811436');
+    expect(signedRead.detail).toContain('not a live user OAuth probe');
   });
 
   it('fails closed on a source mismatch and OAuth metadata mismatch', async () => {
@@ -49,6 +52,7 @@ describe('public closure live proof boundary', () => {
     const body = await (await GET()).json();
     expect(body.checks.slice(0, 3).every((c: {state: string}) => c.state === 'NOT_VERIFIED')).toBe(true);
     expect(body.overall_e2e).toBe('NOT_VERIFIED');
+    expect(body.checks.find((c: {id: string}) => c.id === 'user-oauth').state).toBe('HISTORICAL_VERIFIED');
   });
 
   it('does not turn network failures into PASS', async () => {
