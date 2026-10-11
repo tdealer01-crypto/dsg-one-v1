@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DSG OS Adapter Builder</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui,sans-serif; }
+    body { margin:0; background:#0f1117; color:#e6e6e6; }
+    main { max-width:980px; margin:auto; padding:20px; }
+    textarea,pre { width:100%; box-sizing:border-box; background:#151823; color:#e6e6e6; border:1px solid #2e344d; padding:12px; }
+    textarea { min-height:360px; resize:vertical; }
+    button { margin:12px 8px 12px 0; padding:9px 14px; background:#2e344d; color:white; border:0; cursor:pointer; }
+    #status[data-state="ok"] { color:#89d185; }
+    #status[data-state="error"] { color:#f48771; }
+    small { color:#a8b0c2; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>DSG OS Adapter Builder</h1>
+  <p>Compile a provider definition into a deterministic Spacetime Route contract. This page does not execute providers or grant permissions.</p>
+  <textarea id="input" spellcheck="false"></textarea>
+  <div>
+    <button id="compile">Compile Adapter Contract</button>
+  </div>
+  <p id="status">Ready.</p>
+  <pre id="output" hidden></pre>
+  <small>Execution remains: DSG OS → Spacetime → approval/payload binding → Provider Adapter v2 → provider → evidence/attestation.</small>
+</main>
+<script type="module">
+import { compileAdapterContract, compileAdapterCatalog } from './adapter-builder.js';
+const input=document.getElementById('input');
+const output=document.getElementById('output');
+const status=document.getElementById('status');
+input.value=JSON.stringify({
+  adapter_id:'browser-read-v2',
+  provider_type:'browser',
+  capability:'browser.remote.read',
+  route_id:'route.browser.example.read',
+  source_node:'node.agent',
+  target_node:'node.browser',
+  risk:'medium',
+  required_scopes:['browser:read'],
+  approval_required:false,
+  bind_payload:true,
+  signed_approval_required:false,
+  input_schema:{type:'object'},
+  output_schema:{type:'object',required:['ok'],properties:{ok:{const:true}}},
+  result_verifier:'provider_readback',
+  evidence_mapping:{}
+},null,2);
+document.getElementById('compile').addEventListener('click', async()=>{
+  try {
+    const parsed=JSON.parse(input.value);
+    const compiled=Array.isArray(parsed.contracts)
+      ? await compileAdapterCatalog(parsed)
+      : await compileAdapterContract(parsed);
+    output.textContent=JSON.stringify(compiled,null,2);
+    output.hidden=false;
+    status.dataset.state='ok';
+    status.textContent=Array.isArray(parsed.contracts)
+      ? 'COMPILED CATALOG — register these Routes through DSG Spacetime.'
+      : 'COMPILED — register this Route through DSG Spacetime.';
+  } catch (error) {
+    output.hidden=true;
+    status.dataset.state='error';
+    status.textContent='BLOCK — '+(error.code || error.message);
+  }
+});
+</script>
+</body>
+</html>
