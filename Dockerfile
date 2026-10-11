@@ -51,7 +51,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/automation_spacetime ./automation_spacetime
 COPY --from=builder /app/scripts/dsg-one-container-entrypoint.sh /usr/local/bin/dsg-one-container-entrypoint
 
-RUN apk add --no-cache ca-certificates python3 py3-pip \
+# Install only Alpine's patched zlib (CVE-2026-85091), fail closed if unavailable.
+# The minimum package constraint is validated by apk during the Docker build.
+RUN apk add --no-cache 'zlib>=1.3.2-r1' ca-certificates python3 py3-pip \
     && python3 -m venv /opt/dsg-automation \
     && /opt/dsg-automation/bin/pip install --no-cache-dir -r /app/automation_spacetime/requirements.txt \
     && chmod 0755 /usr/local/bin/dsg-one-container-entrypoint
