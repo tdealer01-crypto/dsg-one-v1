@@ -57,6 +57,8 @@ export type RemoteBrowserCheckpoint = {
 
 export type RemoteBrowserSession = {
   id: string;
+  ownerActorId: string;
+  workspaceId: string;
   providerId: RemoteBrowserProviderId;
   status: RemoteBrowserSessionStatus;
   goal: string;
