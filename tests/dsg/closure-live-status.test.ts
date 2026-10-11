@@ -34,7 +34,7 @@ describe('public closure live proof boundary', () => {
     expect(states['quest-hands']).toBe('NOT_VERIFIED');
     expect(states['user-oauth']).toBe('HISTORICAL_VERIFIED');
     const signedRead = body.checks.find((c: {id: string}) => c.id === 'user-oauth');
-    expect(signedRead.source).toContain('/actions/runs/38140811436');
+    expect(signedRead.source).toBe('https://dsg-3.gitbook.io/dsg-docs/control-plane/');
     expect(signedRead.detail).toContain('not a live user OAuth probe');
   });
 
