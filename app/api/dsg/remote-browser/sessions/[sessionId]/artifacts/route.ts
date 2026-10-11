@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
+import { authorizeRemoteBrowser } from '@/lib/dsg/remote-browser/http-auth';
 import { addRemoteBrowserArtifact, getRemoteBrowserSession } from '@/lib/dsg/remote-browser/session-store';
 import type { RemoteBrowserArtifact } from '@/lib/dsg/remote-browser/types';
 
 type RouteContext = { params: Promise<{ sessionId: string }> };
 
-export async function GET(_req: Request, context: RouteContext) {
+export async function GET(req: Request, context: RouteContext) {
+  const auth = await authorizeRemoteBrowser(req.headers, 'job:read');
+  if (!auth.ok) return auth.response;
   const { sessionId } = await context.params;
   try {
-    const session = getRemoteBrowserSession(sessionId);
+    const session = getRemoteBrowserSession(sessionId, auth.actor);
     return NextResponse.json({ ok: true, data: { artifacts: session.artifacts } });
   } catch (error) {
     return NextResponse.json({ ok: false, error: { message: error instanceof Error ? error.message : 'REMOTE_BROWSER_SESSION_NOT_FOUND' } }, { status: 404 });
@@ -15,6 +18,8 @@ export async function GET(_req: Request, context: RouteContext) {
 }
 
 export async function POST(req: Request, context: RouteContext) {
+  const auth = await authorizeRemoteBrowser(req.headers, 'job:control');
+  if (!auth.ok) return auth.response;
   const { sessionId } = await context.params;
   const body = await req.json().catch(() => null) as Partial<RemoteBrowserArtifact> | null;
   const title = typeof body?.title === 'string' ? body.title.trim() : '';
@@ -27,7 +32,7 @@ export async function POST(req: Request, context: RouteContext) {
   if (!detail) return NextResponse.json({ ok: false, error: { message: 'ARTIFACT_DETAIL_REQUIRED' } }, { status: 400 });
 
   try {
-    const session = addRemoteBrowserArtifact({ sessionId, type, status, title, detail, url });
+    const session = addRemoteBrowserArtifact({ sessionId, owner: auth.actor, type, status, title, detail, url });
     return NextResponse.json({ ok: true, data: { session } });
   } catch (error) {
     return NextResponse.json({ ok: false, error: { message: error instanceof Error ? error.message : 'REMOTE_BROWSER_ARTIFACT_FAILED' } }, { status: 400 });
