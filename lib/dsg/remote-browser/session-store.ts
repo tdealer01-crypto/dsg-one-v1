@@ -92,7 +92,7 @@ export function appendRemoteBrowserNavigation(input: {
     throw new Error('REMOTE_BROWSER_PROVIDER_EXECUTION_NOT_VERIFIED');
   }
   session.navigationLog.push(event({ action: input.action, status: input.status, url: input.url, detail: input.detail }));
-  session.currentUrl = input.url ?? session.currentUrl;
+  // A failed or blocked browser action did not navigate the provider.
   session.status = input.status === 'blocked' ? 'blocked' : input.status === 'failed' ? 'failed' : session.status;
   session.updatedAt = now();
   sessions.set(session.id, session);
@@ -113,7 +113,12 @@ export function addRemoteBrowserArtifact(input: Omit<RemoteBrowserArtifact, 'id'
     url: input.url,
     createdAt: now(),
   });
-  session.navigationLog.push(event({ action: 'screenshot.request', status: input.status === 'available' ? 'completed' : input.status, detail: input.detail, url: input.url }));
+  session.navigationLog.push(event({
+    action: input.type === 'manual_note' ? 'note' : 'screenshot.request',
+    status: input.type === 'manual_note' ? 'completed' : input.status === 'failed' ? 'failed' : 'blocked',
+    detail: input.detail,
+    url: input.url,
+  }));
   session.updatedAt = now();
   sessions.set(session.id, session);
   return session;
@@ -121,6 +126,7 @@ export function addRemoteBrowserArtifact(input: Omit<RemoteBrowserArtifact, 'id'
 
 export function addRemoteBrowserCheckpoint(input: Omit<RemoteBrowserCheckpoint, 'id' | 'createdAt'> & { sessionId: string; owner: BrowserSessionOwner }): RemoteBrowserSession {
   const session = getRemoteBrowserSession(input.sessionId, input.owner);
+  if (input.state === 'resolved') throw new Error('REMOTE_BROWSER_CHECKPOINT_RESOLUTION_NOT_VERIFIED');
   session.checkpoints.push({
     id: id('checkpoint'),
     type: input.type,
@@ -130,7 +136,7 @@ export function addRemoteBrowserCheckpoint(input: Omit<RemoteBrowserCheckpoint, 
     createdAt: now(),
   });
   session.status = input.state === 'active' ? 'blocked' : session.status;
-  session.navigationLog.push(event({ action: 'checkpoint.create', status: input.state === 'active' ? 'blocked' : 'completed', detail: input.instruction }));
+  session.navigationLog.push(event({ action: 'checkpoint.create', status: 'blocked', detail: input.instruction }));
   session.updatedAt = now();
   sessions.set(session.id, session);
   return session;
