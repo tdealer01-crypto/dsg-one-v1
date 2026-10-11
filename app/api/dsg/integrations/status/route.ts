@@ -81,8 +81,22 @@ export async function GET(request: Request) {
       dsg_one: { state: dsgOne.state, health: dsgOne },
       chatgpt_mobile_custom_mcp: { state: 'HOST_SUPPORT_NOT_VERIFIED' },
     },
+    // These two fields reflect the CURRENT website session (this endpoint
+    // only probes metadata and health, never obtains delegated Auth0 OAuth).
     user_oauth_e2e: 'NOT_VERIFIED',
     provider_execution_e2e: 'NOT_VERIFIED',
+    // Independently verified earlier production acceptance, explicitly separate
+    // from the live/current-session metadata probes and high-risk Cinema routes.
+    historical_readonly_e2e: {
+      state: 'HISTORICAL_VERIFIED',
+      scope: 'real user OAuth → governed GitHub public metadata READ-ONLY → signed Provider v2 Ed25519 receipt',
+      accepted_on: '2026-10-11',
+      provider_route: 'route.github-public.repo-metadata-read',
+      approval_required: false,
+      evidence_chain_at_acceptance: 139,
+      source: 'https://dsg-3.gitbook.io/dsg-docs/control-plane/',
+      does_not_prove: ['current_website_session_oauth', 'cinema_remote_connect_execute', 'unity_quest_runtime', 'whole_system_e2e'],
+    },
     owner_service_credential_substitution: 'FORBIDDEN',
   }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
 }
