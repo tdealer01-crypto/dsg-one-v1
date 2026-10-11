@@ -95,7 +95,7 @@ async function probeAnonymousMcp(): Promise<Check> {
     await response.body?.cancel().catch(() => undefined);
     return { id: 'anonymous-mcp', label: 'Anonymous MCP access control',
       state: valid ? 'VERIFIED' : 'NOT_VERIFIED',
-      detail: valid ? 'Anonymous GET rejected with HTTP 401 (fail closed); signed-in user flow still not verified' : 'Expected HTTP 401 denial was not observed',
+      detail: valid ? 'Anonymous GET rejected with HTTP 401 (fail closed). This check cannot establish user E2E; an independently verified signed read-only user acceptance is separately dated below.' : 'Expected HTTP 401 denial was not observed',
       source: MCP_URL };
   } catch {
     return { id: 'anonymous-mcp', label: 'Anonymous MCP access control', state: 'NOT_VERIFIED',
@@ -141,10 +141,10 @@ export async function GET() {
     },
     {
       id: 'user-oauth',
-      label: 'User-bound Auth0 → AWS provider read E2E',
-      state: 'NOT_VERIFIED',
-      detail: 'Requires a user-initiated signed-in session and fresh provider receipt with route, plan hash, evidence hash and verified chain; anonymous probes cannot satisfy this',
-      source: 'https://dsg.pics/dsg/autonomous-level',
+      label: 'User OAuth → GitHub metadata read-only signed Provider E2E (11 Oct 2026)',
+      state: 'HISTORICAL_VERIFIED',
+      detail: 'Scoped production E2E independently verified 11 Oct: real OAuth subject, plan 001fcbffc7c75447b2dbae69d2e751f49c6aff025ae84561a0db542abe46527d, signed record a38db675165c5f5cb3ea6aaed31afd471e200f84a4a3064b025d9db1c483a2d8 and provider result a6108fa91c03853aafe75c03812441da63c231356cfa3ec19c4f9539c35f1fdb. Independent Android SHA/Ed25519 plus public-key pin and tamper denial PASS. Authenticated MCP evidence chain was valid with 140 records when observed on 11 Oct. This is a dated acceptance, not a live user OAuth probe and not Cinema E2E.',
+      source: 'https://github.com/tdealer01-crypto/DSG-Private-Production-Runtime/actions/runs/38140811436',
     },
   ];
   return NextResponse.json({
@@ -153,7 +153,7 @@ export async function GET() {
     observed_at: new Date().toISOString(),
     authority: 'AWS_ONLY',
     overall_e2e: 'NOT_VERIFIED',
-    check_type: 'LIVE_PUBLIC_READ_ONLY_PROBES_PLUS_HISTORICAL_SOURCE_CLASSIFICATION',
+    check_type: 'LIVE_PUBLIC_READ_ONLY_PROBES_PLUS_DATED_SIGNED_READONLY_ACCEPTANCE',
     checks,
     oauth_user_action: '/dsg/autonomous-level',
     warnings: [
