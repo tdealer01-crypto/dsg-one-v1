@@ -46,6 +46,7 @@ export default function HomePage() {
           </Link>
 
           <nav className="hidden items-center gap-2 md:flex">
+            <Link href="/architecture-3d.html" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-300 hover:bg-slate-800 hover:text-white">3D architecture</Link>
             <a href="#how-it-works" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white">
               How it works
             </a>
@@ -90,6 +91,10 @@ export default function HomePage() {
             </Link>
             <Link href="/login?next=/dsg/verify" className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-900/60 px-6 py-3.5 text-sm font-bold text-slate-200 hover:border-cyan-300/50 hover:bg-slate-800">
               Verify one AI action
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+            <Link href="/architecture-3d.html" className="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/30 bg-cyan-950/40 px-6 py-3.5 text-sm font-bold text-cyan-200 hover:border-cyan-300 hover:bg-cyan-950/70">
+              Explore 3D architecture
               <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>
@@ -140,6 +145,21 @@ export default function HomePage() {
             <p className="mt-4 text-sm leading-7 text-slate-300">
               A proof receipt shows that a governed flow was evaluated. It does not claim production readiness, deployment, certification, or marketplace approval unless separate evidence proves those states.
             </p>
+          </div>
+        </section>
+
+        <section aria-labelledby="public-architecture-heading" className="rounded-3xl border border-cyan-500/20 bg-slate-900/80 p-7 sm:p-9">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-2xl">
+              <p className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.22em] text-cyan-300"><LayoutTemplate className="h-4 w-4" /> Public interactive architecture</p>
+              <h2 id="public-architecture-heading" className="mt-3 text-2xl font-black sm:text-3xl">Explore the five trust domains in 3D.</h2>
+              <p className="mt-3 text-sm leading-7 text-slate-300">A no-login, interactive architecture explainer covering Proposal, Proof, Authority, Execution and Evidence, with a dated 11 October 2026 AWS deployment evidence snapshot.</p>
+              <p className="mt-2 text-xs leading-6 text-amber-200/80">Spacetime image and health verified; signed-in OAuth provider E2E, Spacetime Workroom state and full-system acceptance remain unverified or unavailable. Not live telemetry.</p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-3">
+              <Link href="/architecture-3d.html" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 hover:bg-cyan-200">Open 3D model <ArrowUpRight className="h-4 w-4" /></Link>
+              <a href="https://dsg-3.gitbook.io/dsg-docs/control-plane/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-200 hover:border-cyan-400/50">Public status docs <ArrowUpRight className="h-4 w-4" /></a>
+            </div>
           </div>
         </section>
 
