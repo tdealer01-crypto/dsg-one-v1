@@ -138,8 +138,10 @@ export function addRemoteBrowserCheckpoint(input: Omit<RemoteBrowserCheckpoint, 
 
 export function resolveRemoteBrowserCheckpoint(input: { sessionId: string; owner: BrowserSessionOwner; checkpointId: string; detail?: string }): RemoteBrowserSession {
   const session = getRemoteBrowserSession(input.sessionId, input.owner);
-  // This in-process store is a draft only, never an approved executor.
-  throw new Error('REMOTE_BROWSER_PROVIDER_EXECUTION_NOT_VERIFIED');
+  // A blocked draft cannot be resumed as a live session without verified provider execution.
+  if (session.status !== 'running') {
+    throw new Error('REMOTE_BROWSER_PROVIDER_EXECUTION_NOT_VERIFIED');
+  }
   const checkpoint = session.checkpoints.find((item) => item.id === input.checkpointId);
   if (!checkpoint) throw new Error('REMOTE_BROWSER_CHECKPOINT_NOT_FOUND');
   checkpoint.state = 'resolved';
