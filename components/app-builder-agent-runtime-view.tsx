@@ -95,8 +95,7 @@ export function AppBuilderAgentRuntimeView() {
       ...init,
       headers: {
         'content-type': 'application/json',
-        'x-dsg-workspace-id': workspaceId.trim(),
-        'x-dsg-actor-id': actorId.trim(),
+        // Authentication and workspace scope are verified server-side.
         ...(init?.headers || {}),
       },
     });
