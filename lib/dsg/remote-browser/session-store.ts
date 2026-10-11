@@ -33,7 +33,7 @@ export function createRemoteBrowserSession(input: RemoteBrowserCreateSessionInpu
     workspaceId: owner.workspaceId,
     providerId: provider.id,
     // Env presence is not an executor proof: all current adapters are unverified drafts.
-    status: provider.status === 'configured' ? 'created' : 'blocked',
+    status: 'blocked',
     goal: input.goal,
     startUrl: input.startUrl,
     currentUrl: input.startUrl,
@@ -42,7 +42,7 @@ export function createRemoteBrowserSession(input: RemoteBrowserCreateSessionInpu
     navigationLog: [
       event({
         action: 'session.create',
-        status: provider.status === 'configured' ? 'completed' : 'blocked',
+        status: 'blocked',
         url: input.startUrl,
         detail: provider.status === 'missing_env'
           ? `Provider ${provider.id} is missing required env: ${provider.requiredEnv.join(', ')}`
@@ -50,8 +50,7 @@ export function createRemoteBrowserSession(input: RemoteBrowserCreateSessionInpu
       }),
     ],
     artifacts: [],
-    checkpoints: provider.status !== 'configured'
-      ? [{
+    checkpoints: [{
           id: id('checkpoint'),
           type: 'takeover',
           state: 'active',
@@ -59,8 +58,7 @@ export function createRemoteBrowserSession(input: RemoteBrowserCreateSessionInpu
             ? `Configure required env for ${provider.label}: ${provider.requiredEnv.join(', ')}`
             : `Provider ${provider.label} executor not verified; use the governed DSG Spacetime/Cinema route after a live acceptance.`,
           createdAt,
-        }]
-      : [],
+        }],
   };
   sessions.set(session.id, session);
   return session;
@@ -90,8 +88,7 @@ export function appendRemoteBrowserNavigation(input: {
 }): RemoteBrowserSession {
   const session = getRemoteBrowserSession(input.sessionId, input.owner);
   // An unverified draft adapter must not accept client-authored successful execution evidence.
-  if (getRemoteBrowserProvider(session.providerId).status !== 'configured' &&
-      (input.status === 'completed' || input.status === 'running')) {
+  if (input.status === 'completed' || input.status === 'running') {
     throw new Error('REMOTE_BROWSER_PROVIDER_EXECUTION_NOT_VERIFIED');
   }
   session.navigationLog.push(event({ action: input.action, status: input.status, url: input.url, detail: input.detail }));
@@ -104,7 +101,7 @@ export function appendRemoteBrowserNavigation(input: {
 
 export function addRemoteBrowserArtifact(input: Omit<RemoteBrowserArtifact, 'id' | 'createdAt'> & { sessionId: string; owner: BrowserSessionOwner }): RemoteBrowserSession {
   const session = getRemoteBrowserSession(input.sessionId, input.owner);
-  if (input.status === 'available' && input.type !== 'manual_note' && getRemoteBrowserProvider(session.providerId).status !== 'configured') {
+  if (input.status === 'available' && input.type !== 'manual_note') {
     throw new Error('REMOTE_BROWSER_ARTIFACT_NOT_VERIFIED');
   }
   session.artifacts.push({
@@ -141,9 +138,8 @@ export function addRemoteBrowserCheckpoint(input: Omit<RemoteBrowserCheckpoint, 
 
 export function resolveRemoteBrowserCheckpoint(input: { sessionId: string; owner: BrowserSessionOwner; checkpointId: string; detail?: string }): RemoteBrowserSession {
   const session = getRemoteBrowserSession(input.sessionId, input.owner);
-  if (getRemoteBrowserProvider(session.providerId).status !== 'configured') {
-    throw new Error('REMOTE_BROWSER_PROVIDER_EXECUTION_NOT_VERIFIED');
-  }
+  // This in-process store is a draft only, never an approved executor.
+  throw new Error('REMOTE_BROWSER_PROVIDER_EXECUTION_NOT_VERIFIED');
   const checkpoint = session.checkpoints.find((item) => item.id === input.checkpointId);
   if (!checkpoint) throw new Error('REMOTE_BROWSER_CHECKPOINT_NOT_FOUND');
   checkpoint.state = 'resolved';
