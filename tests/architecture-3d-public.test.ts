@@ -24,7 +24,7 @@ describe('public interactive DSG architecture', () => {
     expect(html).toContain('Spacetime Workroom store');
     expect(html).toContain('UNAVAILABLE');
     expect(html).toContain('Full-system Production E2E');
-    expect(html).toContain('https://github.com/tdealer01-crypto/DSG-Private-Production-Runtime/actions/runs/38140811436');
+    expect(html).toContain('https://dsg-3.gitbook.io/dsg-docs/control-plane/');
   });
 
   it('links to the public route from the existing homepage', () => {
