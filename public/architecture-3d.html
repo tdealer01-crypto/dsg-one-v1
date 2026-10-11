@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#07111a">
+  <link rel="canonical" href="https://dsg.pics/architecture-3d.html">
+  <meta name="description" content="Explore DSG ONE trust domains in interactive 3D, with evidence-graded AWS deployment status dated 11 October 2026 and explicit OAuth/E2E limitations.">
+  <meta property="og:url" content="https://dsg.pics/architecture-3d.html">
+  <meta property="og:title" content="DSG ONE — Architecture in 3D">
+  <meta property="og:description" content="Five trust domains. One execution authority. Explore governed AI infrastructure in interactive 3D.">
+  <title>DSG ONE — Governed AI Architecture in 3D</title>
+  <style>
+    :root{color-scheme:dark;--ink:#e9f2f4;--muted:#8da7b0;--faint:#5e7985;--bg:#061019;--cyan:#62e5df;--mint:#9fe9b9;--amber:#f0be7c;--stroke:rgba(165,219,232,.16);--card:rgba(13,30,40,.77)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#061019;color:var(--ink);line-height:1.5;overflow-x:hidden}button,a{font:inherit}a{color:inherit;text-decoration:none}button{cursor:pointer}button:focus-visible,a:focus-visible{outline:2px solid var(--cyan);outline-offset:4px}::selection{background:#338d87;color:white}
+    body:before{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;background:radial-gradient(ellipse 55% 40% at 79% 11%,rgba(23,95,98,.13),transparent),radial-gradient(ellipse 40% 35% at 6% 73%,rgba(16,91,109,.08),transparent)}
+    .grain{pointer-events:none;position:fixed;inset:0;z-index:5;opacity:.12;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E")}
+    .wrap{width:min(1320px,calc(100% - 92px));margin-inline:auto}.topbar{height:76px;border-bottom:1px solid var(--stroke);display:flex;align-items:center;justify-content:space-between;position:relative;z-index:10}.logo{display:flex;gap:13px;align-items:center;font-weight:800;letter-spacing:.07em;font-size:16px}.logo-mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(98,229,223,.55);border-radius:10px;background:linear-gradient(145deg,rgba(98,229,223,.15),transparent);color:var(--cyan);font-weight:900;font-size:14px}.logo em{font-style:normal;color:var(--cyan)}.nav{display:flex;align-items:center;gap:30px;font-size:11px;letter-spacing:.15em;font-weight:700;text-transform:uppercase;color:#9fbbc2}.nav a:hover,.foot a:hover{color:var(--cyan)}.nav .external{border:1px solid rgba(142,193,201,.32);padding:10px 16px;border-radius:7px;color:#e8f8f8}.nav .external:hover{border-color:var(--cyan)}
+    .hero{display:grid;grid-template-columns:43% 57%;min-height:658px;padding-top:93px;padding-bottom:71px;gap:12px;align-items:center}.eyebrow{font-size:11px;letter-spacing:.23em;font-weight:760;text-transform:uppercase;color:var(--cyan);display:flex;align-items:center;gap:13px}.eyebrow:before{content:'';height:1px;width:27px;background:var(--cyan)}h1{font-weight:650;letter-spacing:-.063em;line-height:1.04;font-size:clamp(54px,5.2vw,83px);margin:24px 0 24px;max-width:570px}h1 span{color:var(--cyan)}.lead{font-size:17px;line-height:1.78;color:#a3bdc5;max-width:515px;margin:0 0 31px}.hero-actions{display:flex;flex-wrap:wrap;gap:12px}.btn{display:inline-flex;align-items:center;gap:13px;padding:13px 21px;border-radius:8px;border:1px solid transparent;font-size:13px;font-weight:720;letter-spacing:.015em;transition:background .18s,transform .18s,border .18s}.btn:hover{transform:translateY(-2px)}.btn-primary{background:var(--cyan);color:#04151a}.btn-primary:hover{background:#a4f5ed}.btn-outline{border-color:#38515d;color:#d8e9ed;background:rgba(255,255,255,.015)}.btn-outline:hover{border-color:var(--cyan)}.hero-micro{display:flex;align-items:center;gap:9px;margin-top:25px;color:#7896a2;font-size:11px;letter-spacing:.02em}.hero-micro .dot{background:#94e3bb;width:6px;height:6px;border-radius:50%;box-shadow:0 0 10px #94e3bb66}
+    .visual{position:relative;min-width:0;height:565px;margin-left:-20px;background:radial-gradient(ellipse at 51% 45%,rgba(28,83,101,.20),transparent 62%)}.visual:before{content:'';position:absolute;inset:21px 4px 25px;pointer-events:none;border:1px solid rgba(92,167,182,.12);border-radius:18px;background:linear-gradient(155deg,rgba(65,143,152,.045),transparent 60%)}.vtitle{position:absolute;top:42px;left:28px;z-index:2;display:flex;flex-direction:column;gap:5px}.kicker{font-size:10px;font-weight:800;letter-spacing:.18em;color:#80b8bf}.vtitle strong{font-size:16px;letter-spacing:.02em;font-weight:600}.vcorner{position:absolute;right:29px;top:45px;color:#668d9b;font-size:10px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.canvas-wrap{position:absolute;inset:20px 4px 44px;touch-action:pan-y}#architecture{width:100%;height:100%;display:block;cursor:grab;touch-action:pan-y}#architecture.dragging{cursor:grabbing;touch-action:none}.visual-controls{position:absolute;right:26px;bottom:66px;display:flex;gap:8px;z-index:3}.icon-btn{height:34px;min-width:34px;padding:0 10px;border:1px solid #2b5660;border-radius:6px;background:rgba(7,26,36,.88);color:#b6d0d4;font-size:12px}.icon-btn:hover{color:white;border-color:var(--cyan)}.vhelp{position:absolute;left:28px;bottom:72px;color:#658e9a;font-size:10px;letter-spacing:.05em}.visual .coordinates{position:absolute;bottom:25px;left:29px;font:10px ui-monospace,monospace;letter-spacing:.08em;color:#517380}.visual .footmark{position:absolute;bottom:25px;right:30px;font:10px ui-monospace,monospace;color:#517380}
+    .section-head{display:flex;justify-content:space-between;align-items:flex-end;gap:30px;margin:0 0 27px}.index{font:11px ui-monospace,monospace;color:var(--cyan);letter-spacing:.09em}.section-head h2{font-weight:640;font-size:clamp(31px,3.25vw,48px);line-height:1.12;letter-spacing:-.05em;margin:14px 0 0}.section-head p{max-width:385px;color:var(--muted);font-size:13px;line-height:1.75;margin:0 0 4px}.divider{height:1px;background:var(--stroke)}
+    .explorer{padding:50px 0 108px}.explorer-grid{display:grid;grid-template-columns:1.04fr .96fr;gap:16px}.domain-list{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.domain-btn{display:flex;flex-direction:column;min-height:91px;text-align:left;gap:8px;justify-content:space-between;padding:14px;border-radius:9px;border:1px solid #253f49;background:#0d1f29;color:#94acb6;transition:border .15s,background .15s;min-width:0}.domain-btn:hover{border-color:#4c888d}.domain-btn.active{border-color:var(--cyan);background:#12333a;color:white}.domain-btn b{font:700 11px ui-monospace,monospace;color:#66a7af}.domain-btn.active b{color:var(--cyan)}.domain-btn span{font-size:12px;font-weight:680;line-height:1.35}.detail-box{background:linear-gradient(140deg,rgba(22,53,61,.74),rgba(13,28,38,.8));border:1px solid #29434e;border-radius:13px;padding:30px;min-height:263px;display:flex;flex-direction:column;justify-content:space-between}.detail-kicker{font:11px ui-monospace,monospace;color:var(--cyan);letter-spacing:.08em}.detail-box h3{font-size:26px;font-weight:640;letter-spacing:-.035em;margin:13px 0 8px}.detail-box p{color:#a8c0c7;font-size:14px;line-height:1.7;margin:0;max-width:600px}.detail-tag{display:inline-flex;align-self:flex-start;align-items:center;gap:8px;background:#14333a;color:#aeeae2;padding:8px 11px;border:1px solid #315962;border-radius:5px;font:11px ui-monospace,monospace}.detail-tag:before{content:'';width:5px;height:5px;border-radius:50%;background:var(--cyan)}
+    .how{padding:25px 0 115px}.flow-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;margin-top:33px;background:#203842;border:1px solid #203842;border-radius:12px;overflow:hidden}.flow-card{background:#0a1b25;padding:25px 23px;min-height:233px}.flow-num{font:11px ui-monospace,monospace;color:var(--cyan);margin-bottom:41px}.flow-card h3{margin:0 0 10px;font-size:17px;font-weight:650;letter-spacing:-.025em}.flow-card p{font-size:12px;color:#92aeb6;line-height:1.75;margin:0}.flow-arrow{color:var(--cyan);float:right}
+    .rules{padding:2px 0 116px}.rules-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.rule{border:1px solid var(--stroke);background:var(--card);border-radius:12px;padding:28px;min-height:196px}.rule .rule-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:11px}.rule.allow .rule-dot{background:var(--mint);box-shadow:0 0 16px #9fe9b966}.rule.wait .rule-dot{background:var(--amber)}.rule.block .rule-dot{background:#ee8d92}.rule h3{font:700 15px ui-monospace,monospace;letter-spacing:.065em;display:inline}.rule p{font-size:14px;color:#9eb9c1;line-height:1.7;margin:22px 0 0}.rule strong{color:white}
+    .proof{padding:0 0 109px}.proof-panel{display:grid;grid-template-columns:1.1fr .9fr;gap:30px;align-items:center;border:1px solid #31555e;border-radius:17px;padding:47px;background:radial-gradient(circle at 81% 40%,rgba(48,127,116,.13),transparent 41%),linear-gradient(110deg,#102a35,#0b1a25)}.proof h2{font-size:clamp(29px,3.4vw,43px);letter-spacing:-.05em;line-height:1.16;margin:16px 0}.proof p{font-size:14px;max-width:545px;color:#a5c1c7;line-height:1.78}.proof .stamp{border-left:1px solid #30535e;padding-left:30px}.stamp-item{padding:11px 0;border-bottom:1px solid #25454e;display:flex;gap:16px;align-items:center;justify-content:space-between}.stamp-item:last-child{border:none}.stamp-item span{font-size:12px;color:#a5bfc5}.stamp-item strong{font-size:11px;text-align:right;color:#d1e9e8;font-family:ui-monospace,monospace;letter-spacing:.02em}.stamp-item strong.pending{color:var(--amber)}.caption{color:#6f929e;font-size:11px;line-height:1.6;margin-top:13px}.next{padding:3px 0 94px;text-align:center}.next h2{font-size:clamp(35px,4vw,53px);font-weight:650;letter-spacing:-.056em;margin:15px 0}.next p{color:#90b1bc;max-width:660px;margin:0 auto 25px;font-size:15px;line-height:1.7}.next-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}.foot{padding:27px 0 45px;border-top:1px solid var(--stroke);display:flex;justify-content:space-between;gap:20px;align-items:center}.foot .small{font-size:12px;color:#78949e;max-width:600px}.foot .links{display:flex;gap:22px;color:#abc4c9;font-size:12px}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media (max-width:1100px){.hero{grid-template-columns:1fr;gap:5px;padding-top:76px}.hero .copy{max-width:790px}.visual{margin-left:0;height:520px}.explorer-grid{grid-template-columns:1fr}.domain-list{grid-template-columns:repeat(5,1fr)}.flow-grid{grid-template-columns:repeat(3,1fr)}.flow-card{min-height:190px}.flow-num{margin-bottom:23px}}
+    @media (max-width:680px){.wrap{width:min(100% - 34px,600px)}.topbar{height:66px}.nav{gap:11px}.nav a:not(.external){display:none}.nav .external{font-size:10px;padding:9px 11px}.hero{padding-top:57px;padding-bottom:27px;min-height:auto}h1{font-size:clamp(48px,12vw,64px)}.lead{font-size:15px}.visual{height:410px;margin:0 -11px}.visual:before{inset:15px 0 12px}.vtitle{top:31px;left:22px}.vtitle strong{font-size:13px}.vcorner{top:36px;right:21px}.canvas-wrap{inset:9px 0 21px}.visual-controls{right:18px;bottom:38px}.vhelp{left:20px;bottom:43px}.visual .coordinates{bottom:23px;left:20px}.visual .footmark{display:none}.explorer{padding:22px 0 79px}.section-head{display:block}.section-head p{margin-top:13px}.domain-list{display:flex;overflow-x:auto;padding-bottom:7px;scroll-snap-type:x proximity}.domain-btn{min-width:115px;scroll-snap-align:start;min-height:77px}.detail-box{padding:24px;min-height:285px}.detail-box h3{font-size:24px}.flow-grid{grid-template-columns:1fr}.flow-card{min-height:132px;padding:23px}.flow-num{margin-bottom:15px}.how{padding-bottom:70px}.rules{padding-bottom:80px}.rules-grid{grid-template-columns:1fr}.rule{min-height:unset;padding:23px}.proof{padding-bottom:70px}.proof-panel{grid-template-columns:1fr;padding:26px 21px}.proof .stamp{border-left:none;border-top:1px solid #30535e;padding:18px 0 0}.next{padding-bottom:66px}.foot{align-items:flex-start;flex-direction:column}.foot .links{flex-wrap:wrap}.grain{display:none}}
+    @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
+  </style>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+<header class="topbar wrap" id="top"><a class="logo" href="https://dsg.pics/" aria-label="DSG ONE home"><span class="logo-mark">D</span><span>DSG <em>ONE</em></span></a><nav class="nav" aria-label="Main navigation"><a href="#architecture-section">Architecture</a><a href="#process">Workflow</a><a href="#decisions">Authority</a><a href="#evidence">Evidence</a><a class="external" href="https://dsg.pics/" target="_blank" rel="noopener noreferrer">Main website ↗</a></nav></header>
+<main>
+<section class="hero wrap" aria-labelledby="hero-title"><div class="copy"><div class="eyebrow">THE GOVERNED AI CONTROL PLANE</div><h1 id="hero-title">Intelligence moves.<br><span>Authority stays.</span></h1><p class="lead">A decision architecture that separates what AI proposes from what systems may actually execute. Explore the five trust domains behind DSG ONE.</p><div class="hero-actions"><a class="btn btn-primary" href="#architecture-section">Explore the architecture <span aria-hidden="true">↗</span></a><a class="btn btn-outline" href="https://dsg-3.gitbook.io/dsg-docs/control-plane/" target="_blank" rel="noopener noreferrer">Read the engineering brief ↗</a></div><div class="hero-micro"><span class="dot" aria-hidden="true"></span>Architectural model · Interactive 3D · No login required</div></div>
+<div class="visual" aria-label="Interactive 3D diagram of five DSG trust domains"><div class="vtitle"><span class="kicker">SYSTEM / TOPOLOGY_01</span><strong>Five trust domains. One authority.</strong></div><div class="vcorner">DSG // N2N</div><div class="canvas-wrap"><canvas id="architecture" aria-label="Rotate or tap the interactive 3D architecture. A text-based selection is available below." role="img"></canvas></div><div class="vhelp">DRAG TO ORBIT · TAP TO INSPECT</div><div class="visual-controls"><button id="resetView" class="icon-btn" type="button" aria-label="Reset 3D view" title="Reset view">↺</button><button id="toggleMotion" class="icon-btn" type="button" aria-label="Pause diagram animation" aria-pressed="false" title="Pause animation">Ⅱ</button></div><div class="coordinates">CAM / ORBIT_PERSPECTIVE</div><div class="footmark">FIG 01 / DSG_ONE</div></div></section>
+<div class="wrap"><div class="divider"></div></div>
+<section class="explorer wrap" id="architecture-section"><div class="section-head"><div><span class="index">01 / SYSTEM ARCHITECTURE</span><h2>Every layer has a boundary.</h2></div><p>Tap a domain or select a node in the 3D model. The description stays readable even when animation is disabled.</p></div><div class="explorer-grid"><div class="domain-list" id="domainList" role="group" aria-label="Inspect architecture domain"><button type="button" class="domain-btn active" data-domain="0" aria-pressed="true"><b>01</b><span>Proposal</span></button><button type="button" class="domain-btn" data-domain="1" aria-pressed="false"><b>02</b><span>Proof</span></button><button type="button" class="domain-btn" data-domain="2" aria-pressed="false"><b>03</b><span>Authority</span></button><button type="button" class="domain-btn" data-domain="3" aria-pressed="false"><b>04</b><span>Execution</span></button><button type="button" class="domain-btn" data-domain="4" aria-pressed="false"><b>05</b><span>Evidence</span></button></div><article class="detail-box" aria-live="polite"><div><span class="detail-kicker" id="detailNumber">DOMAIN 01 / GENERATE</span><h3 id="detailTitle">Proposal / Agent Brain</h3><p id="detailText">User goals and model agents propose a bounded plan or candidate. The proposal may be optimized or rejected, but the proposer never grants itself execution permission.</p></div><span class="detail-tag" id="detailTag">PROPOSAL ONLY · NO SIDE EFFECTS</span></article></div></section>
+<section class="how wrap" id="process"><div class="section-head"><div><span class="index">02 / OPERATING SEQUENCE</span><h2>From intent to auditable result.</h2></div><p>Each transition has an explicit contract. The route is conceptual—not a claim that any particular live E2E run passed.</p></div><div class="flow-grid"><article class="flow-card"><div class="flow-num">01 <span class="flow-arrow">→</span></div><h3>Propose</h3><p>Capture intent, constraints and candidate plan. Models generate options—not authority.</p></article><article class="flow-card"><div class="flow-num">02 <span class="flow-arrow">→</span></div><h3>Verify</h3><p>Check applicable deterministic constraints and bounded Z3 proof obligations.</p></article><article class="flow-card"><div class="flow-num">03 <span class="flow-arrow">→</span></div><h3>Authorize</h3><p>Spacetime evaluates plan, principal, scope, policy and approval requirements.</p></article><article class="flow-card"><div class="flow-num">04 <span class="flow-arrow">→</span></div><h3>Execute</h3><p>Only permitted steps reach governed AWS API, MCP, browser or tool adapters.</p></article><article class="flow-card"><div class="flow-num">05 <span class="flow-arrow">↺</span></div><h3>Record</h3><p>Attach result, evidence, hashes and replay context. Incomplete proof is not success.</p></article></div></section>
+<section class="rules wrap" id="decisions"><div class="section-head"><div><span class="index">03 / DECISION POLICY</span><h2>Three outcomes. No silent bypass.</h2></div><p>DSG may continue authorized work. Missing permission pauses an in-plan step; unsupported requests fail closed.</p></div><div class="rules-grid"><article class="rule allow"><div><span class="rule-dot"></span><h3>ALLOW</h3></div><p><strong>Within the approved plan.</strong> The scoped step meets required authority, capability, constraints and evidence conditions.</p></article><article class="rule wait"><div><span class="rule-dot"></span><h3>WAITING_PERMISSION</h3></div><p><strong>Still within the plan.</strong> A required permission or capability has not been provisioned. Resume after authorization.</p></article><article class="rule block"><div><span class="rule-dot"></span><h3>BLOCK</h3></div><p><strong>Out-of-plan or unsupported.</strong> Policy violations, missing authority or failed proof cannot be converted to a success claim.</p></article></div></section>
+<section class="proof wrap" id="evidence">
+  <div class="proof-panel">
+    <div>
+      <span class="index">04 / VERIFIED PRODUCTION EVIDENCE</span>
+      <h2>Evidence over animation.</h2>
+      <p><strong>Verified 11 October 2026:</strong> the DSG Spacetime MCP image promoted from the reviewed approval-ledger fix was activated on the existing AWS instance. Post-merge CI and the owner-gated activation passed; independent container readback confirmed the promoted image was healthy. The four peer containers were unchanged by this scoped rollout.</p>
+      <p>This is a dated release checkpoint, not a live status feed. The successful deployment does <strong>not</strong> prove that an end-user ChatGPT OAuth session completed a governed provider execution, or that the full DSG ONE system passed E2E.</p>
+      <a class="btn btn-outline" href="https://dsg-3.gitbook.io/dsg-docs/control-plane/" target="_blank" rel="noopener noreferrer">Read verified public status ↗</a>
+    </div>
+    <div class="stamp" aria-label="Evidence-graded release status as of 11 October 2026">
+      <div class="stamp-item"><span>AWS Spacetime deployment</span><strong>VERIFIED · 11 OCT 2026</strong></div>
+      <div class="stamp-item"><span>Production container health</span><strong>VERIFIED · HEALTHY</strong></div>
+      <div class="stamp-item"><span>HTTPS transport / anonymous deny</span><strong>VERIFIED · 401 FAIL-CLOSED</strong></div>
+      <div class="stamp-item"><span>Existing evidence chain</span><strong>VALID · 137 RECORDS</strong></div>
+      <div class="stamp-item"><span>ChatGPT user OAuth → provider E2E</span><strong class="pending">NOT VERIFIED</strong></div>
+      <div class="stamp-item"><span>Spacetime Workroom state</span><strong class="pending">UNAVAILABLE</strong></div>
+      <div class="stamp-item"><span>Full-system Production E2E</span><strong class="pending">NOT VERIFIED</strong></div>
+      <div class="caption">Source: 11 October 2026 owner-gated AWS activation, independent post-deploy container health check and DSG ONE Control Plane public status. The 137-record chain is existing evidence, not a new signed-in user execution receipt.</div>
+    </div>
+  </div>
+</section>
+<section class="next wrap"><div class="index">05 / THE NEXT STEP</div><h2>Build with a boundary.<br>Verify with evidence.</h2><p>For API integrations, governed execution or current release evidence, continue to the DSG ONE website or its public AWS status documentation.</p><div class="next-actions"><a class="btn btn-primary" href="https://dsg.pics/" target="_blank" rel="noopener noreferrer">Explore DSG ONE ↗</a><a class="btn btn-outline" href="https://dsg-3.gitbook.io/dsg-docs/control-plane/" target="_blank" rel="noopener noreferrer">Engineering documentation ↗</a></div></section>
+</main>
+<footer class="foot wrap"><a class="logo" href="#top"><span class="logo-mark">D</span><span>DSG <em>ONE</em></span></a><p class="small">Conceptual 3D architecture and dated AWS deployment evidence. Not live telemetry, independent certification or a claim of complete end-to-end production readiness.</p><div class="links"><a href="https://dsg.pics/terms/">Terms</a><a href="https://dsg.pics/support/">Support</a><a href="https://dsg.pics/">dsg.pics ↗</a></div></footer>
+<script>
+(() => {
+  'use strict';
+  const domains = [
+    {short:'PROPOSAL',name:'Proposal / Agent Brain',stage:'DOMAIN 01 / GENERATE',text:'User goals and model agents propose a bounded plan or candidate. The proposal may be optimized or rejected, but the proposer never grants itself execution permission.',tag:'PROPOSAL ONLY · NO SIDE EFFECTS',position:[-2.8,.30,-.18],rgb:[100,218,221]},
+    {short:'PROOF',name:'Cinema / Exact Z3',stage:'DOMAIN 02 / VERIFY',text:'Cinema and deterministic verification evaluate bounded evidence and proof obligations. Exact Z3 results apply only to the mathematical problem that was encoded, never to unobserved real-world outcomes.',tag:'INDEPENDENT CHECK · BOUNDED CLAIM',position:[-1.23,1.25,-.82],rgb:[147,176,246]},
+    {short:'AUTHORITY',name:'DSG Spacetime Authority',stage:'DOMAIN 03 / DECIDE',text:'Spacetime is the sole governance decision boundary. It checks the approved plan, authenticated principal, capabilities, constraints and required approvals before allowing a side effect.',tag:'SOLE PLAN · APPROVAL · POLICY GATE',position:[.52,.3,.36],rgb:[118,230,182]},
+    {short:'EXECUTION',name:'Controlled Providers',stage:'DOMAIN 04 / ACT',text:'Only plan-bound actions reach providers such as APIs, MCP tools, DSG OS / Cinema browser or AWS deployment adapters. Actions without sufficient authority do not run.',tag:'PLAN-BOUND · APPROVAL-GATED',position:[2.50,.67,-1.03],rgb:[244,194,127]},
+    {short:'EVIDENCE',name:'Evidence / Replay',stage:'DOMAIN 05 / OBSERVE',text:'Results, evidence hashes, run context and replay support inspection. Evidence collectors observe and report; they do not silently grant new authority or mutate production.',tag:'OBSERVABLE · NOT AN EXECUTOR',position:[1.70,-1.36,1.08],rgb:[126,196,243]}
+  ];
+  let selected = 0, yaw = -.32, pitch = -.24, zoom = 1, paused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let time = 0, prev = 0, pointer = null, hits = [], cW = 600, cH = 450;
+  const canvas = document.getElementById('architecture');
+  const ctx = canvas.getContext('2d', {alpha:true});
+  const buttons = [...document.querySelectorAll('[data-domain]')];
+  const motionButton = document.getElementById('toggleMotion');
+  function select(i) {
+    selected = i;
+    buttons.forEach((b,j) => {b.classList.toggle('active',j===i);b.setAttribute('aria-pressed',j===i?'true':'false')});
+    document.getElementById('detailNumber').textContent=domains[i].stage;
+    document.getElementById('detailTitle').textContent=domains[i].name;
+    document.getElementById('detailText').textContent=domains[i].text;
+    document.getElementById('detailTag').textContent=domains[i].tag;
+    if (paused) render();
+  }
+  buttons.forEach(b => b.addEventListener('click', () => select(Number(b.dataset.domain))));
+  const hex = (v,a=1) => `rgba(${v[0]},${v[1]},${v[2]},${a})`;
+  function project(p) {
+    const x = p[0]*Math.cos(yaw)-p[2]*Math.sin(yaw);
+    const z = p[0]*Math.sin(yaw)+p[2]*Math.cos(yaw);
+    const y = p[1]*Math.cos(pitch)-z*Math.sin(pitch);
+    const zz = p[1]*Math.sin(pitch)+z*Math.cos(pitch);
+    const s = Math.min(cW/7.7,cH/5.7)*zoom * (9.5/(9.5-zz));
+    return {x:cW*.515+x*s,y:cH*.53-y*s,z:zz,s};
+  }
+  function resize() {
+    const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;
+    const ratio=Math.min(window.devicePixelRatio||1,2);cW=rect.width;cH=rect.height;
+    canvas.width=Math.round(cW*ratio);canvas.height=Math.round(cH*ratio);
+    ctx.setTransform(ratio,0,0,ratio,0,0);render();
+  }
+  function line(a,b,color,width=1,dash=[]) {
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.setLineDash(dash);ctx.stroke();ctx.setLineDash([]);
+  }
+  function ground() {
+    for(let i=-5;i<=5;i++){
+      line(project([-4,-2.08,i*.65]),project([4,-2.08,i*.65]),'rgba(75,156,170,.095)');
+      line(project([i*.7,-2.08,-3.2]),project([i*.7,-2.08,3.2]),'rgba(75,156,170,.095)');
+    }
+    const center=project([0,-2.08,0]);
+    ctx.beginPath();ctx.ellipse(center.x,center.y,Math.min(cW*.35,200),Math.min(cH*.18,63),0,0,2*Math.PI);
+    ctx.strokeStyle='rgba(80,180,193,.075)';ctx.stroke();
+  }
+  function rounded(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r)}
+  function node(n,i) {
+    const p=project(n.position), active=i===selected, w=Math.min(120,p.s*1.60), h=Math.min(69,p.s*.86), dep=Math.min(12,p.s*.16);
+    const x=p.x-w/2,y=p.y-h/2, rgb=n.rgb;
+    if(active){ctx.save();ctx.shadowColor=hex(rgb,.50);ctx.shadowBlur=29;rounded(x-4,y-4,w+8,h+8,12);ctx.fillStyle=hex(rgb,.10);ctx.fill();ctx.restore()}
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+dep,y-dep);ctx.lineTo(x+w+dep,y-dep);ctx.lineTo(x+w,y);ctx.closePath();ctx.fillStyle=hex(rgb,active?.21:.11);ctx.fill();ctx.strokeStyle=hex(rgb,.35);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+w,y);ctx.lineTo(x+w+dep,y-dep);ctx.lineTo(x+w+dep,y+h-dep);ctx.lineTo(x+w,y+h);ctx.closePath();ctx.fillStyle=hex(rgb,.075);ctx.fill();ctx.stroke();
+    const grad=ctx.createLinearGradient(x,y,x+w,y+h);grad.addColorStop(0,active?'#1d4650':'#102d39');grad.addColorStop(1,active?'#173740':'#10212e');rounded(x,y,w,h,8);ctx.fillStyle=grad;ctx.fill();ctx.lineWidth=active?1.5:1;ctx.strokeStyle=hex(rgb,active?.95:.57);ctx.stroke();
+    ctx.fillStyle=hex(rgb,.96);ctx.font=`700 ${Math.max(9,Math.min(12,w*.095))}px ui-monospace,monospace`;ctx.fillText('0'+(i+1)+' / '+n.short,x+11,y+21,Math.max(w-12,20));
+    ctx.strokeStyle=hex(rgb,.3);ctx.beginPath();ctx.moveTo(x+11,y+29);ctx.lineTo(x+w-11,y+29);ctx.stroke();
+    ctx.font=`600 ${Math.max(9,Math.min(12,w*.095))}px ui-sans-serif,system-ui`;ctx.fillStyle='#d3eef0';ctx.fillText(['Agent Brain','Exact Z3','Spacetime','Providers','Replay'][i],x+11,y+48,Math.max(w-13,20));
+    hits.push({i,x:x-5,y:y-dep-5,w:w+dep+10,h:h+dep+10,depth:p.z});
+  }
+  function render() {
+    if(!ctx)return;ctx.clearRect(0,0,cW,cH);
+    const vignette=ctx.createRadialGradient(cW*.52,cH*.51,25,cW*.52,cH*.51,cW*.54);vignette.addColorStop(0,'rgba(44,117,129,.085)');vignette.addColorStop(1,'rgba(6,16,25,0)');ctx.fillStyle=vignette;ctx.fillRect(0,0,cW,cH);
+    ground();hits=[];
+    for(let i=0;i<domains.length-1;i++){
+      const a=project(domains[i].position),b=project(domains[i+1].position),v=domains[i].rgb;
+      line(a,b,hex(v,.14),7);line(a,b,hex(v,.69),1.35,[5,4]);
+      const k=paused?.58:((time*.21+i*.14)%1);const px=a.x+(b.x-a.x)*k,py=a.y+(b.y-a.y)*k;
+      ctx.beginPath();ctx.arc(px,py,3.3,0,Math.PI*2);ctx.fillStyle=hex(v,.98);ctx.shadowColor=hex(v,.85);ctx.shadowBlur=10;ctx.fill();ctx.shadowBlur=0;
+    }
+    line(project(domains[4].position),project(domains[2].position),'rgba(100,191,200,.21)',1,[3,5]);
+    const sorted=domains.map((d,i)=>({d,i,z:project(d.position).z})).sort((a,b)=>a.z-b.z);
+    sorted.forEach(({d,i})=>node(d,i));
+  }
+  function frame(t){const delta=prev?Math.min(t-prev,50):16;prev=t;if(!paused){time+=delta/1000;render()}requestAnimationFrame(frame)}
+  canvas.addEventListener('pointerdown', e=>{pointer={id:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,drag:false};canvas.setPointerCapture(e.pointerId)});
+  canvas.addEventListener('pointermove', e=>{if(!pointer||e.pointerId!==pointer.id)return;const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y; if(Math.abs(e.clientX-pointer.startX)+Math.abs(e.clientY-pointer.startY)>7)pointer.drag=true;
+    if(pointer.drag){yaw+=dx*.007;pitch=Math.max(-.98,Math.min(.98,pitch+dy*.006));canvas.classList.add('dragging');render()}pointer.x=e.clientX;pointer.y=e.clientY;});
+  canvas.addEventListener('pointerup',e=>{if(!pointer)return;const wasDrag=pointer.drag;pointer=null;canvas.classList.remove('dragging');if(!wasDrag){const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;const hit=hits.filter(h=>x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h).sort((a,b)=>b.depth-a.depth)[0];if(hit){select(hit.i);document.getElementById('architecture-section').scrollIntoView({behavior:'smooth',block:'start'})}}});
+  canvas.addEventListener('pointercancel',()=>{pointer=null;canvas.classList.remove('dragging')});
+  canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.72,Math.min(1.43,zoom-e.deltaY*.001));render()},{passive:false});
+  document.getElementById('resetView').addEventListener('click',()=>{yaw=-.32;pitch=-.24;zoom=1;render()});
+  motionButton.addEventListener('click',()=>{paused=!paused;motionButton.textContent=paused?'▶':'Ⅱ';motionButton.setAttribute('aria-pressed',String(paused));motionButton.setAttribute('aria-label',paused?'Resume diagram animation':'Pause diagram animation');render()});
+  if(paused){motionButton.textContent='▶';motionButton.setAttribute('aria-pressed','true');motionButton.setAttribute('aria-label','Resume diagram animation')}
+  if('ResizeObserver' in window){new ResizeObserver(resize).observe(canvas)}else window.addEventListener('resize',resize);
+  resize();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
