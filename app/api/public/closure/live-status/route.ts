@@ -112,11 +112,18 @@ export async function GET() {
     metadata,
     anonymous,
     {
-      id: 'unity-build-14',
-      label: 'Unity Build Automation #14 — artifact attestation',
+      id: 'unity-build-15',
+      label: 'Unity Build Automation #15 — frozen competition candidate',
       state: 'HISTORICAL_VERIFIED',
-      detail: 'Previously verified APK + exact source/evidence bundle; historical build proof only, not Unity Editor or Quest runtime E2E',
-      source: 'https://github.com/tdealer01-crypto/dsg-meta-xr-client/actions/runs/36953067672',
+      detail: 'Verified 2026-10-11: Unity cloud build, downloaded APK and evidence bundle passed exact-source attestation for frozen source 718978bb. Historical artifact proof only — not Unity Editor, headset or XR runtime E2E. Meta channel and judge access are checkpoint-recorded observations, not independently rechecked by this API.',
+      source: 'https://github.com/tdealer01-crypto/dsg-meta-xr-client/actions/runs/37104030195',
+    },
+    {
+      id: 'xr-governance-component',
+      label: 'XR software-live Spacetime approval/evidence component',
+      state: 'HISTORICAL_VERIFIED',
+      detail: '2026-10-05: direct governed XR write recorded APPROVAL_REQUIRED, authenticated approval, exact-bound ALLOW, evidence hash and blocked payload mismatch. This is NOT an end-to-end Software XR Monitor trace, Unity-originated E2E or Quest hands-first evidence.',
+      source: 'https://github.com/tdealer01-crypto/dsg-meta-xr-client/blob/main/evidence/canonical-abcde-20261005.md',
     },
     {
       id: 'unity-runtime',
@@ -151,7 +158,7 @@ export async function GET() {
     oauth_user_action: '/dsg/autonomous-level',
     warnings: [
       'Public health, metadata and HTTP 401 cannot certify signed-in provider execution.',
-      'Historical Unity Build #14 evidence is not a current XR runtime PASS.',
+      'Historical Unity Build #15 and Software XR governance component receipts are not current integrated XR/Quest runtime PASS.',
       'Quest hands-first proof requires real supported Quest input; never accept software surrogate.',
       'This API does not expose private artifacts, secrets or actor-specific receipts.',
     ],
