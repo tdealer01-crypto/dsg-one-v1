@@ -104,11 +104,11 @@ export function AppBuilderAgentRuntimeView() {
     return readResult(json);
   }
 
-  async function governedTool(input: DsgGovernedToolRequest, execute = false) {
+  async function governedTool(input: DsgGovernedToolRequest) {
     const response = await fetch('/api/dsg/tools', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...input, execute }),
+      body: JSON.stringify({ ...input, execute: false }),
     });
     const json = (await response.json().catch(() => ({ ok: false, error: { message: 'INVALID_GOVERNED_TOOL_JSON' } }))) as DsgGovernedToolPreparedRequest | DsgGovernedToolExecutionResult;
     if (!response.ok && !('prepared' in json)) throw new Error('GOVERNED_TOOL_PREPARE_FAILED');
