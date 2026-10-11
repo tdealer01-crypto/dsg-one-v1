@@ -47,6 +47,7 @@ export default function HomePage() {
 
           <nav className="hidden items-center gap-2 md:flex">
             <Link href="/architecture-3d.html" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-300 hover:bg-slate-800 hover:text-white">3D architecture</Link>
+            <Link href="/closure-dashboard.html" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-cyan-200">Closure checklist</Link>
             <a href="#how-it-works" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white">
               How it works
             </a>
@@ -158,6 +159,7 @@ export default function HomePage() {
             </div>
             <div className="flex shrink-0 flex-wrap gap-3">
               <Link href="/architecture-3d.html" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 hover:bg-cyan-200">Open 3D model <ArrowUpRight className="h-4 w-4" /></Link>
+              <Link href="/closure-dashboard.html" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-500/25 bg-amber-950/20 px-5 py-3 text-sm font-bold text-amber-100 hover:border-amber-300/50">Closure checklist <ArrowUpRight className="h-4 w-4" /></Link>
               <a href="https://dsg-3.gitbook.io/dsg-docs/control-plane/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-200 hover:border-cyan-400/50">Public status docs <ArrowUpRight className="h-4 w-4" /></a>
             </div>
           </div>
