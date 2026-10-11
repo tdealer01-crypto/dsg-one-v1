@@ -37,7 +37,9 @@ To genuinely issue actions across these surfaces under one verified user:
 - `APP_HEALTH_AND_IMAGE_BOUND`: verified app deployment identity only.
 - `METADATA_MATCH`: verified OAuth metadata only.
 - `VERIFIED_SITE_SESSION`: authenticated website/workspace only.
-- `user_oauth_e2e` and `provider_execution_e2e`: fixed `NOT_VERIFIED` until an authenticated governed execution supplies proof.
+- `user_oauth_e2e` and `provider_execution_e2e`: report **this specific website session** as `NOT_VERIFIED` until it executes and verifies a delegated Auth0 provider action; reachability never upgrades these.
+- `historical_readonly_e2e`: `HISTORICAL_VERIFIED`, dated 11 October 2026, for the independently verified real-user governed GitHub metadata read-only route and signed Provider v2 Ed25519 evidence. [Public AWS Control Plane acceptance](https://dsg-3.gitbook.io/dsg-docs/control-plane/). No fresh site-session OAuth or Cinema/Quest/whole-system claim.
+- The Access Console displays both fields side-by-side to prevent false negative retesting of completed low-risk acceptance and false positive promotion of unrelated high-risk actions.
 - ChatGPT Android Custom MCP unavailable per current support guidance; compatibility of a **different** app mechanism must be proven rather than assumed.
 
 **Deployment policy:** AWS-only, no Azure. CI and security review before merge; no automated production promotion from this documentation.
