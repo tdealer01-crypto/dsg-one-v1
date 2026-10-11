@@ -1,73 +1,396 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DSG OS Adapter Builder</title>
   <style>
     :root { color-scheme: dark; font-family: system-ui,sans-serif; }
-    body { margin:0; background:#0f1117; color:#e6e6e6; }
-    main { max-width:980px; margin:auto; padding:20px; }
-    textarea,pre { width:100%; box-sizing:border-box; background:#151823; color:#e6e6e6; border:1px solid #2e344d; padding:12px; }
-    textarea { min-height:360px; resize:vertical; }
-    button { margin:12px 8px 12px 0; padding:9px 14px; background:#2e344d; color:white; border:0; cursor:pointer; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:#0f1117; color:#e6e6e6; line-height:1.5; }
+    main { max-width:980px; margin:auto; padding:20px 16px 48px; }
+    a { color:#9cdcfe; }
+    h1 { margin:.4em 0 .2em; }
+    h2 { font-size:1.05rem; margin:1.6em 0 .5em; }
+    p, small { color:#b6c1d0; }
+    .note { border-left:3px solid #e5c07b; padding:6px 12px; background:#171a26; }
+    .steps { display:flex; flex-wrap:wrap; gap:8px; padding:0; margin:14px 0; list-style:none; counter-reset:s; }
+    .steps li { counter-increment:s; background:#171a26; border:1px solid #2e344d; border-radius:999px; padding:6px 12px; font-size:.9rem; }
+    .steps li::before { content:counter(s) ". "; color:#89d185; font-weight:700; }
+    .tabs { display:flex; gap:8px; margin:16px 0 4px; }
+    .tabs button, .row button, .actions button { margin:0; }
+    button { min-height:44px; padding:9px 16px; background:#2e344d; color:#fff; border:1px solid #3a4260; border-radius:8px; cursor:pointer; font-size:1rem; }
+    button:hover { background:#3a4260; }
+    button[aria-pressed="true"] { background:#2b7093; border-color:#2b7093; }
+    button.primary { background:#2b7093; border-color:#2b7093; font-weight:650; }
+    button[disabled] { opacity:.45; cursor:not-allowed; }
+    .grid { display:grid; grid-template-columns:1fr; gap:14px; }
+    @media (min-width:720px) { .grid { grid-template-columns:1fr 1fr; } .wide { grid-column:1 / -1; } }
+    label, .label { display:block; font-weight:650; font-size:.95rem; margin-bottom:4px; }
+    .hint { display:block; font-weight:400; color:#a8b0c2; font-size:.85rem; }
+    input[type=text], select, textarea { width:100%; min-height:44px; font-size:16px; background:#151823; color:#e6e6e6; border:1px solid #2e344d; border-radius:8px; padding:9px 12px; }
+    textarea { min-height:140px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:14px; resize:vertical; }
+    textarea.tall { min-height:360px; }
+    .check { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid #2e344d; border-radius:8px; background:#151823; }
+    .check input { width:22px; height:22px; margin-top:2px; flex:none; }
+    .check b { display:block; }
+    details { border:1px solid #2e344d; border-radius:8px; padding:8px 12px; background:#12151f; }
+    summary { cursor:pointer; min-height:36px; display:flex; align-items:center; font-weight:650; }
+    .row { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; margin:8px 0; }
+    ul.checks { list-style:none; padding:0; margin:8px 0; display:grid; gap:6px; }
+    ul.checks li { padding:8px 12px; border-radius:8px; border:1px solid #2e344d; background:#151823; }
+    ul.checks li.err { border-color:#f48771; color:#ffc9bd; }
+    ul.checks li.warn { border-color:#e5c07b; color:#f2dfae; }
+    ul.checks li.ok { border-color:#89d185; color:#c9efc5; }
+    #status { font-weight:650; }
     #status[data-state="ok"] { color:#89d185; }
     #status[data-state="error"] { color:#f48771; }
-    small { color:#a8b0c2; }
+    pre { width:100%; background:#151823; color:#e6e6e6; border:1px solid #2e344d; border-radius:8px; padding:12px; white-space:pre-wrap; overflow-wrap:anywhere; max-height:420px; overflow:auto; }
+    dl.summary { display:grid; grid-template-columns:max-content 1fr; gap:4px 14px; margin:8px 0; }
+    dl.summary dt { color:#a8b0c2; } dl.summary dd { margin:0; overflow-wrap:anywhere; }
+    .actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+    [hidden] { display:none !important; }
   </style>
 </head>
 <body>
 <main>
+  <a href="/dsg-os">← DSG OS</a>
   <h1>DSG OS Adapter Builder</h1>
-  <p>Compile a provider definition into a deterministic Spacetime Route contract. This page does not execute providers or grant permissions.</p>
-  <textarea id="input" spellcheck="false"></textarea>
-  <div>
-    <button id="compile">Compile Adapter Contract</button>
+  <p>สร้าง “สัญญา” (contract) ของ Provider แล้วคอมไพล์เป็น Route ที่ Spacetime นำไปลงทะเบียนได้ ผลลัพธ์เหมือนกันทุกครั้ง (deterministic)</p>
+  <p class="note">Compile a provider definition into a deterministic Spacetime Route contract. This page does not execute providers or grant permissions. หน้านี้ไม่รัน provider และไม่ให้สิทธิ์ใดๆ — สิทธิ์ตัดสินที่ Spacetime เท่านั้น</p>
+  <ol class="steps" aria-label="ขั้นตอน">
+    <li>เลือกตัวอย่าง</li><li>ตรวจ/แก้ค่า</li><li>คอมไพล์</li><li>ส่งให้ผู้ดูแล Spacetime ลงทะเบียน</li>
+  </ol>
+
+  <div class="tabs" role="group" aria-label="โหมดการกรอก">
+    <button type="button" id="tab-form" aria-pressed="true">แบบฟอร์ม</button>
+    <button type="button" id="tab-json" aria-pressed="false">JSON (ขั้นสูง / แค็ตตาล็อก)</button>
   </div>
-  <p id="status">Ready.</p>
-  <pre id="output" hidden></pre>
-  <small>Execution remains: DSG OS → Spacetime → approval/payload binding → Provider Adapter v2 → provider → evidence/attestation.</small>
+
+  <section id="form-mode">
+    <div class="grid">
+      <div class="wide">
+        <label for="preset">1) เริ่มจากตัวอย่าง <span class="hint">เลือกแล้วระบบกรอกค่าให้ จากนั้นแก้เฉพาะที่ต้องการ</span></label>
+        <select id="preset"></select>
+      </div>
+      <div>
+        <label for="provider_type">ประเภท Provider <span class="hint">provider_type — ระบบปลายทางที่ adapter จะเชื่อมต่อ</span></label>
+        <select id="provider_type"></select>
+      </div>
+      <div>
+        <label for="risk">ระดับความเสี่ยง <span class="hint">risk — สูง/วิกฤต บังคับต้องมีการอนุมัติและผูก payload</span></label>
+        <select id="risk"></select>
+      </div>
+      <div>
+        <label for="adapter_id">adapter_id <span class="hint">ชื่อ adapter (ไม่ซ้ำ)</span></label>
+        <input type="text" id="adapter_id" autocomplete="off" spellcheck="false">
+      </div>
+      <div>
+        <label for="capability">capability <span class="hint">ความสามารถที่ node ปลายทางให้ เช่น browser.remote.read</span></label>
+        <input type="text" id="capability" autocomplete="off" spellcheck="false">
+      </div>
+      <div>
+        <label for="route_id">route_id <span class="hint">รหัส Route (ไม่ซ้ำ)</span></label>
+        <input type="text" id="route_id" autocomplete="off" spellcheck="false">
+      </div>
+      <div>
+        <label for="required_scopes">scope ที่ต้องมี <span class="hint">required_scopes — คั่นด้วยจุลภาคหรือเว้นวรรค</span></label>
+        <input type="text" id="required_scopes" autocomplete="off" spellcheck="false">
+      </div>
+      <div>
+        <label for="source_node">source_node <span class="hint">node ต้นทาง (ผู้เรียก)</span></label>
+        <input type="text" id="source_node" autocomplete="off" spellcheck="false">
+      </div>
+      <div>
+        <label for="target_node">target_node <span class="hint">node ปลายทาง (ผู้ให้บริการ)</span></label>
+        <input type="text" id="target_node" autocomplete="off" spellcheck="false">
+      </div>
+    </div>
+
+    <h2>การอนุมัติและการผูก payload</h2>
+    <div class="grid">
+      <label class="check"><input type="checkbox" id="approval_required"><span><b>ต้องมีการอนุมัติ</b><span class="hint">approval_required</span></span></label>
+      <label class="check"><input type="checkbox" id="bind_payload"><span><b>ผูก payload ที่แน่นอน</b><span class="hint">bind_payload — เปลี่ยน payload หลังวางแผนไม่ได้</span></span></label>
+      <label class="check wide"><input type="checkbox" id="signed_approval_required"><span><b>อนุมัติแบบมีลายเซ็น (แนะนำสำหรับความเสี่ยงสูง)</b><span class="hint">signed_approval_required — ถ้าไม่เปิด ระบบแค่ตรวจว่ามี approval_id ไม่ว่าง ไม่ได้ตรวจว่าใครอนุมัติ</span></span></label>
+    </div>
+
+    <h2>การตรวจผลลัพธ์</h2>
+    <div class="grid">
+      <div>
+        <label for="result_verifier">ตัวตรวจผล <span class="hint">result_verifier — ที่ Spacetime รองรับตอนนี้</span></label>
+        <select id="result_verifier"></select>
+      </div>
+      <div class="wide">
+        <span class="label">Evidence mapping <span class="hint">ฟิลด์ที่ provider ต้องส่งกลับ แล้วบันทึกเป็นหลักฐาน (ชื่อใน evidence → ฟิลด์ใน result)</span></span>
+        <div id="evidence-rows"></div>
+        <button type="button" id="add-evidence">+ เพิ่มแถว</button>
+      </div>
+      <div class="wide">
+        <details>
+          <summary>ขั้นสูง: Input / Output schema (JSON Schema)</summary>
+          <label for="input_schema">input_schema <span class="hint">รูปแบบ payload ที่รับ — {} หมายถึงรับอะไรก็ได้</span></label>
+          <textarea id="input_schema" spellcheck="false"></textarea>
+          <label for="output_schema" style="margin-top:12px">output_schema <span class="hint">รูปแบบผลที่ provider ต้องส่งกลับ — ต้องอนุญาตฟิลด์ ok = true</span></label>
+          <textarea id="output_schema" spellcheck="false"></textarea>
+          <div class="actions"><button type="button" id="basic-output">ใส่ output schema พื้นฐาน</button></div>
+        </details>
+      </div>
+    </div>
+
+    <h2>2) ผลตรวจก่อนคอมไพล์</h2>
+    <ul class="checks" id="checks" aria-live="polite"></ul>
+    <div class="actions"><button type="button" id="compile" class="primary">3) คอมไพล์ Adapter Contract</button></div>
+  </section>
+
+  <section id="json-mode" hidden>
+    <p>วาง contract เดี่ยว หรือแค็ตตาล็อก <code>{"contracts":[…]}</code> แล้วกดคอมไพล์</p>
+    <label for="input">JSON</label>
+    <textarea id="input" class="tall" spellcheck="false"></textarea>
+    <div class="actions"><button type="button" id="compile-json" class="primary">คอมไพล์ JSON</button></div>
+  </section>
+
+  <p id="status" role="status" aria-live="polite">พร้อม — เลือกตัวอย่างหรือกรอกแบบฟอร์ม</p>
+
+  <section id="result" hidden>
+    <h2>ผลการคอมไพล์</h2>
+    <dl class="summary" id="summary"></dl>
+    <div class="actions">
+      <button type="button" id="copy">คัดลอก JSON</button>
+      <button type="button" id="download">ดาวน์โหลด .json</button>
+    </div>
+    <pre id="output"></pre>
+    <h2>4) ขั้นต่อไป</h2>
+    <ol id="next-steps">
+      <li>ส่งไฟล์นี้ให้ผู้ดูแล Spacetime — การคอมไพล์ <b>ไม่ใช่</b>การลงทะเบียนหรือการอนุมัติ</li>
+      <li>ผู้ดูแลลงทะเบียน Route และติดตั้ง executable adapter ใน image ที่ใช้งาน</li>
+      <li>ตรวจหลักฐานการทำงานจริงที่หน้า <a href="/dsg-os/verify/index.html">Verify Evidence</a></li>
+    </ol>
+  </section>
+
+  <small>Execution remains: DSG OS → Spacetime → approval/payload binding → Provider Adapter v2 → provider → evidence/attestation.
+    การตรวจ JSON Schema แบบเต็มรูปแบบทำที่ Spacetime ตอนลงทะเบียน; หน้านี้ตรวจเฉพาะกฎหลักที่ผิดแล้วลงทะเบียนไม่ผ่านแน่นอน</small>
 </main>
 <script type="module">
-import { compileAdapterContract, compileAdapterCatalog } from './adapter-builder.js';
-const input=document.getElementById('input');
-const output=document.getElementById('output');
-const status=document.getElementById('status');
-input.value=JSON.stringify({
-  adapter_id:'browser-read-v2',
-  provider_type:'browser',
-  capability:'browser.remote.read',
-  route_id:'route.browser.example.read',
-  source_node:'node.agent',
-  target_node:'node.browser',
-  risk:'medium',
-  required_scopes:['browser:read'],
-  approval_required:false,
-  bind_payload:true,
-  signed_approval_required:false,
-  input_schema:{type:'object'},
-  output_schema:{type:'object',required:['ok'],properties:{ok:{const:true}}},
-  result_verifier:'provider_readback',
-  evidence_mapping:{}
-},null,2);
-document.getElementById('compile').addEventListener('click', async()=>{
-  try {
-    const parsed=JSON.parse(input.value);
-    const compiled=Array.isArray(parsed.contracts)
-      ? await compileAdapterCatalog(parsed)
-      : await compileAdapterContract(parsed);
-    output.textContent=JSON.stringify(compiled,null,2);
-    output.hidden=false;
-    status.dataset.state='ok';
-    status.textContent=Array.isArray(parsed.contracts)
-      ? 'COMPILED CATALOG — register these Routes through DSG Spacetime.'
-      : 'COMPILED — register this Route through DSG Spacetime.';
-  } catch (error) {
-    output.hidden=true;
-    status.dataset.state='error';
-    status.textContent='BLOCK — '+(error.code || error.message);
+import { compileAdapterContract, compileAdapterCatalog, PROVIDER_TYPES, RISKS } from './adapter-builder.js';
+
+const $ = (id) => document.getElementById(id);
+const FIELDS = ['adapter_id','capability','route_id','source_node','target_node'];
+const VERIFIERS = [
+  ['provider_readback','provider_readback — ตรวจจากผลที่ provider ส่งกลับ (ใช้ได้กับทุกประเภท)'],
+  ['a2a_resulting_state','a2a_resulting_state — ใช้ได้เฉพาะ provider_type = a2a'],
+];
+const RISK_LABEL = { low:'low — ต่ำ (อ่านอย่างเดียว)', medium:'medium — กลาง', high:'high — สูง (มีผลเปลี่ยนแปลง)', critical:'critical — วิกฤต' };
+const BASIC_OUTPUT = { type:'object', required:['ok'], properties:{ ok:{ const:true } } };
+
+const PRESETS = {
+  read_low: { label:'อ่านข้อมูลทั่วไป (ความเสี่ยงต่ำ)', value:{
+    adapter_id:'http-read-v1', provider_type:'http', capability:'http.json.read', route_id:'route.http.json-read',
+    source_node:'node.agent', target_node:'node.http', risk:'low', required_scopes:[],
+    approval_required:false, bind_payload:false, signed_approval_required:false,
+    input_schema:{type:'object'}, output_schema:BASIC_OUTPUT,
+    result_verifier:'provider_readback', evidence_mapping:{} } },
+  browser_read: { label:'เบราว์เซอร์: อ่านหน้าเว็บ (ความเสี่ยงกลาง)', value:{
+    adapter_id:'browser-read-v2', provider_type:'browser', capability:'browser.remote.read', route_id:'route.browser.example.read',
+    source_node:'node.agent', target_node:'node.browser', risk:'medium', required_scopes:['browser:read'],
+    approval_required:false, bind_payload:true, signed_approval_required:false,
+    input_schema:{type:'object'}, output_schema:BASIC_OUTPUT,
+    result_verifier:'provider_readback', evidence_mapping:{} } },
+  write_high: { label:'เขียนไฟล์ในเครื่อง (ความเสี่ยงสูง ต้องอนุมัติ)', value:{
+    adapter_id:'desktop-write-v1', provider_type:'desktop', capability:'device.fs.write', route_id:'route.desktop.fs-write',
+    source_node:'node.agent', target_node:'node.desktop', risk:'high', required_scopes:['desktop:use','filesystem:write'],
+    approval_required:true, bind_payload:true, signed_approval_required:true,
+    input_schema:{type:'object',required:['path','content'],additionalProperties:false,properties:{path:{type:'string',minLength:1},content:{type:'string'}}},
+    output_schema:{type:'object',required:['ok','receipt'],properties:{ok:{const:true},receipt:{type:'string',minLength:3}}},
+    result_verifier:'provider_readback', evidence_mapping:{receipt:'receipt'} } },
+};
+
+function fill(select, entries) {
+  select.replaceChildren(...entries.map(([value, label]) => { const o = document.createElement('option'); o.value = value; o.textContent = label; return o; }));
+}
+fill($('preset'), Object.entries(PRESETS).map(([k, p]) => [k, p.label]));
+fill($('provider_type'), PROVIDER_TYPES.map((p) => [p, p]));
+fill($('risk'), RISKS.map((r) => [r, RISK_LABEL[r] || r]));
+fill($('result_verifier'), VERIFIERS);
+
+function addEvidenceRow(key = '', source = '') {
+  const row = document.createElement('div'); row.className = 'row';
+  const k = document.createElement('input'); k.type = 'text'; k.placeholder = 'ชื่อใน evidence'; k.value = key; k.setAttribute('aria-label', 'ชื่อใน evidence');
+  const s = document.createElement('input'); s.type = 'text'; s.placeholder = 'ฟิลด์ใน result'; s.value = source; s.setAttribute('aria-label', 'ฟิลด์ใน result ของ provider');
+  const x = document.createElement('button'); x.type = 'button'; x.textContent = 'ลบ'; x.setAttribute('aria-label', 'ลบแถวนี้');
+  for (const el of [k, s]) { el.autocomplete = 'off'; el.spellcheck = false; el.addEventListener('input', refresh); }
+  x.addEventListener('click', () => { row.remove(); refresh(); });
+  row.append(k, s, x); $('evidence-rows').append(row);
+}
+
+function parseScopes(text) { return text.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean); }
+
+function writeForm(c) {
+  for (const f of FIELDS) $(f).value = c[f] ?? '';
+  $('provider_type').value = c.provider_type; $('risk').value = c.risk ?? 'medium';
+  $('required_scopes').value = (c.required_scopes || []).join(', ');
+  for (const f of ['approval_required','bind_payload','signed_approval_required']) $(f).checked = c[f] === true;
+  $('result_verifier').value = c.result_verifier ?? 'provider_readback';
+  $('input_schema').value = JSON.stringify(c.input_schema ?? {}, null, 2);
+  $('output_schema').value = JSON.stringify(c.output_schema ?? {}, null, 2);
+  $('evidence-rows').replaceChildren();
+  for (const [k, s] of Object.entries(c.evidence_mapping || {})) addEvidenceRow(k, s);
+  refresh();
+}
+
+// Returns { contract, problems } where problems are JSON parse errors that block reading the form.
+function readForm() {
+  const problems = [];
+  const parse = (id, label) => { try { const v = JSON.parse($(id).value || '{}'); if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error(); return v; } catch { problems.push(label + ' ต้องเป็น JSON object ที่ถูกต้อง'); return {}; } };
+  const mapping = {};
+  for (const row of $('evidence-rows').children) {
+    const [k, s] = row.querySelectorAll('input'); const key = k.value.trim(), src = s.value.trim();
+    if (key || src) mapping[key] = src;
   }
+  const contract = {
+    adapter_id: $('adapter_id').value, provider_type: $('provider_type').value, capability: $('capability').value,
+    route_id: $('route_id').value, source_node: $('source_node').value, target_node: $('target_node').value,
+    risk: $('risk').value, required_scopes: parseScopes($('required_scopes').value),
+    approval_required: $('approval_required').checked, bind_payload: $('bind_payload').checked,
+    signed_approval_required: $('signed_approval_required').checked,
+    input_schema: parse('input_schema', 'input_schema'), output_schema: parse('output_schema', 'output_schema'),
+    result_verifier: $('result_verifier').value, evidence_mapping: mapping,
+  };
+  return { contract, problems };
+}
+
+// Mirrors the rules a Spacetime registration would reject (adapter_builder.py / adapter_contract_guard.py).
+function evaluate({ contract: c, problems }) {
+  const errors = [...problems], warnings = [];
+  const limits = { adapter_id:192, capability:192, route_id:192, source_node:128, target_node:128 };
+  for (const f of FIELDS) { const v = String(c[f] ?? '').trim(); if (!v) errors.push(f + ' ห้ามว่าง'); else if (v.length > limits[f]) errors.push(f + ' ยาวเกิน ' + limits[f] + ' ตัวอักษร'); }
+  if (new Set(c.required_scopes).size !== c.required_scopes.length) errors.push('required_scopes มีค่าซ้ำ');
+  if (c.signed_approval_required && !c.approval_required) errors.push('เปิด “อนุมัติแบบมีลายเซ็น” ต้องเปิด “ต้องมีการอนุมัติ” ด้วย');
+  const high = c.risk === 'high' || c.risk === 'critical';
+  if (high && !c.approval_required) errors.push('ความเสี่ยงสูง/วิกฤต ต้องเปิด “ต้องมีการอนุมัติ”');
+  if (high && !c.bind_payload) errors.push('ความเสี่ยงสูง/วิกฤต ต้องเปิด “ผูก payload”');
+  if (c.result_verifier === 'a2a_resulting_state' && c.provider_type !== 'a2a') errors.push('a2a_resulting_state ใช้ได้เฉพาะ provider_type = a2a');
+  const out = c.output_schema || {};
+  if (c.result_verifier === 'provider_readback') {
+    if (out.type !== undefined && out.type !== 'object') errors.push('output_schema.type ต้องเป็น "object" (หรือไม่ระบุ)');
+    const props = out.properties === undefined ? {} : out.properties;
+    if (!props || typeof props !== 'object' || Array.isArray(props)) errors.push('output_schema.properties ต้องเป็น object');
+    else {
+      if (out.additionalProperties === false && !('ok' in props)) errors.push('output_schema ห้ามฟิลด์อื่นแต่ไม่มี "ok" — provider จะไม่มีทางผ่านการตรวจ');
+      const ok = props.ok;
+      if (ok && typeof ok === 'object' && ((ok.const !== undefined && ok.const !== true) || (Array.isArray(ok.enum) && !ok.enum.includes(true)) || (ok.type !== undefined && ok.type !== 'boolean')))
+        errors.push('output_schema.properties.ok ต้องยอมรับค่า true');
+    }
+  }
+  for (const [k, s] of Object.entries(c.evidence_mapping)) {
+    if (!k || !s) errors.push('Evidence mapping ต้องกรอกทั้งชื่อใน evidence และฟิลด์ใน result');
+    else if (out.properties && typeof out.properties === 'object' && !(s in out.properties)) warnings.push('Evidence mapping: ฟิลด์ "' + s + '" ไม่อยู่ใน output_schema.properties');
+  }
+  if (high && c.approval_required && !c.signed_approval_required) warnings.push('ความเสี่ยงสูงแต่ไม่ได้เปิดอนุมัติแบบมีลายเซ็น — ระบบจะแค่ตรวจว่ามี approval_id ไม่ว่าง ไม่ได้ตรวจว่าใครอนุมัติ');
+  if (c.approval_required && !c.bind_payload) warnings.push('มีการอนุมัติแต่ไม่ได้ผูก payload — อนุมัติแล้วเปลี่ยน payload ได้');
+  if (c.risk !== 'low' && Object.keys(c.input_schema || {}).length === 0) warnings.push('input_schema ว่าง = รับ payload อะไรก็ได้');
+  return { errors, warnings };
+}
+
+function li(cls, text) { const el = document.createElement('li'); el.className = cls; el.textContent = text; return el; }
+
+// High/critical locks the two mandatory switches so the form cannot reach a state the server rejects.
+function applyRiskLocks() {
+  const high = ['high','critical'].includes($('risk').value);
+  if (high) { $('approval_required').checked = true; $('bind_payload').checked = true; }
+  $('approval_required').disabled = high; $('bind_payload').disabled = high;
+  if (!$('approval_required').checked) $('signed_approval_required').checked = false;
+  $('signed_approval_required').disabled = !$('approval_required').checked;
+}
+
+let lastEval = { errors: [], warnings: [] };
+function refresh() {
+  applyRiskLocks();
+  lastEval = evaluate(readForm());
+  const list = $('checks'); list.replaceChildren();
+  for (const e of lastEval.errors) list.append(li('err', '❌ ต้องแก้: ' + e));
+  for (const w of lastEval.warnings) list.append(li('warn', '⚠️ ควรพิจารณา: ' + w));
+  if (!lastEval.errors.length) list.append(li('ok', '✅ ผ่านการตรวจเบื้องต้น — คอมไพล์ได้'));
+  $('compile').disabled = lastEval.errors.length > 0;
+  $('compile').title = lastEval.errors.length ? 'แก้รายการ ❌ ก่อน' : '';
+}
+
+// Spacetime sorts catalog contracts by code point; adapter-builder.js sorts with locale-aware localeCompare.
+// For mixed-case ids or "_" vs "-" the order (and so catalog_hash) differs, so say so instead of showing a hash that will not match.
+function catalogOrderWarning(compiled) {
+  const pairs = compiled.contracts.map((c) => [c.contract.route_id, c.contract.adapter_id]);
+  const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const byCodePoint = [...pairs].sort((a, b) => cmp(a[0], b[0]) || cmp(a[1], b[1]));
+  const same = pairs.every((p, i) => p[0] === byCodePoint[i][0] && p[1] === byCodePoint[i][1]);
+  return same ? '' : 'ลำดับ contract ที่คอมไพล์ในเบราว์เซอร์ต่างจาก Spacetime (route_id มีตัวพิมพ์ใหญ่ผสม หรือใช้ _ ปนกับ -) ทำให้ catalog_hash ไม่ตรงกับที่ Spacetime คำนวณ — ใช้ตัวพิมพ์เล็กล้วนและ - อย่างเดียวใน route_id/adapter_id จนกว่าจะแก้ที่ตัวคอมไพล์';
+}
+
+let compiledText = '';
+function showResult(compiled, label, warning = '') {
+  compiledText = JSON.stringify(compiled, null, 2);
+  const dl = $('summary'); dl.replaceChildren();
+  const add = (k, v) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); };
+  if (compiled.contract_hash) {
+    const c = compiled.contract, yn = (b) => (b ? 'ใช่' : 'ไม่');
+    add('route_id', c.route_id); add('ความเสี่ยง', c.risk); add('ต้องอนุมัติ', yn(c.approval_required));
+    add('อนุมัติแบบมีลายเซ็น', yn(c.signed_approval_required)); add('ผูก payload', yn(c.bind_payload));
+    add('scope ที่ต้องมี', c.required_scopes.join(', ') || '— ไม่มี');
+    add('contract_hash', compiled.contract_hash);
+  } else {
+    add('จำนวน contract', String(compiled.contracts.length)); add('catalog_hash', compiled.catalog_hash);
+  }
+  if (warning) add('⚠️ คำเตือน', warning);
+  $('output').textContent = compiledText; $('result').hidden = false;
+  $('status').dataset.state = 'ok'; $('status').textContent = (warning ? '⚠️ ' : '✅ ') + label + ' — ยังไม่ได้ลงทะเบียนหรืออนุมัติ ต้องให้ Spacetime ลงทะเบียน' + (warning ? ' (ดูคำเตือน)' : '');
+  $('result').scrollIntoView({ block: 'nearest' });
+}
+function showError(error) {
+  $('result').hidden = true; $('status').dataset.state = 'error';
+  $('status').textContent = '❌ BLOCK — ' + (error.code || error.message);
+}
+
+$('compile').addEventListener('click', async () => {
+  refresh(); if (lastEval.errors.length) return;
+  try {
+    const compiled = await compileAdapterContract(readForm().contract);
+    const again = await compileAdapterContract(compiled.contract);
+    if (again.contract_hash !== compiled.contract_hash) throw new Error('hash ไม่คงที่');
+    showResult(compiled, 'คอมไพล์สำเร็จ (คอมไพล์ซ้ำได้ hash เดิม)');
+  } catch (error) { showError(error); }
 });
+$('compile-json').addEventListener('click', async () => {
+  try {
+    const parsed = JSON.parse($('input').value);
+    const isCatalog = Array.isArray(parsed.contracts);
+    const compiled = isCatalog ? await compileAdapterCatalog(parsed) : await compileAdapterContract(parsed);
+    showResult(compiled, isCatalog ? 'คอมไพล์แค็ตตาล็อกสำเร็จ' : 'คอมไพล์สำเร็จ', isCatalog ? catalogOrderWarning(compiled) : '');
+  } catch (error) { showError(error); }
+});
+
+$('preset').addEventListener('change', () => { writeForm(PRESETS[$('preset').value].value); $('status').dataset.state = ''; $('status').textContent = 'โหลดตัวอย่างแล้ว — ตรวจและแก้ค่าที่ต้องการ'; });
+$('basic-output').addEventListener('click', () => { $('output_schema').value = JSON.stringify(BASIC_OUTPUT, null, 2); refresh(); });
+$('add-evidence').addEventListener('click', () => { addEvidenceRow(); refresh(); $('evidence-rows').lastChild.querySelector('input').focus(); });
+for (const id of [...FIELDS, 'provider_type','risk','required_scopes','approval_required','bind_payload','signed_approval_required','result_verifier','input_schema','output_schema'])
+  $(id).addEventListener(id === 'provider_type' || id === 'risk' || id === 'result_verifier' || $(id).type === 'checkbox' ? 'change' : 'input', refresh);
+
+$('copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(compiledText); $('status').textContent = 'คัดลอกแล้ว'; }
+  catch { const r = document.createRange(); r.selectNodeContents($('output')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $('status').textContent = 'เลือกข้อความไว้แล้ว — กดคัดลอกเอง'; }
+});
+$('download').addEventListener('click', () => {
+  const url = URL.createObjectURL(new Blob([compiledText + '\n'], { type: 'application/json' }));
+  const a = document.createElement('a'); a.href = url; a.download = 'adapter-contract.json'; document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+});
+
+function setMode(json) {
+  $('form-mode').hidden = json; $('json-mode').hidden = !json;
+  $('tab-form').setAttribute('aria-pressed', String(!json)); $('tab-json').setAttribute('aria-pressed', String(json));
+  if (json) $('input').value = JSON.stringify(readForm().contract, null, 2);
+  else { try { const p = JSON.parse($('input').value); if (p && !Array.isArray(p.contracts) && PROVIDER_TYPES.includes(String(p.provider_type).toLowerCase())) writeForm({ ...p, provider_type: String(p.provider_type).toLowerCase() }); } catch { /* keep the form as is */ } }
+}
+$('tab-form').addEventListener('click', () => setMode(false));
+$('tab-json').addEventListener('click', () => setMode(true));
+
+writeForm(PRESETS.read_low.value);
 </script>
 </body>
 </html>

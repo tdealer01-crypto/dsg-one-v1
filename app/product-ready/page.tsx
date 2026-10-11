@@ -1,5 +1,9 @@
 import {assessProductReadiness} from '@/lib/dsg/product-ready/readiness';
 
+// Reads process.env on every request; a static prerender would freeze the build-time
+// (secret-less) result into the public page.
+export const dynamic = 'force-dynamic';
+
 function badgeClass(status: string) {
   if (status === 'PASS') return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
   if (status === 'WARN') return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
