@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
+import { authorizeRemoteBrowser } from '@/lib/dsg/remote-browser/http-auth';
 import { addRemoteBrowserCheckpoint, getRemoteBrowserSession } from '@/lib/dsg/remote-browser/session-store';
 import type { RemoteBrowserCheckpoint } from '@/lib/dsg/remote-browser/types';
 
 type RouteContext = { params: Promise<{ sessionId: string }> };
 
-export async function GET(_req: Request, context: RouteContext) {
+export async function GET(req: Request, context: RouteContext) {
+  const auth = await authorizeRemoteBrowser(req.headers, 'job:read');
+  if (!auth.ok) return auth.response;
   const { sessionId } = await context.params;
   try {
-    const session = getRemoteBrowserSession(sessionId);
+    const session = getRemoteBrowserSession(sessionId, auth.actor);
     return NextResponse.json({ ok: true, data: { checkpoints: session.checkpoints } });
   } catch (error) {
     return NextResponse.json({ ok: false, error: { message: error instanceof Error ? error.message : 'REMOTE_BROWSER_SESSION_NOT_FOUND' } }, { status: 404 });
@@ -15,6 +18,8 @@ export async function GET(_req: Request, context: RouteContext) {
 }
 
 export async function POST(req: Request, context: RouteContext) {
+  const auth = await authorizeRemoteBrowser(req.headers, 'job:control');
+  if (!auth.ok) return auth.response;
   const { sessionId } = await context.params;
   const body = await req.json().catch(() => null) as Partial<RemoteBrowserCheckpoint> | null;
   const type = body?.type ?? 'takeover';
@@ -24,7 +29,7 @@ export async function POST(req: Request, context: RouteContext) {
   if (!instruction) return NextResponse.json({ ok: false, error: { message: 'CHECKPOINT_INSTRUCTION_REQUIRED' } }, { status: 400 });
 
   try {
-    const session = addRemoteBrowserCheckpoint({ sessionId, type, state, instruction });
+    const session = addRemoteBrowserCheckpoint({ sessionId, owner: auth.actor, type, state, instruction });
     return NextResponse.json({ ok: true, data: { session } });
   } catch (error) {
     return NextResponse.json({ ok: false, error: { message: error instanceof Error ? error.message : 'REMOTE_BROWSER_CHECKPOINT_FAILED' } }, { status: 400 });
