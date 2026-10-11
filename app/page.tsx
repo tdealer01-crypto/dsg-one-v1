@@ -133,7 +133,7 @@ export default function HomePage() {
             ดูเพิ่มเติม:{' '}
             <Link href="/architecture-3d.html" className="font-semibold text-cyan-300 underline-offset-4 hover:underline">แผนภาพสถาปัตยกรรม 3D</Link>
             {' · '}
-            <Link href="/remote-browser-execution" className="font-semibold text-emerald-300 underline-offset-4 hover:underline">DSG Spacetime · Governed Browser Execution</Link>
+            <Link href="/remote-browser-execution" className="font-semibold text-emerald-300 underline-offset-4 hover:underline">DSG Spacetime · Browser pilot (signed approval required)</Link>
           </p>
           <p className="mt-3 text-xs text-slate-500">
             หน้านี้เปิดดูได้โดยไม่ต้องมีบัญชี ส่วนการใช้งานจริงต้องได้รับสิทธิ์ก่อน — ขอได้ทางอีเมล {ACCESS_REQUEST_EMAIL}
@@ -211,7 +211,7 @@ export default function HomePage() {
               <p className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.22em] text-cyan-300"><LayoutTemplate className="h-4 w-4" /> Public interactive architecture</p>
               <h2 id="public-architecture-heading" className="mt-3 text-2xl font-black sm:text-3xl">Explore the five trust domains in 3D.</h2>
               <p className="mt-3 text-sm leading-7 text-slate-300">A no-login, interactive architecture explainer covering Proposal, Proof, Authority, Execution and Evidence, with a dated 11 October 2026 AWS deployment evidence snapshot.</p>
-              <p className="mt-2 text-xs leading-6 text-amber-200/80">Spacetime image and health verified; signed-in OAuth provider E2E, Spacetime Workroom state and full-system acceptance remain unverified or unavailable. Not live telemetry.</p>
+              <p className="mt-2 text-xs leading-6 text-amber-200/80">AWS image activation #38140649005 and signed read-only canary #38140811436 PASS (11 Oct 2026). Real user OAuth → governed GitHub metadata read-only provider → independently checked Ed25519 evidence E2E PASS for that limited scope. Production MCP chain readback on 11 Oct: valid, 140 records. Cinema browser Connect/Execute, Quest/Unity and whole-system E2E remain NOT VERIFIED; Workroom store is UNAVAILABLE. This is a dated evidence checkpoint, not live telemetry.</p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-3">
               <Link href="/architecture-3d.html" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 hover:bg-cyan-200">Open 3D model <ArrowUpRight className="h-4 w-4" /></Link>
