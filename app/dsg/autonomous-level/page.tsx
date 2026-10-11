@@ -32,7 +32,7 @@ export default function DsgAutonomousLevelPage() {
           <p className="mt-2 text-sm text-slate-300">ตรวจและอนุมัติเฉพาะงานที่ผูกกับบัญชี Auth0 ของคุณ — ไม่ใช้ internal key</p>
           <a href="/dsg/approvals" className="mt-3 inline-block rounded bg-indigo-600 px-4 py-2 text-sm">เปิดรายการรออนุมัติ</a>
         </section>
-        <DsgIdentityBridge />
+        <section id="governed-e2e" className="scroll-mt-24"><DsgIdentityBridge /></section>
 
         <section className="grid gap-4 lg:grid-cols-2">
           {gate.capabilities.map((capability) => (
