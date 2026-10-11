@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useSyncExternalStore } from 'react';
 import { ArrowRight, LockKeyhole, ShieldCheck } from 'lucide-react';
+import { accessRequestMailto } from '@/lib/dsg/public/access-request';
 
 function safeNextPath(value: string | null): string {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/dsg/access';
@@ -86,7 +87,9 @@ export default function LoginPage() {
             <p className={`mt-5 rounded-2xl border px-4 py-3 text-sm ${status === 'error' ? 'border-red-500/30 bg-red-500/10 text-red-200' : status === 'success' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' : 'border-slate-800 bg-slate-950 text-slate-400'}`}>
               {message}
             </p>
-            <Link href="/" className="mt-5 inline-flex text-sm font-bold text-indigo-300 hover:text-indigo-200">Back to home</Link>
+            <p className="mt-5 text-sm text-slate-400">ยังไม่มีบัญชี?</p>
+            <a href={accessRequestMailto()} className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-cyan-400/40 px-4 py-2 text-sm font-bold text-cyan-200 hover:bg-cyan-400/10">ขอสิทธิ์ใช้งานทางอีเมล</a>
+            <Link href="/" className="mt-3 inline-flex text-sm font-bold text-indigo-300 hover:text-indigo-200">Back to home</Link>
           </div>
         </section>
       </div>
