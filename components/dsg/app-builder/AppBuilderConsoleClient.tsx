@@ -64,13 +64,9 @@ type PreviewMode = 'concept' | 'live' | 'monitor' | 'brain' | 'tools';
 
 const liveGeneratedAppPath = '/generated-apps/2f3b20b0-824c-4d4a-ae6a-250bd18f3392';
 
-const dsgHeaders = {
-  'content-type': 'application/json',
-  'x-dsg-workspace-id': 'demo-workspace',
-  'x-dsg-actor-id': 'operator-ui',
-  'x-dsg-actor-role': 'operator',
-  'x-dsg-permissions': 'memory:read,memory:write',
-};
+// The verified identity and workspace are resolved server-side from the
+// authenticated session and membership; browser headers never assert a role.
+const dsgHeaders = { 'content-type': 'application/json' };
 
 const starterApps = [
   {
