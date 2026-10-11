@@ -144,7 +144,7 @@ export async function GET() {
       label: 'User OAuth → GitHub metadata read-only signed Provider E2E (11 Oct 2026)',
       state: 'HISTORICAL_VERIFIED',
       detail: 'Scoped production E2E independently verified 11 Oct: real OAuth subject, plan 001fcbffc7c75447b2dbae69d2e751f49c6aff025ae84561a0db542abe46527d, signed record a38db675165c5f5cb3ea6aaed31afd471e200f84a4a3064b025d9db1c483a2d8 and provider result a6108fa91c03853aafe75c03812441da63c231356cfa3ec19c4f9539c35f1fdb. Independent Android SHA/Ed25519 plus public-key pin and tamper denial PASS. Authenticated MCP evidence chain was valid with 140 records when observed on 11 Oct. This is a dated acceptance, not a live user OAuth probe and not Cinema E2E.',
-      source: 'https://github.com/tdealer01-crypto/DSG-Private-Production-Runtime/actions/runs/38140811436',
+      source: 'https://dsg-3.gitbook.io/dsg-docs/control-plane/',
     },
   ];
   return NextResponse.json({
