@@ -28,7 +28,8 @@ describe('public closure live proof boundary', () => {
     expect(states['website-runtime']).toBe('VERIFIED');
     expect(states['auth0-metadata']).toBe('REACHABLE');
     expect(states['anonymous-mcp']).toBe('VERIFIED');
-    expect(states['unity-build-14']).toBe('HISTORICAL_VERIFIED');
+    expect(states['unity-build-15']).toBe('HISTORICAL_VERIFIED');
+    expect(states['xr-governance-component']).toBe('HISTORICAL_VERIFIED');
     expect(states['unity-runtime']).toBe('NOT_VERIFIED');
     expect(states['quest-hands']).toBe('NOT_VERIFIED');
     expect(states['user-oauth']).toBe('NOT_VERIFIED');
