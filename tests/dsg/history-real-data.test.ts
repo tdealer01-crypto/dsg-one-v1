@@ -22,6 +22,11 @@ describe('/dsg/history shows real data, never a fabricated list', () => {
     for (const b of dead) expect(b).toMatch(/\bdisabled\b/);
   });
 
+  it('uses native anchors for navigation (same reason as the #212 sidebar fix)', () => {
+    expect(page).not.toContain("from 'next/link'");
+    expect(page).not.toContain('<Link');
+  });
+
   it('never prints the raw server error body to the user', () => {
     expect(page).not.toMatch(/error\.code|body\.error|\.message\}/);
   });

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import {
   ChevronLeft,
   ChevronRight,
@@ -31,6 +30,8 @@ const STATUS_LABEL: Record<StatusFilter, string> = {
   DRAFT: 'ฉบับร่าง',
 };
 
+// Plain <a> (not next/link) for navigation to protected pages: same reason as the sidebar in #212 -
+// a real browser navigation carries the session cookie even in embedded Android browsers.
 const SEARCH_DEBOUNCE_MS = 300;
 const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400';
 
@@ -243,9 +244,9 @@ export default function BuildHistoryPage() {
               <>
                 <p className="font-bold text-red-200">ต้องเข้าสู่ระบบก่อนดูประวัติ (HTTP {outcome.httpStatus})</p>
                 <p className="mt-1 text-sm text-slate-300">เซสชันอาจหมดอายุ หรือบัญชีนี้ยังไม่มีสิทธิ์อ่านประวัติ</p>
-                <Link href="/login?next=/dsg/history" className={`mt-4 inline-flex min-h-11 items-center rounded-2xl bg-indigo-600 px-5 text-sm font-bold text-white hover:bg-indigo-500 ${FOCUS}`}>
+                <a href="/login?next=/dsg/history" className={`mt-4 inline-flex min-h-11 items-center rounded-2xl bg-indigo-600 px-5 text-sm font-bold text-white hover:bg-indigo-500 ${FOCUS}`}>
                   เข้าสู่ระบบ
-                </Link>
+                </a>
               </>
             )}
             {outcome.reason === 'server' && (
@@ -282,9 +283,11 @@ export default function BuildHistoryPage() {
               <>
                 <p className="mt-4 text-lg font-bold text-slate-300">ยังไม่มีประวัติการสร้างแอป</p>
                 <p className="mt-2 text-sm text-slate-500">เริ่มสร้างแอปแรกใน App Builder แล้วทุกเวอร์ชันจะมาแสดงที่นี่</p>
-                <Link href="/dsg/app-builder" className={`mt-6 inline-flex min-h-11 items-center rounded-2xl bg-indigo-600 px-5 text-sm font-bold text-white hover:bg-indigo-500 ${FOCUS}`}>
+                {/* Native navigation on purpose (see the comment above SEARCH_DEBOUNCE_MS / #212). */}
+                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+                <a href="/dsg/app-builder" className={`mt-6 inline-flex min-h-11 items-center rounded-2xl bg-indigo-600 px-5 text-sm font-bold text-white hover:bg-indigo-500 ${FOCUS}`}>
                   เปิด App Builder
-                </Link>
+                </a>
               </>
             )}
           </div>

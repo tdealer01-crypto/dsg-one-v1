@@ -76,8 +76,12 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, data: { items: paged, total, page, totalPages } });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'HISTORY_FETCH_FAILED';
-    const status = message === 'DSG_AUTH_REQUIRED' || message === 'DSG_PERMISSION_DENIED' ? 403 : 500;
-    return NextResponse.json({ ok: false, error: { code: message } }, { status });
+    // Only known authorization codes are echoed. Anything else (database errors, missing
+    // env names, SQL text) stays server-side so it cannot leak to the browser.
+    const message = error instanceof Error ? error.message : '';
+    if (message === 'DSG_AUTH_REQUIRED' || message === 'DSG_PERMISSION_DENIED' || message === 'DSG_CONTEXT_REQUIRED') {
+      return NextResponse.json({ ok: false, error: { code: message } }, { status: 403 });
+    }
+    return NextResponse.json({ ok: false, error: { code: 'HISTORY_FETCH_FAILED' } }, { status: 500 });
   }
 }
