@@ -9,6 +9,9 @@
 // Requirements: `node scripts/dsg-next-build.mjs` already run; `playwright-core` resolvable (or set
 // PLAYWRIGHT_CORE to its path); a Chromium binary (CHROME=/path/to/chrome).
 // Optional: SHOT=/dir to save screenshots, E2E_APP_PORT / E2E_FAKE_PORT to change ports.
+//
+// `--serve` starts the same fake backend + built app and keeps them running (no browser, no checks) so a
+// person can open the real UI on a real Android phone; see the printed instructions. Loopback only, fake data.
 // Login-flow scenario (B9): the script gives the app process a fake
 // NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY. Verified: /api/auth/session reads it at run time, so a
 // normal build works. If an app build ever stops seeing it, B9 is reported as SKIPPED (never as a pass).
@@ -17,7 +20,9 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-const { chromium } = await import(process.env.PLAYWRIGHT_CORE || 'playwright-core');
+const SERVE = process.argv.includes('--serve');
+// Serve mode needs no browser driver, so playwright-core is only loaded for the test run.
+const { chromium } = SERVE ? {} : await import(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 
 const APP_PORT = Number(process.env.E2E_APP_PORT || 18190);
 const FAKE_PORT = Number(process.env.E2E_FAKE_PORT || 18191);
@@ -178,6 +183,18 @@ process.on('exit', () => app.kill('SIGTERM'));
     if (!up) await new Promise((r) => setTimeout(r, 300));
   }
   if (!up) { console.log('BLOCKED  the built app did not start (run `node scripts/dsg-next-build.mjs` first)'); shutdown(); process.exit(2); }
+}
+if (SERVE) {
+  console.log(`SERVE  DSG ONE UI on FAKE data (fake users and rows, nothing real). Loopback only: http://localhost:${APP_PORT}
+  Real Android phone (USB debugging on):
+    1. adb reverse tcp:${APP_PORT} tcp:${APP_PORT}
+    2. open  http://localhost:${APP_PORT}/login  in Chrome on the phone  (localhost is needed: the session cookies are Secure)
+    3. sign in as alice@example.test / correct-password  (fake)  -> Workspace, Workroom, Approvals, Verify, History, Analytics, Notifications
+  Stop with Ctrl+C.
+  This only gives you something to test. Android hardware acceptance stays NOT VERIFIED until someone does it on a device.`);
+  process.on('SIGINT', () => { shutdown(); process.exit(0); });
+  process.on('SIGTERM', () => { shutdown(); process.exit(0); });
+  await new Promise(() => {});
 }
 const shot = async (page, name, fullPage = false) => { if (SHOT) await page.screenshot({ path: `${SHOT}/${name}`, fullPage }); };
 
