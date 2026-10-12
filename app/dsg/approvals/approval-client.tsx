@@ -7,6 +7,11 @@ const CALLBACK = 'https://dsg.pics/dsg/approvals';
 const AUDIENCE = 'https://aws.dsg.pics';
 const SCOPE = 'openid profile email dsg.approve';
 
+// Unknown risk is NEVER implicitly downgraded to a standard approval.
+export function knownRiskTier(tier: unknown): tier is 'standard' | 'high' {
+  return tier === 'standard' || tier === 'high';
+}
+
 type Approval = {
   approval_request_id: string;
   plan_id?: string;
@@ -87,8 +92,9 @@ export default function ApprovalClient() {
     });
   }
 
-  async function tool(name: string, args: Record<string, unknown>): Promise<ToolResponse> {
-    const accessToken = await obtainToken();
+  async function tool(name: string, args: Record<string, unknown>, tokenOverride?: string): Promise<ToolResponse> {
+    const accessToken = tokenOverride ?? await obtainToken();
+    if (!accessToken) throw new Error('AUTH0_APPROVER_TOKEN_REQUIRED');
     const res = await fetch('/api/dsg/spacetime/user-tools', {
       method: 'POST', credentials: 'include', cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
@@ -138,15 +144,33 @@ export default function ApprovalClient() {
 
   async function decide(decision: 'APPROVE' | 'REJECT') {
     if (!selected) return;
-    if (selected.risk_tier === 'high' && decision === 'APPROVE') {
-      setStatus('BLOCKED: งานความเสี่ยงสูงยังต้องพิสูจน์ Auth0 step-up ก่อนอนุมัติ');
+    if (decision === 'APPROVE' && (!knownRiskTier(selected.risk_tier) ||
+        !selected.route_id || !selected.plan_hash || !selected.subject_hash ||
+        !selected.payload || !selected.expires_at)) {
+      setStatus('BLOCKED: รายละเอียดงานหรือระดับความเสี่ยงไม่ครบ ห้ามอนุมัติโดยไม่เห็นสิ่งที่ผูกไว้');
       return;
     }
     setBusy(true);
     try {
+      // For high-risk, interactive max_age=0 is a user-experience request,
+      // NOT a proof. AWS verifies Auth0-signed recent authentication method
+      // claims and fails closed if the Auth0 Action / runtime gate is absent.
+      const interactiveToken = decision === 'APPROVE' && selected.risk_tier === 'high'
+        ? await client.current?.getTokenWithPopup({
+            authorizationParams: {
+              redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE,
+              prompt: 'login', max_age: 0,
+              ext_dsg_stepup: '1', // Auth0 post-login v3 OTP challenge Action
+            },
+            cacheMode: 'off',
+          })
+        : undefined;
+      if (decision === 'APPROVE' && selected.risk_tier === 'high' && !interactiveToken) {
+        throw new Error('AUTH0_STEP_UP_TOKEN_REQUIRED');
+      }
       const data = await tool('spacetime_resolve_approval', {
         approval_request_id: selected.approval_request_id, decision,
-      });
+      }, interactiveToken);
       if (data.receipt?.verdict !== (decision === 'APPROVE' ? 'APPROVED' : 'REJECTED')) {
         throw new Error(data.receipt?.reason || 'APPROVAL_RESULT_NOT_VERIFIED');
       }
@@ -192,13 +216,14 @@ export default function ApprovalClient() {
               {JSON.stringify(selected.payload, null, 2)}
             </pre>
             <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={busy || selected.risk_tier === 'high'}
+              <button type="button" disabled={busy || !knownRiskTier(selected.risk_tier)}
                 onClick={() => void decide('APPROVE')}
                 className="rounded-lg bg-emerald-700 px-4 py-2 disabled:opacity-40">อนุมัติงานนี้</button>
               <button type="button" disabled={busy} onClick={() => void decide('REJECT')}
                 className="rounded-lg bg-rose-700 px-4 py-2 disabled:opacity-40">ปฏิเสธ</button>
             </div>
-            {selected.risk_tier === 'high' && <p className="text-amber-200 text-sm">ยังไม่เปิดอนุมัติงาน High Risk จนกว่าจะมีหลักฐาน step-up Authentication</p>}
+            {selected.risk_tier === 'high' && <p className="text-amber-200 text-sm">งาน High Risk จะเปิด Auth0 ให้ยืนยันตัวตนซ้ำ และจะอนุมัติได้ต่อเมื่อ Spacetime ตรวจหลักฐานยืนยันตัวตนจาก Token ที่ลงลายเซ็นจริงแล้วเท่านั้น</p>}
+            {!knownRiskTier(selected.risk_tier) && <p className="text-rose-200 text-sm">BLOCKED: ไม่พบระดับความเสี่ยงที่ตรวจสอบได้</p>}
           </section>
         )}
       </section>
