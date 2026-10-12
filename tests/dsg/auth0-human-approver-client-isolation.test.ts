@@ -61,6 +61,29 @@ describe('separate Auth0 agents and human approver', () => {
     expect(await verifyDsgAuth0Principal(token, 'dsg.approve')).toBeNull();
   });
 
+  it('validates actual signed MFA method and timestamp, not password or iat alone', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    verifiedClaims(DSG_AUTH0_APPROVER_CLIENT_ID, 'dsg.approve');
+    expect((await verifyDsgAuth0Principal(token, 'dsg.approve'))?.mfaProofVerified).toBe(false);
+    for (const proof of [
+      { at: now - 4, method: 'pwd', valid: false },
+      { at: now - 121, method: 'mfa', valid: false },
+      { at: now + 15, method: 'mfa', valid: false },
+      { at: now - 4, method: 'mfa', valid: true },
+    ]) {
+      vi.mocked(jwtVerify).mockResolvedValue({
+        payload: {
+          sub: 'auth0|same-human', azp: DSG_AUTH0_APPROVER_CLIENT_ID,
+          scope: 'dsg.approve', iat: now, exp: now + 120,
+          'https://dsg.pics/claims/reauth_at': proof.at,
+          'https://dsg.pics/claims/reauth_method': proof.method,
+        },
+      } as never);
+      expect((await verifyDsgAuth0Principal(token, 'dsg.approve'))?.mfaProofVerified)
+        .toBe(proof.valid);
+    }
+  });
+
   it('does not use an unrecognized Auth0 azp as a fallback', async () => {
     verifiedClaims('unknown-oauth-client', 'openid dsg.use dsg.approve');
     expect(await verifyDsgAuth0Principal(token, 'dsg.use')).toBeNull();

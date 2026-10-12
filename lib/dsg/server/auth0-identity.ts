@@ -16,6 +16,8 @@ export type VerifiedAuth0Principal = {
   clientId: string;
   scope: 'dsg.use' | 'dsg.approve';
   hasApprovalScope?: boolean;
+  // Diagnostic only. Runtime independently enforces signed MFA for approvals.
+  mfaProofVerified?: boolean;
 };
 
 export async function verifyDsgAuth0Principal(token: unknown, requiredScope: 'dsg.use' | 'dsg.approve' = 'dsg.use'): Promise<VerifiedAuth0Principal | null> {
@@ -38,7 +40,24 @@ export async function verifyDsgAuth0Principal(token: unknown, requiredScope: 'ds
     if (typeof payload.scope !== 'string') return null;
     if (requiredScope === 'dsg.use' && !payload.scope.split(' ').includes('dsg.use')) return null;
     if (requiredScope === 'dsg.approve' && !payload.scope.split(' ').includes('dsg.approve')) return null;
-    return { subject: payload.sub, issuer: DSG_AUTH0_ISSUER, clientId: expectedClientId, scope: requiredScope, hasApprovalScope: payload.scope.split(' ').includes('dsg.approve') };
+    // An MFA proof is only meaningful after full JWT signature, issuer, audience,
+    // expiration, exact azp and dsg.approve scope verification above.
+    const reauthAt = payload['https://dsg.pics/claims/reauth_at'];
+    const reauthMethod = payload['https://dsg.pics/claims/reauth_method'];
+    const now = Math.floor(Date.now() / 1000);
+    const signedRecentMfa = requiredScope === 'dsg.approve'
+      && reauthMethod === 'mfa'
+      && typeof reauthAt === 'number' && Number.isInteger(reauthAt)
+      && reauthAt > 0 && reauthAt <= now + 5 && now - reauthAt <= 120
+      && reauthAt <= payload.iat + 5 && payload.iat - reauthAt <= 120;
+    return {
+      subject: payload.sub,
+      issuer: DSG_AUTH0_ISSUER,
+      clientId: expectedClientId,
+      scope: requiredScope,
+      hasApprovalScope: payload.scope.split(' ').includes('dsg.approve'),
+      ...(requiredScope === 'dsg.approve' ? { mfaProofVerified: signedRecentMfa } : {}),
+    };
   } catch {
     return null;
   }
