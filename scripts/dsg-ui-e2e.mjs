@@ -21,6 +21,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_CORE || 'playwright-cor
 
 const APP_PORT = Number(process.env.E2E_APP_PORT || 18190);
 const FAKE_PORT = Number(process.env.E2E_FAKE_PORT || 18191);
+const PROVIDER_PORT = Number(process.env.E2E_PROVIDER_PORT || 18192);
 const BASE = `http://127.0.0.1:${APP_PORT}`;
 const SHOT = process.env.SHOT;
 
@@ -98,17 +99,46 @@ const fakeServer = http.createServer((req, res) => {
 });
 await new Promise((resolve) => fakeServer.listen(FAKE_PORT, '127.0.0.1', resolve));
 
+// ───────── fake third-party providers (OpenAI-compatible, Katzilla, ActiveCampaign) that record every call
+// Used to prove who can make the SERVER spend its own provider credentials. Nothing here is real.
+const providerLog = [];
+const providerServer = http.createServer((req, res) => {
+  const url = new URL(req.url, `http://127.0.0.1:${PROVIDER_PORT}`);
+  providerLog.push({ method: req.method, path: url.pathname + url.search, authorization: req.headers.authorization, apiKey: req.headers['x-api-key'], acToken: req.headers['api-token'] });
+  const send = (status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
+  req.resume();
+  if (url.pathname.startsWith('/openai/')) return send(200, { id: 'resp_fake', output_text: 'fake', output: [{ type: 'message', content: [{ type: 'output_text', text: 'fake' }] }], choices: [{ message: { content: 'fake' } }] });
+  if (url.pathname.startsWith('/agents') || url.pathname.startsWith('/v1/')) return send(200, { agents: [] });
+  if (url.pathname === '/ac/api/3/contacts') return send(200, { contacts: [{ id: '7', email: (url.searchParams.get('email') || '').toLowerCase() }] });
+  if (url.pathname === '/ac/api/3/contacts/7/contactTags') return send(200, { contactTags: [] });
+  if (url.pathname === '/ac/api/3/contactTags') return send(201, {});
+  return send(404, {});
+});
+await new Promise((resolve) => providerServer.listen(PROVIDER_PORT, '127.0.0.1', resolve));
+const PROVIDER_KEYS = { openai: 'local-e2e-fake-openai-key', katzilla: 'local-e2e-fake-katzilla-key', ac: 'local-e2e-fake-ac-token' };
+
 // ───────── the built app, pointed at the fake
 const env = { ...process.env, NODE_ENV: 'production', NEXT_TELEMETRY_DISABLED: '1' };
+// Never let a real credential from the caller's shell reach the app under test.
+for (const name of Object.keys(env)) if (/(API_KEY|_TOKEN|SECRET|SERVICE_ROLE|PASSWORD)/i.test(name)) delete env[name];
 for (const name of ['DSG_ONE_V1_SUPABASE_URL', 'NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL', 'SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL',
   'DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY', 'DSG_ALLOW_DEV_HEADER_ACTOR', 'DSG_ALLOW_DEV_AUTH_HEADERS']) delete env[name];
 env.DSG_ONE_V1_SUPABASE_URL = `http://127.0.0.1:${FAKE_PORT}`;
 env.DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY = 'local-e2e-fake-key-not-a-secret';
 env.NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY = 'local-e2e-fake-publishable-key';
+env.OPENAI_API_KEY = PROVIDER_KEYS.openai;
+env.OPENAI_API_BASE = `http://127.0.0.1:${PROVIDER_PORT}/openai/v1`;
+env.KATZILLA_API_KEY = PROVIDER_KEYS.katzilla;
+env.KATZILLA_API_BASE = `http://127.0.0.1:${PROVIDER_PORT}`; // the connector resolves '/agents' against the origin
+env.ACTIVECAMPAIGN_API_URL = `http://127.0.0.1:${PROVIDER_PORT}/ac`;
+env.ACTIVECAMPAIGN_API_TOKEN = PROVIDER_KEYS.ac;
+env.ACTIVECAMPAIGN_TAG_PROOF_VIEWED_ID = '11';
+env.ACTIVECAMPAIGN_TAG_VERIFICATION_STARTED_ID = '12';
+env.ACTIVECAMPAIGN_TAG_PROOF_CREATED_ID = '13';
 const nextBin = path.join(process.cwd(), 'node_modules', '.bin', 'next');
 const app = spawn(nextBin, ['start', '-p', String(APP_PORT), '-H', '127.0.0.1'], { env, stdio: 'ignore' });
-const shutdown = () => { app.kill('SIGTERM'); fakeServer.close(); };
+const shutdown = () => { app.kill('SIGTERM'); fakeServer.close(); providerServer.close(); };
 process.on('exit', () => app.kill('SIGTERM'));
 {
   const end = Date.now() + 40000;
@@ -535,6 +565,185 @@ const cardNames = (page) => page.locator('article p.font-bold').allTextContents(
     const forgedSession = await post('/api/dsg/access/workspace', { workspaceId: WS.one }, `sb-access-token=${jwtFor(ID.alice)}x`);
     check('[B9] selecting a workspace with a forged session token -> 401', forgedSession.status === 401, `${forgedSession.status}`);
     await ctx.close();
+  }
+}
+
+// ═════════ Part C: who can make the SERVER spend its own provider credentials?
+// The fake providers above record every call. Anonymous or under-privileged callers must cause none.
+console.log('\n── Part C: server-held provider credentials');
+{
+  const hub = (prefix) => providerLog.filter((r) => r.path.startsWith(prefix));
+  const send = (c, headers = {}) => {
+    const body = c.body ? JSON.stringify(c.body) : undefined;
+    return raw(c.method, c.path, { ...(body ? { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body)) } : {}), ...headers }, body);
+  };
+  const asAlice = { ...bearer(TOKEN.alice), 'x-dsg-workspace-id': WS.one };
+  const asCarol = { ...bearer(TOKEN.carol), 'x-dsg-workspace-id': WS.one };
+  const routes = [
+    { name: 'ai-gateway execute:true', method: 'POST', path: '/api/dsg/ai-gateway', body: { provider: 'openai', goal: 'e2e goal', prompt: 'say hi', execute: true }, prefix: '/openai', needs: 'skill:execute' },
+    { name: 'openai chat', method: 'POST', path: '/api/dsg/ai/openai/chat', body: { input: 'hi' }, prefix: '/openai', needs: 'job:plan' },
+    { name: 'design-draft', method: 'POST', path: '/api/dsg/app-builder/design-draft', body: { message: 'a todo app', history: [] }, prefix: '/openai', needs: 'job:plan' },
+    { name: 'katzilla query', method: 'POST', path: '/api/dsg/katzilla/query', body: { path: '/agents' }, prefix: '/agents', needs: 'skill:execute' },
+    { name: 'katzilla agents', method: 'GET', path: '/api/dsg/katzilla/agents', prefix: '/agents', needs: 'skill:read' },
+  ];
+
+  // C1: anonymous callers
+  for (const r of [...routes,
+    { name: 'lifecycle event (victim email)', method: 'POST', path: '/api/dsg/lifecycle/event', body: { event: 'proof_viewed', email: 'victim@example.test' }, prefix: '/ac' },
+    { name: 'app-builder proof with an email', method: 'POST', path: '/api/dsg/app-builder/proof', body: { goal: 'Build a CRM dashboard for the e2e check', email: 'victim@example.test' }, prefix: '/ac' }]) {
+    const before = hub(r.prefix).length;
+    const res = await send(r);
+    const made = hub(r.prefix).length - before;
+    check(`[C1] anonymous ${r.name}: the server makes NO provider call with its credentials`, made === 0, `status=${res.status} provider-calls=${made}`);
+  }
+  const anonProof = await raw('GET', '/api/dsg/app-builder/proof');
+  check('[C1] the public deterministic proof (GET, used by the production smoke) still works anonymously', anonProof.status === 200 && JSON.parse(anonProof.text).ok === true, `${anonProof.status}`);
+
+  // C2: a verified OPERATOR still gets the work done (nothing broken for real users)
+  for (const r of routes) {
+    const before = hub(r.prefix).length;
+    const res = await send(r, asAlice);
+    const calls = hub(r.prefix).slice(before);
+    const key = r.prefix === '/agents' ? calls[0]?.apiKey : calls[0]?.authorization;
+    const expected = r.prefix === '/agents' ? PROVIDER_KEYS.katzilla : `Bearer ${PROVIDER_KEYS.openai}`;
+    check(`[C2] verified OPERATOR ${r.name}: reaches the provider with the server-held key`, calls.length >= 1 && key === expected, `status=${res.status} provider-calls=${calls.length}`);
+  }
+  {
+    const before = hub('/ac').length;
+    const res = await send({ method: 'POST', path: '/api/dsg/lifecycle/event', body: { event: 'proof_viewed', email: 'alice@example.test' } }, bearer(TOKEN.alice));
+    const calls = hub('/ac').slice(before);
+    check('[C2] verified user\'s own-account lifecycle event is delivered (contact lookup for her email)', res.status === 200 && calls.some((c) => c.path.includes('email=alice%40example.test')), `status=${res.status} calls=${calls.length}`);
+    const before2 = hub('/ac').length;
+    const other = await send({ method: 'POST', path: '/api/dsg/lifecycle/event', body: { event: 'proof_viewed', email: 'victim@example.test' } }, bearer(TOKEN.alice));
+    const calls2 = hub('/ac').slice(before2);
+    check('[C2] a verified user cannot tag SOMEONE ELSE\'s email (no lookup for victim@)', !calls2.some((c) => c.path.includes('victim')), `status=${other.status} calls=${calls2.length}`);
+    check('[C2] the response does not reveal whether an arbitrary email is a CRM contact', !/CONTACT_NOT_FOUND/.test(other.text), other.text.slice(0, 90));
+  }
+
+  // C3: a VIEWER may read but must not trigger paid/planning calls
+  for (const r of routes) {
+    const before = hub(r.prefix).length;
+    const res = await send(r, asCarol);
+    const made = hub(r.prefix).length - before;
+    const allowed = r.needs === 'skill:read';
+    check(`[C3] VIEWER ${r.name} (needs ${r.needs}): ${allowed ? 'allowed' : 'refused 403, no provider call'}`, allowed ? made >= 1 : (res.status === 403 && made === 0), `status=${res.status} provider-calls=${made}`);
+  }
+  // C4: a forged / non-member credential never reaches a provider either
+  {
+    const before = providerLog.length;
+    const res = await send(routes[0], { ...bearer(jwtFor(ID.alice) + 'x'), 'x-dsg-workspace-id': WS.one });
+    const notMember = await send(routes[1], { ...bearer(TOKEN.alice), 'x-dsg-workspace-id': WS.two });
+    check('[C4] forged token / non-member workspace on the provider routes -> 401/403 and no provider call', [res.status, notMember.status].every((c) => c === 401 || c === 403) && providerLog.length === before, `${res.status}/${notMember.status} calls=${providerLog.length - before}`);
+  }
+}
+
+// C5: the server-side agents (Z3 / search / loopback calls) need a verified member of the claimed workspace
+{
+  const agentRoutes = ['orchestrator', 'code-evolution', 'deploy-monitor', 'browser-research', 'security-gate', 'test-coverage'];
+  const payload = { jobId: 'job-e2e', workspaceId: WS.one, goal: 'e2e goal', actionId: 'a1', agentType: 'x', deploymentUrl: 'https://example.com', researchQuery: 'q', previousCoveragePct: 80, currentCoveragePct: 82, subGoals: [] };
+  const body = JSON.stringify(payload);
+  const hdr = { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body)) };
+  const anon = await Promise.all(agentRoutes.map((r) => raw('POST', `/api/dsg/agents/${r}`, hdr, body)));
+  check('[C5] anonymous POST to all 6 /api/dsg/agents/* routes -> 401 (no server-side skill runs)', anon.every((r) => r.status === 401), anon.map((r) => r.status).join(','));
+  const wrongWs = await Promise.all(agentRoutes.map((r) => raw('POST', `/api/dsg/agents/${r}`, { ...hdr, ...bearer(TOKEN.alice), 'x-dsg-workspace-id': WS.one }, JSON.stringify({ ...payload, workspaceId: WS.two }))));
+  check('[C5] a workspace id in the body that is not the session\'s -> 403 DSG_WORKSPACE_MISMATCH on every agent route', wrongWs.every((r) => r.status === 403 && codeOf(r) === 'DSG_WORKSPACE_MISMATCH'), wrongWs.map((r) => `${r.status}`).join(','));
+  const viewer = await raw('POST', '/api/dsg/agents/orchestrator', { ...hdr, ...bearer(TOKEN.carol), 'x-dsg-workspace-id': WS.one }, body);
+  check('[C5] a VIEWER cannot start the orchestrator -> 403', viewer.status === 403, `${viewer.status}`);
+}
+
+// C6: an operator cannot approve their own request through the execution routes (human approval stays human)
+{
+  const approve = JSON.stringify({ capability: 'browser.remote.execute', payload: { action: 'browser.remote.run', arguments: { url: 'https://example.com' } }, approvalRequestId: 'approval-e2e', approvalDecision: 'APPROVE' });
+  const h = { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(approve)), ...bearer(TOKEN.alice), 'x-dsg-workspace-id': WS.one };
+  const res = await raw('POST', '/api/agent/execute', h, approve);
+  check('[C6] /api/agent/execute with approvalDecision=APPROVE (OPERATOR) -> 403 DSG_HUMAN_APPROVAL_REQUIRED', res.status === 403 && codeOf(res) === 'DSG_HUMAN_APPROVAL_REQUIRED', `${res.status} ${codeOf(res)}`);
+  const auto = JSON.stringify({ action: 'EXECUTE', taskId: 't1', capability: 'browser.remote.execute', approvalDecision: 'APPROVE' });
+  const res2 = await raw('POST', '/api/dsg/jobs/33333333-3333-4333-8333-333333333333/automation', { ...h, 'content-length': String(Buffer.byteLength(auto)) }, auto);
+  check('[C6] /api/dsg/jobs/<id>/automation EXECUTE with APPROVE (OPERATOR) -> 403 DSG_HUMAN_APPROVAL_REQUIRED', res2.status === 403 && codeOf(res2) === 'DSG_HUMAN_APPROVAL_REQUIRED', `${res2.status} ${codeOf(res2)}`);
+}
+
+// ═════════ Part D: pages must stay usable when the network or an API fails (Workspace / Workroom / Verify)
+console.log('\n── Part D: failure handling and accessible names');
+{
+  // D1/D3: the workspace-selection POST fails -> one automatic attempt only, a visible error, buttons usable again
+  for (const [route, shape] of [['/dsg/access', 'network'], ['/dsg/workroom', 'network'], ['/dsg/access', 'http500'], ['/dsg/workroom', 'http500']]) {
+    const { ctx, page } = await sessionPage({ token: TOKEN.alice });
+    let posts = 0;
+    await page.route('**/api/dsg/access/workspace', (r) => { posts += 1; return shape === 'network' ? r.abort('failed') : json(r, 500, { ok: false, error: 'boom' }); });
+    await page.goto(`${BASE}${route}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3000);
+    const body = await page.locator('body').innerText();
+    check(`[D1] ${route} (${shape}): a failing workspace activation is tried once automatically, not in an endless loop`, posts >= 1 && posts <= 2, `POSTs in 3s = ${posts}`);
+    check(`[D1] ${route} (${shape}): the failure is shown with a next step (not stuck on "Loading")`, /ไม่สำเร็จ/.test(body), body.match(/.{0,40}ไม่สำเร็จ.{0,40}/)?.[0] || 'no failure text');
+    const enabled = await page.locator('button:has-text("Use this workspace"), button:has-text("Active session workspace")').first().isEnabled().catch(() => false);
+    check(`[D1] ${route} (${shape}): the workspace button is clickable again so the user can retry`, enabled);
+    await ctx.close();
+  }
+  // D2/D4: the session endpoint is down -> an honest error, not an eternal "Loading…"
+  for (const route of ['/dsg/access', '/dsg/workroom']) {
+    const { ctx, page } = await sessionPage({ token: TOKEN.alice, workspace: WS.one });
+    await page.route('**/api/dsg/access/session', (r) => json(r, 500, { ok: false }));
+    await page.goto(`${BASE}${route}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    const body = await page.locator('body').innerText();
+    check(`[D2] ${route}: session API 500 -> an error with HTTP code and how to retry (no endless "Loading…")`, /ไม่สำเร็จ.*500|500.*ไม่สำเร็จ/s.test(body) && !/Loading authenticated/.test(body), body.match(/.{0,50}(Loading authenticated|ไม่สำเร็จ).{0,50}/)?.[0]);
+    await ctx.close();
+  }
+  // D5: verify - telemetry down must not break the verification, and the page must not claim it was recorded
+  {
+    const { ctx, page } = await sessionPage({ token: TOKEN.alice, workspace: WS.one });
+    await page.route('**/api/dsg/lifecycle/event', (r) => r.abort('failed'));
+    await page.goto(`${BASE}/dsg/verify`, { waitUntil: 'networkidle' });
+    await page.locator('input[type=email]').fill('alice@example.test');
+    await page.getByRole('button', { name: 'Verify one AI action' }).click();
+    const gotReceipt = await page.getByText('Your verification receipt').waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
+    check('[D5] /dsg/verify: the verification still completes when the lifecycle telemetry endpoint is down', gotReceipt);
+    await page.waitForTimeout(800);
+    check('[D5] /dsg/verify: it does NOT claim "event recorded" when the event was not delivered', !(await page.getByText(/event recorded/i).count()));
+    await ctx.close();
+  }
+  // D6: verify - when blocked without a proof, the reasons are shown (and announced)
+  {
+    const { ctx, page } = await sessionPage({ token: TOKEN.alice, workspace: WS.one });
+    await page.route('**/api/dsg/lifecycle/event', (r) => json(r, 200, { ok: true, delivery: { delivered: false } }));
+    await page.route('**/api/dsg/app-builder/proof', (r) => r.request().method() === 'POST'
+      ? json(r, 422, { ok: false, runtimeGate: { status: 'BLOCKED', failures: [{ code: 'EXECUTOR_NOT_CONFIGURED', message: 'No executor is configured for this goal' }] } })
+      : r.continue());
+    await page.goto(`${BASE}/dsg/verify`, { waitUntil: 'networkidle' });
+    await page.locator('input[type=email]').fill('alice@example.test');
+    await page.getByRole('button', { name: 'Verify one AI action' }).click();
+    await page.waitForTimeout(1200);
+    check('[D6] /dsg/verify: a blocked result without a proof still lists WHY (failures are not hidden)', (await page.getByText('No executor is configured for this goal').count()) > 0);
+    check('[D6] /dsg/verify: the error is announced to assistive tech (role=alert)', (await page.locator('[role=alert]').count()) > 0);
+    await ctx.close();
+  }
+  // D7: every control on the key pages has an accessible name; one h1; no horizontal scroll (360px)
+  {
+    const pages = ['/login', '/dsg/access', '/dsg/workroom', '/dsg/approvals', '/dsg/verify', '/dsg/history'];
+    for (const route of pages) {
+      const { ctx, page } = await sessionPage({ token: route === '/login' ? undefined : TOKEN.alice, workspace: route === '/login' ? undefined : WS.one, viewport: { width: 360, height: 800 } });
+      await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(600);
+      const audit = await page.evaluate(() => {
+        const nameOf = (el) => {
+          const aria = el.getAttribute('aria-label') || '';
+          const by = (el.getAttribute('aria-labelledby') || '').split(/\s+/).map((id) => document.getElementById(id)?.textContent || '').join(' ');
+          const labels = el.labels ? [...el.labels].map((l) => l.textContent || '').join(' ') : '';
+          const text = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' ? '' : (el.textContent || '');
+          const alt = el.querySelector('img[alt]')?.getAttribute('alt') || '';
+          return (aria + by + labels + text + alt + (el.getAttribute('title') || '')).trim();
+        };
+        const controls = [...document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea')]
+          .filter((el) => el.getBoundingClientRect().width > 0 && getComputedStyle(el).visibility !== 'hidden');
+        const unnamed = controls.filter((el) => !nameOf(el)).map((el) => `${el.tagName.toLowerCase()}${el.getAttribute('type') ? `[${el.getAttribute('type')}]` : ''}`);
+        const small = controls.filter((el) => { const r = el.getBoundingClientRect(); return r.height < 40 || r.width < 40; }).length;
+        return { unnamed, small, h1: document.querySelectorAll('h1').length, overflow: document.documentElement.scrollWidth > innerWidth + 1, controls: controls.length };
+      });
+      check(`[D7] ${route}: every control has an accessible name`, audit.unnamed.length === 0, `unnamed=${JSON.stringify(audit.unnamed)} of ${audit.controls}`);
+      check(`[D7] ${route}: exactly one h1 and no horizontal scroll at 360px`, audit.h1 === 1 && !audit.overflow, `h1=${audit.h1} overflow=${audit.overflow}`);
+      console.log(`   info ${route}: ${audit.small} of ${audit.controls} controls are under 40px (not asserted)`);
+      await ctx.close();
+    }
   }
 }
 
