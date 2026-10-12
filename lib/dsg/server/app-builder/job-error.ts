@@ -9,6 +9,9 @@ export function classifyAppBuilderJobError(error: unknown): { code: string; stat
   if (code === 'DSG_PERMISSION_DENIED') {
     return { code, status: 403 };
   }
+  if (code === 'APP_BUILDER_GOAL_REQUIRED') {
+    return { code, status: 400 };
+  }
   if (code === 'APP_BUILDER_JOB_NOT_FOUND') {
     return { code, status: 404 };
   }
