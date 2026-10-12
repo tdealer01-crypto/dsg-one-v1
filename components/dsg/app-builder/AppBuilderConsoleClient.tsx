@@ -160,7 +160,7 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
       const json: unknown = await response.json();
       if (!response.ok || !json || typeof json !== 'object' || !('ok' in json) || json.ok !== true ||
           !('data' in json) || !Array.isArray(json.data)) {
-        const failure = 'error' in json && json.error && typeof json.error === 'object' && 'code' in json.error
+        const failure = json && typeof json === 'object' && 'error' in json && json.error && typeof json.error === 'object' && 'code' in json.error
           ? json.error.code : null;
         const allowedCodes = [
           'APP_BUILDER_DB_URL_NOT_CONFIGURED',
