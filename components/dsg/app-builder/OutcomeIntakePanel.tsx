@@ -30,7 +30,7 @@ export function OutcomeIntakePanel() {
       setResult(json);
       if ('ok' in json && json.ok === true) {
         // Share only the actual submitted input with the console below.
-        bridge?.publish(goal, successOutcome.trim() ? [successOutcome.trim()] : []);
+        bridge?.publish(json.intake);
       }
     } catch (error) {
       setResult({
