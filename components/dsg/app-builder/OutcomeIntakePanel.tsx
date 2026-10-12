@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { useAppBuilderGoalBridge } from './AppBuilderGoalBridge';
 import type { DsgOutcomePlan } from '@/lib/dsg/app-builder/outcome-intake';
 
 type OutcomeError = { ok: false; error: { code: string; message: string }; nextAction: string };
 
 export function OutcomeIntakePanel() {
+  const bridge = useAppBuilderGoalBridge();
   const [goal, setGoal] = useState('');
   const [targetUsers, setTargetUsers] = useState('operators, reviewers');
   const [successOutcome, setSuccessOutcome] = useState('User can see a useful first workflow and the missing evidence before production.');
@@ -26,6 +28,10 @@ export function OutcomeIntakePanel() {
       });
       const json = (await response.json()) as DsgOutcomePlan | OutcomeError;
       setResult(json);
+      if ('ok' in json && json.ok === true) {
+        // Share only the actual submitted input with the console below.
+        bridge?.publish(goal, successOutcome.trim() ? [successOutcome.trim()] : []);
+      }
     } catch (error) {
       setResult({
         ok: false,
@@ -83,6 +89,9 @@ export function OutcomeIntakePanel() {
             <div>
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200">Next action</p>
               <p className="mt-2 text-sm leading-6 text-slate-200">{result.nextAction}</p>
+              <a href="#dsg-app-builder-console" className="mt-3 inline-flex rounded-xl border border-cyan-300/40 px-3 py-2 text-sm font-semibold text-cyan-100">
+                ไปต่อใน Console ด้วยเป้าหมายนี้
+              </a>
               <p className="mt-3 text-sm text-slate-300">Suggested templates: {result.suggestedTemplateIds.join(', ')}</p>
               <p className="mt-2 text-sm text-slate-300">Readiness impact: {Object.entries(result.readinessImpact).filter(([, value]) => value).map(([key]) => key).join(', ') || 'planning only'}</p>
             </div>
