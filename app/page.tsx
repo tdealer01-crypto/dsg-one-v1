@@ -12,6 +12,72 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+const systemEntries = [
+  {
+    title: 'Access Hub',
+    description: 'Sign in, select your DSG workspace, and access governed product tools.',
+    href: '/dsg/access',
+    badge: 'Sign-in required',
+    external: false,
+  },
+  {
+    title: 'Workroom',
+    description: 'Your operator workspace for goals, Agent Chat and Command Center.',
+    href: '/dsg/workroom',
+    badge: 'Sign-in required',
+    external: false,
+  },
+  {
+    title: 'Desktop Control UI',
+    description: 'Open the existing AWS desktop control surface. Page reachability does not prove remote execution.',
+    href: '/control/',
+    badge: 'Runtime control',
+    external: false,
+  },
+  {
+    title: 'DSG OS',
+    description: 'Adapter Builder and local evidence verifier. Browser-side tools do not authorize execution.',
+    href: '/dsg-os',
+    badge: 'Public tools',
+    external: false,
+  },
+  {
+    title: 'Cinema Remote Browser',
+    description: 'Open the AWS Cinema app. Browser connect and execute are protected by Spacetime approvals.',
+    href: 'https://aws.dsg.pics/app',
+    badge: 'Approval-gated',
+    external: true,
+  },
+  {
+    title: 'Remote Desktop Commander',
+    description: 'Open the external RDC connector. Device pairing and permissions are managed separately.',
+    href: 'https://mcp.desktopcommander.app/',
+    badge: 'External connector',
+    external: true,
+  },
+  {
+    title: 'Human Approvals',
+    description: 'Review exact Spacetime requests with your linked Auth0 approver account. MFA may be required.',
+    href: '/dsg/approvals',
+    badge: 'Approver sign-in',
+    external: false,
+  },
+  {
+    title: 'App Builder',
+    description: 'Continue building DSG applications inside the existing protected workspace.',
+    href: '/dsg/app-builder',
+    badge: 'Sign-in required',
+    external: false,
+  },
+  {
+    title: 'Browser Execution Pilot',
+    description: 'Read the supervised browser pilot scope and request a governed trial.',
+    href: '/remote-browser-execution',
+    badge: 'Public pilot',
+    external: false,
+  },
+] as const;
+
 const steps = [
   {
     number: '01',
@@ -49,6 +115,9 @@ export default function HomePage() {
           <nav className="hidden items-center gap-2 md:flex">
             <Link href="/architecture-3d.html" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-300 hover:bg-slate-800 hover:text-white">3D architecture</Link>
             <Link href="/closure-dashboard.html" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-cyan-200">Closure checklist</Link>
+            <a href="#system-access" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-slate-800 hover:text-white">
+              System access
+            </a>
             <a href="#how-it-works" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white">
               How it works
             </a>
@@ -112,6 +181,45 @@ export default function HomePage() {
       </section>
 
       <div className="mx-auto max-w-6xl space-y-20 px-5 py-16 sm:px-8">
+        <section id="system-access" aria-labelledby="system-access-heading" className="scroll-mt-24">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="max-w-3xl">
+              <p className="font-mono text-xs uppercase tracking-[0.22em] text-cyan-300">One website · existing tools</p>
+              <h2 id="system-access-heading" className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">DSG ONE — System Access Hub</h2>
+              <p className="mt-3 text-sm leading-7 text-slate-400">
+                Find every existing DSG surface from this landing page. Protected tools require your normal website or provider login.
+                Links do not grant execution permission or bypass Spacetime, Auth0, MFA, or the approval ledger.
+              </p>
+            </div>
+            <Link href="/login?next=/dsg/access" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-3 text-sm font-black text-slate-950 hover:bg-cyan-200">
+              Enter authenticated Hub <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {systemEntries.map((entry) => (
+              <a
+                key={entry.title}
+                href={entry.href}
+                target={entry.external ? '_blank' : undefined}
+                rel={entry.external ? 'noopener noreferrer' : undefined}
+                className="group flex h-full min-h-48 flex-col rounded-2xl border border-slate-700/80 bg-slate-900/80 p-5 transition hover:border-cyan-400/60 hover:bg-slate-800/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+              >
+                <span className="self-start rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-[11px] font-semibold text-cyan-200">{entry.badge}</span>
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <h3 className="text-lg font-bold text-white">{entry.title}</h3>
+                  <ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0 text-cyan-300 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-400">{entry.description}</p>
+              </a>
+            ))}
+          </div>
+          <p className="mt-5 text-xs leading-6 text-amber-200/80">
+            Production truth boundary: OAuth-bound signed read-only provider E2E is verified for its exact scope.
+            Cinema high-risk connect/execute, Quest and whole-system E2E are not verified. A reachable page is not an execution receipt.
+            MCP clients continue to use the separate OAuth-protected https://aws.dsg.pics/mcp endpoint.
+          </p>
+        </section>
+
         <PublicProductionSnapshot />
         <section id="how-it-works" className="scroll-mt-24">
           <div className="mx-auto max-w-2xl text-center">
