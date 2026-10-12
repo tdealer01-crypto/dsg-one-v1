@@ -1,43 +1,8 @@
-import { AppBuilderConsoleClient } from '@/components/dsg/app-builder/AppBuilderConsoleClient';
+import { AppBuilderConsoleWorkspace } from '@/components/dsg/app-builder/AppBuilderConsoleClient';
+import { AppBuilderGoalProvider } from '@/components/dsg/app-builder/AppBuilderGoalBridge';
 import { AppBuilderProofPanel, type ProofPanelItem } from '@/components/dsg/app-builder/AppBuilderProofPanel';
 import { OutcomeIntakePanel } from '@/components/dsg/app-builder/OutcomeIntakePanel';
 import { DSG_APP_TEMPLATES, DSG_MARKET_TEMPLATES } from '@/lib/dsg/app-builder/templates/template-registry';
-import type { DsgAppBuilderPrd } from '@/lib/dsg/app-builder/types/prd';
-
-const demoPrd: DsgAppBuilderPrd = {
-  title: 'Market-Ready Agent App Builder',
-  summary:
-    'A governed app-builder workspace that turns a plain-language goal into a PRD, execution plan, approval gate, runtime evidence, and generated-app proof without claiming production readiness before evidence exists.',
-  useCase: 'Enterprise Agent Builder Workspace',
-  userProblem:
-    'Users want to describe the outcome they need, see a realistic preview, approve the plan, and verify proof without navigating scattered tools or trusting black-box AI claims.',
-  targetUsers: ['founder', 'operator', 'SMB owner', 'enterprise reviewer', 'developer'],
-  coreFeatures: [
-    'Outcome-first app request',
-    'Prompt to PRD preview',
-    'Template and risk registry',
-    'Z3 feasibility observer boundary',
-    'Approval and runtime proof gate',
-    'Visible next action for every blocked state',
-  ],
-  nonGoals: [
-    'No hidden autonomous execution',
-    'No direct model-to-secret access',
-    'No production-ready claim without build, deploy, database, auth, and proof evidence',
-    'No mock data presented as production evidence',
-  ],
-  acceptanceCriteria: [
-    'User can state the app outcome in plain language',
-    'User can see PRD and plan before approval',
-    'User can inspect risk, proof, and blocked reasons',
-    'User can open a generated app preview when available',
-    'Production claim remains blocked until runtime evidence exists',
-  ],
-  frontend: ['Next.js App Router', 'React', 'Tailwind'],
-  backend: ['Next API routes', 'DSG controlled executor', 'Governed tool boundary'],
-  database: ['Supabase Postgres', 'Evidence-first persistence boundary'],
-  deployment: ['Vercel', 'GitHub PR flow', 'CI and deployment proof required'],
-};
 
 const marketPillars = [
   {
@@ -156,6 +121,7 @@ const builderStages = [
 
 export default function DsgAppBuilderPage() {
   return (
+    <AppBuilderGoalProvider>
     <main className="min-h-screen overflow-hidden bg-[#090b0f] text-[#eef3f8]">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_15%_8%,rgba(242,202,80,0.20),transparent_30%),radial-gradient(circle_at_90%_18%,rgba(56,189,248,0.16),transparent_28%),linear-gradient(135deg,#090b0f_0%,#111827_48%,#050608_100%)]" />
       <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.028)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(circle_at_center,black,transparent_82%)]" />
@@ -238,6 +204,7 @@ export default function DsgAppBuilderPage() {
         </section>
 
         <section className="mt-8">
+          <p className="mb-3 text-sm text-slate-400">Static product readiness checklist — ไม่ใช่สถานะของ Job ผู้ใช้ ตรวจงานที่บันทึกจริงและ Evidence แยกที่ Workspace Console ด้านล่าง</p>
           <AppBuilderProofPanel items={proofPanelItems} productionReadyClaim={false} />
         </section>
 
@@ -265,7 +232,7 @@ export default function DsgAppBuilderPage() {
           </div>
         </section>
 
-        <AppBuilderConsoleClient initialPrd={demoPrd} />
+        <AppBuilderConsoleWorkspace />
 
         <section className="mt-8 rounded-[2rem] border border-white/10 bg-[#0f151f]/78 p-6 backdrop-blur-xl">
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
@@ -320,5 +287,6 @@ export default function DsgAppBuilderPage() {
         </section>
       </div>
     </main>
+    </AppBuilderGoalProvider>
   );
 }
