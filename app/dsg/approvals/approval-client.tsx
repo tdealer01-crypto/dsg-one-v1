@@ -160,6 +160,7 @@ export default function ApprovalClient() {
             authorizationParams: {
               redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE,
               prompt: 'login', max_age: 0,
+              ext_dsg_stepup: '1', // Auth0 post-login v3 OTP challenge Action
             },
             cacheMode: 'off',
           })
