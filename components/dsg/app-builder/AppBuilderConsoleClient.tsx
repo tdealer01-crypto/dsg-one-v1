@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PRDViewer } from './PRDViewer';
+import { useAppBuilderGoalBridge } from './AppBuilderGoalBridge';
 import { PlanObserverPanel } from './PlanObserverPanel';
 import { HandoffPanel } from './HandoffPanel';
 import { RuntimeGatePanel } from './RuntimeGatePanel';
@@ -111,6 +112,7 @@ function extractCreatedJobId(url: string | null) {
 }
 
 export function AppBuilderConsoleClient() {
+  const sharedOutcome = useAppBuilderGoalBridge()?.submitted;
   const [goal, setGoal] = useState('');
   const [criteria, setCriteria] = useState('');
   const [prd, setPrd] = useState<DsgAppBuilderPrd | null>(null);
@@ -142,6 +144,25 @@ export function AppBuilderConsoleClient() {
   const [loadingGovernedTool, setLoadingGovernedTool] = useState(false);
 
   const criteriaList = useMemo(() => criteria.split('\n').map((line) => line.trim()).filter(Boolean), [criteria]);
+
+  useEffect(() => {
+    if (!sharedOutcome) return;
+    setGoal(sharedOutcome.goal);
+    setCriteria(sharedOutcome.criteria.join('\n'));
+    setPrd(null);
+    setPlan(null);
+    setObserver(null);
+    setApprovalGate(null);
+    setHandoff(null);
+    setRuntimeGate(null);
+    setAgentLoop(null);
+    setCreatedJobUrl(null);
+    setGovernedPrepared(null);
+    setGovernedResult(null);
+    setPreviewMode('concept');
+    setStatus('OUTCOME_ACCEPTED · create governed job and PRD from the new input');
+  }, [sharedOutcome]);
+
 
   // The owner-scoped server route reads persisted Supabase jobs. Never synthesize
   // a saved job from a sample, localStorage or a guessed generated-app route.
@@ -447,7 +468,7 @@ export function AppBuilderConsoleClient() {
   }
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[0.95fr_1.05fr]">
+    <div id="dsg-app-builder-console" className="grid scroll-mt-4 gap-8 xl:grid-cols-[0.95fr_1.05fr]">
       <div className="space-y-8">
 
         <section aria-label="Real saved app builder jobs" className="rounded-2xl border border-cyan-400/25 bg-slate-900 p-5">
