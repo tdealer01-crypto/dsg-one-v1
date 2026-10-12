@@ -46,6 +46,15 @@ describe('App Builder truth: user goal and real jobs, not a frozen demo', () => 
     expect(consoleSource).not.toContain('localStorage.setItem(');
   });
 
+  it('shows current next action and treats requirements as pending, not completed proof', () => {
+    expect(consoleSource).toContain('const nextAction = !goal.trim()');
+    expect(consoleSource).toContain('User next action · current goal');
+    expect(consoleSource).not.toContain('6. Open live preview and verify output.');
+    expect(consoleSource).toContain('ข้อกำหนดที่ต้องทำ: {item}');
+    expect(consoleSource).not.toContain('✓ {item}');
+    expect(page).toContain('Static product readiness checklist');
+  });
+
   it('does not show the old generated app as the result of a newly created job', () => {
     expect(consoleSource).toContain('LIVE_PREVIEW_NOT_VERIFIED');
     expect(consoleSource).toContain('ตรวจ Job Timeline และ Evidence จริง');
