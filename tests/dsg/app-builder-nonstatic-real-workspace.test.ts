@@ -12,8 +12,8 @@ const persistedJobsRoute = source('app/api/dsg/app-builder/jobs/route.ts');
 describe('App Builder truth: user goal and real jobs, not a frozen demo', () => {
   it('does not initialize a PRD, goal, or preview as fake evidence', () => {
     expect(page).not.toContain('demoPrd');
-    expect(page).toContain('<AppBuilderConsoleClient />');
-    expect(consoleSource).toContain("const [goal, setGoal] = useState('')");
+    expect(page).toContain('<AppBuilderConsoleWorkspace />');
+    expect(consoleSource).toContain("const [goal, setGoal] = useState(initialGoal)");
     expect(consoleSource).toContain("const [prd, setPrd] = useState<DsgAppBuilderPrd | null>(null)");
     expect(consoleSource).toContain('USER_INPUT_ONLY · ยังไม่มี Build, Preview หรือ Execution');
     expect(consoleSource).not.toContain("const liveGeneratedAppPath =");
@@ -59,8 +59,8 @@ describe('App Builder truth: user goal and real jobs, not a frozen demo', () => 
     expect(bridge).toContain('createContext<GoalBridge | null>');
     expect(intake).toContain("json.ok === true");
     expect(intake).toContain('bridge?.publish(goal');
-    expect(consoleSource).toContain('setGoal(sharedOutcome.goal)');
-    expect(consoleSource).toContain('setCriteria(sharedOutcome.criteria.join');
+    expect(consoleSource).toContain('initialGoal={accepted?.goal');
+    expect(consoleSource).toContain('initialCriteria={accepted?.criteria.join');
     expect(consoleSource).toContain('id="dsg-app-builder-console"');
     expect(bridge).not.toContain('APPROVED');
     expect(bridge).not.toContain('EXECUTED');
