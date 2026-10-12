@@ -32,7 +32,7 @@ describe('2026-10-12 scoped AWS Marketplace production acceptance', () => {
   });
   it('links to the same owner activation and canonical evidence record in public site and 3D', () => {
     const issue = 'issues/656#issuecomment-6120341073';
-    expect(snapshot).not.toContain(issue);
+    expect(snapshot).toContain(issue);
     expect(snapshot).toContain('dsg-marketplace-verified-oauth-read-e2e-12-october-2026');
     expect(snapshot).toContain('GitHub access required');
     expect(docs).toContain(issue);
