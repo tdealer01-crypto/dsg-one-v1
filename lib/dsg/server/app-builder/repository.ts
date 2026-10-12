@@ -44,7 +44,7 @@ function queryId(ctx: AppBuilderRequestContext, id: string): string {
 export async function listAppBuilderJobs(ctx: AppBuilderRequestContext): Promise<AppBuilderJob[]> {
   const rows = await supabaseRest<Row[]>({
     path: 'dsg_app_builder_jobs',
-    query: `?workspace_id=eq.${ctx.workspaceId}&select=*&order=created_at.desc`,
+    query: `?workspace_id=eq.${ctx.workspaceId}&select=id,workspace_id,created_by,status,claim_status,goal,created_at,updated_at&order=created_at.desc&limit=8`,
   });
   return rows.map(mapJob);
 }
