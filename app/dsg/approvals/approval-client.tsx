@@ -56,7 +56,7 @@ export default function ApprovalClient() {
         setSiteReady(true);
         const c = await createAuth0Client({
           domain: 'dev-kcddqmnusbxxo25s.us.auth0.com',
-          clientId: 'mLIAcMEAhuVDaUvzXn8Qo54zj2llFp3X',
+          clientId: 'jI1uiKcQu7mqORsaCrogKTQVsAcZuQSt',
           authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE },
           cacheLocation: 'memory',
           useRefreshTokens: false,
