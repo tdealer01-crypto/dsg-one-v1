@@ -21,7 +21,10 @@ describe('2026-10-12 scoped AWS Marketplace production acceptance', () => {
   });
   it('does not promote empty catalog or old signed canary to commercial acceptance', () => {
     expect(snapshot).toContain('Empty listings are a real empty catalog');
-    expect(snapshot).toContain('Not verified: seller/listing write');
+    expect(snapshot).toContain('Seller listing creation and write');
+    expect(snapshot).toContain("status: 'BLOCKED'");
+    expect(snapshot).toContain("status: 'REVIEW'");
+    expect(snapshot).toContain('nextAction:');
     expect(snapshot).toContain('Marketplace-specific signed Provider v2 receipt');
     expect(snapshot).toContain('This dated receipt does not mean the current website session is OAuth-bound');
     expect(docs).toContain('Cinema approved Connect/Execute');
@@ -30,6 +33,8 @@ describe('2026-10-12 scoped AWS Marketplace production acceptance', () => {
   it('links to the same owner activation and canonical evidence record in public site and 3D', () => {
     const issue = 'issues/656#issuecomment-6120341073';
     expect(snapshot).toContain(issue);
+    expect(snapshot).toContain('dsg-marketplace-verified-oauth-read-e2e-12-october-2026');
+    expect(snapshot).toContain('GitHub access required');
     expect(docs).toContain(issue);
     expect(snapshot).toContain('actions/runs/38221386222');
   });
