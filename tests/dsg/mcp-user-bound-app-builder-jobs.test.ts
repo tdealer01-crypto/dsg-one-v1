@@ -142,7 +142,7 @@ describe('MCP App Builder signed OAuth workspace read (inactive until delegated 
     [{ scope: 'openid email' }, 'missing dsg.use'],
     [{ sub: 'x'.repeat(221) }, 'oversized principal'],
     [{ iat: Math.floor(Date.now() / 1000) + 600 }, 'future issue time'],
-  ])('rejects %s (%s) without querying membership', async (payload) => {
+  ])('rejects %s (%s) without querying membership', async (payload, _description) => {
     tokenVerifier.mockResolvedValue(signedClaims(payload) as never);
     const response = await GET(request());
     expect(response.status).toBe(401);
