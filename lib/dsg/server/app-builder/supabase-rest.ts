@@ -49,6 +49,9 @@ export async function supabaseRest<T>(input: SupabaseRequest): Promise<T> {
   // Do not propagate raw PostgREST error messages: they can contain schema
   // details, SQL, or private operational information.
   if (!response.ok) {
+    // Release the connection without reading (or exposing) the upstream body: unconsumed bodies are left to
+    // garbage collection by undici, which can exhaust the pool during an outage or a key misconfiguration.
+    await response.body?.cancel().catch(() => undefined);
     if (response.status === 401 || response.status === 403) {
       throw new Error('APP_BUILDER_DB_ACCESS_DENIED');
     }

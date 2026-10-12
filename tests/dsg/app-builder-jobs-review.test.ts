@@ -118,6 +118,34 @@ describe('a failure in the authentication / membership backend is reported as th
     }
   });
 
+  it('wrongly typed goal fields are client errors too (400), while an empty goal keeps its own code', async () => {
+    mocks.verify.mockResolvedValue({ actorId: 'u1', workspaceId: 'w1', role: 'OPERATOR' });
+    const post = (body: unknown) => createJob(req('/api/dsg/app-builder/jobs', { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } }));
+    for (const body of [{ goal: 123 }, { goal: 'x', successCriteria: 'a string' }, { goal: 'x', constraints: [1, 2] }]) {
+      const res = await post(body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect((await res.json()).error.code).toBe('APP_BUILDER_REQUEST_INVALID');
+    }
+    const empty = await post({ goal: '   ' });
+    expect(empty.status).toBe(400);
+    expect((await empty.json()).error.code).toBe('APP_BUILDER_GOAL_REQUIRED');
+  });
+
+  it('a failed upstream response is cancelled, not left for garbage collection, and its text is never exposed', async () => {
+    vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://db.example.test');
+    vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'sb_secret_test');
+    let cancelled = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ReadableStream({
+      start(controller) { controller.enqueue(new TextEncoder().encode('private upstream text')); },
+      cancel() { cancelled += 1; },
+    }), { status: 503 })));
+    for (let i = 0; i < 3; i += 1) {
+      const error = await supabaseRest({ path: 'dsg_app_builder_jobs' }).catch((e: Error) => e);
+      expect((error as Error).message).toBe('APP_BUILDER_DB_UPSTREAM_UNAVAILABLE');
+    }
+    expect(cancelled).toBe(3);
+  });
+
   it('the classification table knows the new codes and nothing leaks through the default branch', () => {
     expect(classifyAppBuilderJobError(new Error('APP_BUILDER_AUTH_BACKEND_UNAVAILABLE'))).toEqual({ code: 'APP_BUILDER_AUTH_BACKEND_UNAVAILABLE', status: 503 });
     expect(classifyAppBuilderJobError(new Error('APP_BUILDER_REQUEST_INVALID'))).toEqual({ code: 'APP_BUILDER_REQUEST_INVALID', status: 400 });
