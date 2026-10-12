@@ -84,9 +84,9 @@ POST /api/plugins/graphmap/query
 
 ### ไฟล์ใหม่: Market parity features
 - `app/dsg/templates/page.tsx` + `app/api/dsg/templates/route.ts` — Template gallery (12 templates, search, category filter, Popular badge)
-- `app/dsg/analytics/page.tsx` + `app/api/dsg/analytics/route.ts` — Analytics dashboard (recharts BarChart, toggle 7d/30d/90d)
+- `app/dsg/analytics/page.tsx` + `app/api/dsg/analytics/route.ts` — Analytics dashboard — counts of the caller's own `dsg_app_builds` rows (recharts BarChart, 7d/30d/90d, trend vs previous window); no token/cost/provider figures because none are stored
 - `app/dsg/history/page.tsx` + `app/api/dsg/history/route.ts` — Build history timeline (compare mode, restore, diff stats, pagination)
-- `app/dsg/notifications/page.tsx` + `app/api/dsg/notifications/route.ts` — Notifications feed (filter tabs, mark-read, settings panel)
+- `app/dsg/notifications/page.tsx` + `app/api/dsg/notifications/route.ts` — Notifications feed from `dsg_notifications` (server filters, mark-read / mark-all via PATCH). No producer writes this table yet, so the page is honestly empty; there is no email/Slack settings panel
 
 ### ไฟล์ใหม่: UI/UX
 - `app/page.tsx` (updated) — เปลี่ยนจาก bare `redirect('/dsg/action-layer')` เป็น welcome page เต็ม (hero, how-it-works, template chips, recent builds)

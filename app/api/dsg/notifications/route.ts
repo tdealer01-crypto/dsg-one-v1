@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
+import { authorizeDsgRoute } from '@/lib/dsg/server/route-auth';
 import { getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
 
 export type NotificationType = 'BUILD_COMPLETE' | 'BUILD_FAILED' | 'GOVERNANCE' | 'APPROVAL' | 'SYSTEM';
@@ -35,9 +35,19 @@ function mapNotification(row: NotificationRow): Notification {
 
 type RestPatchResponse = { id: string; read: boolean }[];
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Database/driver text stays server-side; the browser only gets a stable code.
+function failure(code: string, status = 500) {
+  return NextResponse.json({ ok: false, error: { code } }, { status });
+}
+
 export async function GET(req: Request) {
+  const auth = await authorizeDsgRoute(req.headers, 'job:read');
+  if (!auth.ok) return auth.response;
+  const actor = auth.actor;
+
   try {
-    const actor = await requireVerifiedDsgActor(req.headers, 'job:read');
     const { searchParams } = new URL(req.url);
     const filter = searchParams.get('filter') ?? 'ALL';
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
@@ -76,17 +86,18 @@ export async function GET(req: Request) {
     const total = allMapped.length;
     const items = allMapped.slice((page - 1) * perPage, page * perPage);
 
-    return NextResponse.json({ ok: true, data: { items, total, unreadCount } });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'NOTIFICATIONS_FETCH_FAILED';
-    const httpStatus = message === 'DSG_AUTH_REQUIRED' || message === 'DSG_PERMISSION_DENIED' ? 403 : 500;
-    return NextResponse.json({ ok: false, error: { code: message } }, { status: httpStatus });
+    return NextResponse.json({ ok: true, data: { items, total, unreadCount, page, perPage } });
+  } catch {
+    return failure('NOTIFICATIONS_FETCH_FAILED');
   }
 }
 
 export async function PATCH(req: Request) {
+  const auth = await authorizeDsgRoute(req.headers, 'job:read');
+  if (!auth.ok) return auth.response;
+  const actor = auth.actor;
+
   try {
-    const actor = await requireVerifiedDsgActor(req.headers, 'job:read');
     const body = (await req.json().catch(() => null)) as { id?: string; markAll?: boolean } | null;
     const config = getDsgSupabaseRpcConfig();
     const baseUrl = `${config.url}/rest/v1/dsg_notifications`;
@@ -109,16 +120,14 @@ export async function PATCH(req: Request) {
         cache: 'no-store',
       });
 
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err || `NOTIFICATIONS_PATCH_${res.status}`);
-      }
+      if (!res.ok) throw new Error(`NOTIFICATIONS_PATCH_${res.status}`);
 
       const updated = (await res.json()) as RestPatchResponse;
       return NextResponse.json({ ok: true, data: { updated: updated.length } });
     }
 
     if (typeof body?.id === 'string') {
+      if (!UUID.test(body.id)) return failure('NOTIFICATIONS_PATCH_INVALID_BODY', 400);
       const url = new URL(baseUrl);
       url.searchParams.set('id', `eq.${body.id}`);
       url.searchParams.set('user_id', `eq.${actor.actorId}`);
@@ -135,29 +144,16 @@ export async function PATCH(req: Request) {
         cache: 'no-store',
       });
 
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err || `NOTIFICATIONS_PATCH_${res.status}`);
-      }
+      if (!res.ok) throw new Error(`NOTIFICATIONS_PATCH_${res.status}`);
 
       const updated = (await res.json()) as RestPatchResponse;
-      if (updated.length === 0) {
-        return NextResponse.json(
-          { ok: false, error: { code: 'NOTIFICATION_NOT_FOUND' } },
-          { status: 404 },
-        );
-      }
+      if (updated.length === 0) return failure('NOTIFICATION_NOT_FOUND', 404);
 
       return NextResponse.json({ ok: true, data: { id: updated[0].id, read: updated[0].read } });
     }
 
-    return NextResponse.json(
-      { ok: false, error: { code: 'NOTIFICATIONS_PATCH_INVALID_BODY' } },
-      { status: 400 },
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'NOTIFICATIONS_PATCH_FAILED';
-    const httpStatus = message === 'DSG_AUTH_REQUIRED' || message === 'DSG_PERMISSION_DENIED' ? 403 : 500;
-    return NextResponse.json({ ok: false, error: { code: message } }, { status: httpStatus });
+    return failure('NOTIFICATIONS_PATCH_INVALID_BODY', 400);
+  } catch {
+    return failure('NOTIFICATIONS_PATCH_FAILED');
   }
 }

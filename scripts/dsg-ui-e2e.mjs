@@ -57,6 +57,18 @@ const build = (prefix, owner, n) => Array.from({ length: n }, (_, i) => ({
   created_at: new Date(Date.now() - (i + 1) * 3600e3).toISOString(),
 }));
 const BUILDS = [...build('Alice', ID.alice, 12), ...build('Bob Secret', ID.bob, 3)];
+const nid = (n) => `eeeeeeee-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`;
+const NOTIF_IDS = { failed: nid(1), deployed: nid(2), approval: nid(3), governance: nid(4), system: nid(5), bob: nid(6) };
+const notifRow = (id, user, type, title, read, hoursAgo) => ({ id, user_id: user, type, title, message: `${title} (detail)`, read, created_at: new Date(Date.now() - hoursAgo * 3600e3).toISOString() });
+const seedNotifs = () => [
+  notifRow(NOTIF_IDS.failed, ID.alice, 'BUILD_FAILED', 'Alice build failed', false, 1),
+  notifRow(NOTIF_IDS.deployed, ID.alice, 'BUILD_COMPLETE', 'Alice build deployed', false, 2),
+  notifRow(NOTIF_IDS.approval, ID.alice, 'APPROVAL', 'Alice approval waiting', false, 3),
+  notifRow(NOTIF_IDS.governance, ID.alice, 'GOVERNANCE', 'Alice governance digest', true, 30),
+  notifRow(NOTIF_IDS.system, ID.alice, 'SYSTEM', 'Alice system notice', true, 50),
+  notifRow(NOTIF_IDS.bob, ID.bob, 'SYSTEM', 'Bob Secret notice', false, 1),
+];
+let NOTIFS = seedNotifs();
 const fake = { mode: 'ok' };
 const DB_ERROR_MARKER = 'E2E-SECRET-MARKER';
 
@@ -91,8 +103,26 @@ const fakeServer = http.createServer((req, res) => {
   if (url.pathname === '/rest/v1/dsg_app_builds') {
     if (fake.mode === 'dberror') return send(400, { message: `relation "dsg_app_builds" does not exist (${DB_ERROR_MARKER})` });
     const status = eq(url.searchParams.get('status'));
-    const rows = BUILDS.filter((b) => b.user_id === eq(url.searchParams.get('user_id')) && (!status || b.status === status))
+    const since = (url.searchParams.get('created_at') || '').replace(/^gte\./, '');
+    const limit = Number(url.searchParams.get('limit') || Infinity);
+    const rows = BUILDS.filter((b) => b.user_id === eq(url.searchParams.get('user_id')) && (!status || b.status === status) && (!since || b.created_at >= since))
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, limit);
+    return send(200, rows);
+  }
+  if (url.pathname === '/rest/v1/dsg_notifications') {
+    if (fake.mode === 'dberror') return send(400, { message: `relation "dsg_notifications" does not exist (${DB_ERROR_MARKER})` });
+    const owner = eq(url.searchParams.get('user_id'));
+    const id = eq(url.searchParams.get('id'));
+    const read = eq(url.searchParams.get('read'));
+    const typeParam = url.searchParams.get('type');
+    const typeOk = (t) => !typeParam || (typeParam.startsWith('in.(') ? typeParam.slice(4, -1).split(',').includes(t) : typeParam.startsWith('eq.') ? typeParam.slice(3) === t : true);
+    const rows = NOTIFS.filter((n) => (!owner || n.user_id === owner) && (!id || n.id === id) && (read === undefined || String(n.read) === read) && typeOk(n.type))
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    if (req.method === 'PATCH') {
+      req.on('data', () => {});
+      req.on('end', () => { for (const n of rows) n.read = true; send(200, rows.map((n) => ({ id: n.id, read: n.read }))); });
+      return undefined;
+    }
     return send(200, rows);
   }
   return send(404, { message: 'not found in fake supabase' });
@@ -744,6 +774,147 @@ console.log('\n── Part D: failure handling and accessible names');
       console.log(`   info ${route}: ${audit.small} of ${audit.controls} controls are under 40px (not asserted)`);
       await ctx.close();
     }
+  }
+}
+
+// ═════════ Part E: Analytics and Notifications show the caller's own real rows (they used to be hard-coded demo data)
+console.log('\n── Part E: analytics and notifications are real, scoped and honest');
+{
+  const H = (tok = TOKEN.alice, ws = WS.one) => ({ ...bearer(tok), 'x-dsg-workspace-id': ws });
+  const patch = (body, tok = TOKEN.alice, ws = WS.one) => { const text = JSON.stringify(body); return raw('PATCH', '/api/dsg/notifications', { ...H(tok, ws), 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(text)) }, text); };
+  const DEMO = /Inventory Tracker|Payments Portal|Customer Portal|Provider Usage|Gemini|Anthropic|AI Tokens/;
+
+  // E1: analytics API
+  const none = await raw('GET', '/api/dsg/analytics');
+  check('[E1] /api/dsg/analytics without credentials -> 401 DSG_AUTH_REQUIRED', none.status === 401 && codeOf(none) === 'DSG_AUTH_REQUIRED', `${none.status} ${codeOf(none)}`);
+  const a7 = await raw('GET', '/api/dsg/analytics?range=7d', H());
+  const d7 = JSON.parse(a7.text).data;
+  check('[E1] counts only the caller\'s 12 builds (3 deployed, 3 failed -> 50%); bob\'s rows never appear', a7.status === 200 && d7.stats.totalBuilds === 12 && d7.stats.deployed === 3 && d7.stats.failed === 3 && d7.stats.successRate === 50 && !a7.text.includes('Bob Secret'), `${a7.status} ${JSON.stringify(d7?.stats)}`);
+  check('[E1] nothing is estimated: no token / cost / provider figures in the payload', !/token|cost|provider|updatedEvery/i.test(a7.text));
+  check('[E1] the newest build is listed with its real name (the old API returned an empty name)', d7.recentBuilds[0].appName === 'Alice App 1' && d7.recentBuilds.length === 10, d7.recentBuilds[0]?.appName);
+  const shape = {};
+  for (const r of ['7d', '30d', '90d', 'bogus']) {
+    const res = await raw('GET', `/api/dsg/analytics?range=${r}`, H());
+    const data = JSON.parse(res.text).data;
+    shape[r] = `${data.range}:${data.buildActivity.length}bars:${data.buildActivity.reduce((n, b) => n + b.builds, 0)}`;
+  }
+  check('[E1] each range really changes the chart (7d=7 bars, 30d=6, 90d=9; unknown range -> 7d); every build is counted once', shape['7d'] === '7d:7bars:12' && shape['30d'] === '30d:6bars:12' && shape['90d'] === '90d:9bars:12' && shape.bogus === '7d:7bars:12', JSON.stringify(shape));
+  const other = await raw('GET', '/api/dsg/analytics?range=7d', H(TOKEN.bob, WS.two));
+  const otherData = JSON.parse(other.text).data;
+  check('[E1] another user sees only their own builds (bob: 3, none of alice\'s)', otherData.stats.totalBuilds === 3 && !other.text.includes('Alice App'), `${otherData?.stats?.totalBuilds}`);
+  fake.mode = 'dberror';
+  const dbErr = await raw('GET', '/api/dsg/analytics', H());
+  check('[E1] DB error -> 500 ANALYTICS_FETCH_FAILED with no table/driver text', dbErr.status === 500 && codeOf(dbErr) === 'ANALYTICS_FETCH_FAILED' && !dbErr.text.includes(DB_ERROR_MARKER) && !dbErr.text.includes('dsg_app_builds'), `${dbErr.status} ${dbErr.text.slice(0, 80)}`);
+  fake.mode = 'ok';
+
+  // E2: analytics page
+  {
+    const { ctx, page, errors } = await sessionPage({ token: TOKEN.alice, workspace: WS.one });
+    const requested = [];
+    page.on('request', (r) => { if (r.url().includes('/api/dsg/analytics')) requested.push(new URL(r.url()).searchParams.get('range')); });
+    await page.goto(`${BASE}/dsg/analytics`, { waitUntil: 'domcontentloaded' });
+    const shown = await page.getByText('Alice App 1').first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
+    const body = await page.locator('body').innerText();
+    check('[E2] /dsg/analytics shows the caller\'s real builds and rate, no demo figures', shown && /50%/.test(body) && !DEMO.test(body) && !body.includes('Bob Secret'), body.match(DEMO)?.[0] || '');
+    check('[E2] it says tokens / cost are not recorded instead of showing an estimate', /ยังไม่เก็บจำนวน token/.test(body));
+    await page.getByRole('button', { name: '30 วัน' }).click();
+    check('[E2] choosing 30 วัน calls the API with range=30d and marks the button pressed', await until(async () => requested.includes('30d')) && (await page.getByRole('button', { name: '30 วัน' }).getAttribute('aria-pressed')) === 'true', requested.join(','));
+    check('[E2] no page errors', errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await sessionPage({ token: TOKEN.alice, workspace: WS.one });
+    fake.mode = 'dberror';
+    await page.goto(`${BASE}/dsg/analytics`, { waitUntil: 'domcontentloaded' });
+    await page.locator('[role=alert]').filter({ hasText: 'HTTP 500' }).waitFor({ timeout: 8000 });
+    const html = await page.content();
+    check('[E2] API failure -> role=alert with HTTP 500 + retry; no DB text, no demo data', !html.includes(DB_ERROR_MARKER) && !html.includes('dsg_app_builds') && !DEMO.test(await page.locator('body').innerText()));
+    fake.mode = 'ok';
+    await page.getByRole('button', { name: 'ลองอีกครั้ง' }).click();
+    check('[E2] retry after recovery shows the real rows', await page.getByText('Alice App 1').first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false));
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await sessionPage({ token: TOKEN.carol, workspace: WS.one, viewport: { width: 360, height: 800 } });
+    await page.goto(`${BASE}/dsg/analytics`, { waitUntil: 'domcontentloaded' });
+    const empty = await page.getByText(/ยังไม่มี build ในช่วง 7 วัน/).waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
+    check('[E2] a user with no builds sees an honest empty state with a next step (not a demo chart)', empty && (await page.getByRole('link', { name: 'ไปที่ App Builder' }).count()) === 1 && !DEMO.test(await page.locator('body').innerText()));
+    check('[E2] no horizontal scroll at 360px', !(await overflow(page)));
+    await ctx.close();
+  }
+
+  // E3: notifications API
+  const nNone = await raw('GET', '/api/dsg/notifications');
+  check('[E3] /api/dsg/notifications without credentials -> 401', nNone.status === 401 && codeOf(nNone) === 'DSG_AUTH_REQUIRED', `${nNone.status}`);
+  const nAll = JSON.parse((await raw('GET', '/api/dsg/notifications?filter=ALL', H())).text).data;
+  check('[E3] list returns only the caller\'s 5 notifications (3 unread); bob\'s is never visible', nAll.total === 5 && nAll.unreadCount === 3 && !JSON.stringify(nAll).includes('Bob Secret'), `${nAll.total}/${nAll.unreadCount}`);
+  const nUnread = JSON.parse((await raw('GET', '/api/dsg/notifications?filter=UNREAD', H())).text).data;
+  const nBuilds = JSON.parse((await raw('GET', '/api/dsg/notifications?filter=BUILDS', H())).text).data;
+  check('[E3] filters are applied by the server (UNREAD=3, BUILDS=only build events)', nUnread.items.length === 3 && nBuilds.items.length === 2 && nBuilds.items.every((n) => n.type.startsWith('BUILD_')), `${nUnread.items.length}/${nBuilds.items.length}`);
+  const foreign = await patch({ id: NOTIF_IDS.bob });
+  const bobAfter = JSON.parse((await raw('GET', '/api/dsg/notifications?filter=UNREAD', H(TOKEN.bob, WS.two))).text).data;
+  check('[E3] alice cannot mark bob\'s notification (404) and it stays unread', foreign.status === 404 && codeOf(foreign) === 'NOTIFICATION_NOT_FOUND' && bobAfter.unreadCount === 1, `${foreign.status} bobUnread=${bobAfter.unreadCount}`);
+  const badId = await patch({ id: 'not-a-uuid&user_id=neq.x' });
+  check('[E3] a malformed id is refused (400) before any database call', badId.status === 400 && codeOf(badId) === 'NOTIFICATIONS_PATCH_INVALID_BODY', `${badId.status}`);
+  const one = await patch({ id: NOTIF_IDS.failed });
+  const afterOne = JSON.parse((await raw('GET', '/api/dsg/notifications', H())).text).data;
+  check('[E3] marking one notification read persists on the server (unread 3 -> 2)', one.status === 200 && afterOne.unreadCount === 2, `${one.status} unread=${afterOne.unreadCount}`);
+  fake.mode = 'dberror';
+  const nDb = await raw('GET', '/api/dsg/notifications', H());
+  const nDbPatch = await patch({ markAll: true });
+  check('[E3] DB errors on read and on write -> 500 with a generic code, no table/driver text', nDb.status === 500 && nDbPatch.status === 500 && ![nDb.text, nDbPatch.text].some((t) => t.includes(DB_ERROR_MARKER) || t.includes('dsg_notifications')), `${nDb.status} ${nDbPatch.status}`);
+  fake.mode = 'ok';
+  NOTIFS = seedNotifs();
+
+  // E4: notifications page
+  {
+    const { ctx, page, errors } = await sessionPage({ token: TOKEN.alice, workspace: WS.one });
+    await page.goto(`${BASE}/dsg/notifications`, { waitUntil: 'domcontentloaded' });
+    const shown = await page.getByText('Alice build failed').first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
+    const body = await page.locator('body').innerText();
+    check('[E4] /dsg/notifications lists the caller\'s real notifications, none of the demo ones, none of bob\'s', shown && /ยังไม่ได้อ่าน 3/.test(body) && !DEMO.test(body) && !/Auth Service|Welcome to DSG One|Bob Secret/.test(body), body.match(DEMO)?.[0] || '');
+    check('[E4] no switches for email / Slack that do nothing (and the page says why)', (await page.locator('[role=switch]').count()) === 0 && /ยังไม่เปิดให้ใช้/.test(body));
+    await page.getByRole('button', { name: 'ทำเครื่องหมายว่าอ่านแล้ว' }).first().click();
+    const dropped = await page.getByText('ยังไม่ได้อ่าน 2').waitFor({ timeout: 6000 }).then(() => true).catch(() => false);
+    const serverUnread = JSON.parse((await raw('GET', '/api/dsg/notifications', H())).text).data.unreadCount;
+    check('[E4] pressing "mark as read" changes the server state, not just the screen (3 -> 2)', dropped && serverUnread === 2, `ui=${dropped} server=${serverUnread}`);
+    await page.getByRole('button', { name: 'ทำเครื่องหมายว่าอ่านทั้งหมด' }).click();
+    const allRead = await page.getByText('ยังไม่ได้อ่าน 0').waitFor({ timeout: 6000 }).then(() => true).catch(() => false);
+    check('[E4] "mark all as read" empties the unread count on the server and hides the button', allRead && JSON.parse((await raw('GET', '/api/dsg/notifications', H())).text).data.unreadCount === 0 && (await page.getByRole('button', { name: 'ทำเครื่องหมายว่าอ่านทั้งหมด' }).count()) === 0);
+    await page.getByRole('button', { name: 'Builds' }).click();
+    check('[E4] the Builds tab shows only build events', await until(async () => (await page.locator('ol > li').count()) === 2) && !(await page.locator('body').innerText()).includes('Alice approval waiting'));
+    check('[E4] no page errors', errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+  NOTIFS = seedNotifs();
+  {
+    const { ctx, page } = await sessionPage({ token: TOKEN.alice, workspace: WS.one });
+    await page.route('**/api/dsg/notifications', (r) => (r.request().method() === 'PATCH' ? r.abort('failed') : r.continue()));
+    await page.goto(`${BASE}/dsg/notifications`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'ทำเครื่องหมายว่าอ่านแล้ว' }).first().click();
+    const msg = await page.locator('[role=alert]').filter({ hasText: 'ไม่สำเร็จ' }).waitFor({ timeout: 6000 }).then(() => true).catch(() => false);
+    check('[E4] a failed "mark as read" is reported (role=alert) and the unread count is NOT lowered', msg && /ยังไม่ได้อ่าน 3/.test(await page.locator('body').innerText()));
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await sessionPage({ token: TOKEN.alice, workspace: WS.one });
+    fake.mode = 'dberror';
+    await page.goto(`${BASE}/dsg/notifications`, { waitUntil: 'domcontentloaded' });
+    await page.locator('[role=alert]').filter({ hasText: 'HTTP 500' }).waitFor({ timeout: 8000 });
+    const html = await page.content();
+    check('[E4] load failure -> role=alert with HTTP 500 and a retry; no DB text, no demo list', !html.includes(DB_ERROR_MARKER) && !html.includes('dsg_notifications') && !DEMO.test(await page.locator('body').innerText()));
+    fake.mode = 'ok';
+    await page.getByRole('button', { name: 'ลองอีกครั้ง' }).click();
+    check('[E4] retry after recovery shows the real list', await page.getByText('Alice build failed').first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false));
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await sessionPage({ token: TOKEN.carol, workspace: WS.one, viewport: { width: 360, height: 800 } });
+    await page.goto(`${BASE}/dsg/notifications`, { waitUntil: 'domcontentloaded' });
+    const empty = await page.getByText('ยังไม่มีการแจ้งเตือน').waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
+    check('[E4] a user with no notifications sees an honest empty state pointing to Approvals and History', empty && (await page.getByRole('link', { name: 'ไปหน้าอนุมัติ' }).count()) === 1 && (await page.getByRole('link', { name: 'ดูประวัติ build' }).count()) === 1);
+    check('[E4] no horizontal scroll at 360px', !(await overflow(page)));
+    await ctx.close();
   }
 }
 
