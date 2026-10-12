@@ -225,6 +225,20 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
     { label: 'Governed tool', state: governedResult?.outputVerification || governedPrepared?.status || 'waiting', detail: governedPrepared ? `${governedPrepared.tool}.${governedPrepared.action} · ${governedPrepared.audit.truth}` : 'Prepare or execute from Tools panel' },
   ], [goal, prd, plan, handoff, runtimeGate, agentLoop, governedPrepared, governedResult]);
 
+  const nextAction = !goal.trim()
+    ? 'กรอกเป้าหมายของแอปก่อน — ยังไม่มี PRD หรือ Job'
+    : !createdJobUrl
+      ? 'กด Create governed job เพื่อบันทึกงานนี้ใน Workspace จริง'
+      : !prd
+        ? 'กด Generate PRD จากเป้าหมายนี้ และตรวจสถานะ Job ที่บันทึก'
+        : !plan
+          ? 'กด Plan + Observer เพื่อสร้างแผนสำหรับ PRD ปัจจุบัน'
+          : !handoff
+            ? 'ตรวจ Approval Gate และ Handoff ก่อนใช้ Runtime'
+            : runtimeGate
+              ? 'ตรวจผล Runtime Gate และ Evidence ใน Job Timeline; ห้ามอ้างว่า Deploy แล้วหากยังไม่มี Proof'
+              : 'ตรวจ Handoff แล้วกด Start Runtime Gate; ยังไม่ใช่การ Execute';
+
   function applyStarter(app: (typeof starterApps)[number]) {
     setGoal(app.goal);
     setCriteria(app.criteria.join('\n'));
@@ -551,7 +565,7 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
                 <p className="mt-3 text-sm leading-6 text-slate-300">{prd?.summary || (goal.trim() ? goal : 'กรอกเป้าหมายของแอปก่อน หน้าจอนี้จะไม่แสดง Demo เป็นผลลัพธ์จริง')}</p>
                 <p className="mt-2 text-xs text-amber-300">{prd ? 'PRD_DRAFT_ONLY · ไม่ใช่แอปที่ Deploy' : 'USER_INPUT_ONLY · ยังไม่มี Build, Preview หรือ Execution'}</p>
                 <div className="mt-5 grid gap-3">
-                  {criteriaList.slice(0, 4).map((item) => <div key={item} className="rounded-2xl border border-slate-800 bg-slate-900 p-3 text-sm text-slate-200">✓ {item}</div>)}
+                  {criteriaList.slice(0, 4).map((item) => <div key={item} className="rounded-2xl border border-slate-800 bg-slate-900 p-3 text-sm text-slate-200">ข้อกำหนดที่ต้องทำ: {item}</div>)}
                 </div>
               </div>
             </div>
@@ -651,15 +665,10 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
         </section>
 
         <section className="rounded-3xl border border-slate-800 bg-slate-900 p-5">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">User next action</p>
-          <div className="mt-4 grid gap-3 text-sm text-slate-300">
-            <p className="rounded-2xl bg-slate-950 p-3">1. Describe app or pick example.</p>
-            <p className="rounded-2xl bg-slate-950 p-3">2. Run Brain Loop to use memory and truth gate.</p>
-            <p className="rounded-2xl bg-slate-950 p-3">3. Create governed job.</p>
-            <p className="rounded-2xl bg-slate-950 p-3">4. Generate PRD and plan.</p>
-            <p className="rounded-2xl bg-slate-950 p-3">5. Approve handoff only when proof is visible.</p>
-            <p className="rounded-2xl bg-slate-950 p-3">6. Open live preview and verify output.</p>
-          </div>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">User next action · current goal</p>
+          <p role="status" className="mt-4 rounded-2xl border border-cyan-400/20 bg-slate-950 p-4 text-sm leading-6 text-cyan-100">{nextAction}</p>
+          <p className="mt-3 text-xs text-slate-400">สถานะ: {status} · ไม่มีการอ้าง Runtime/Deploy สำเร็จหากยังไม่มีหลักฐานจริง</p>
+          {createdJobUrl ? <a href={createdJobUrl} className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-indigo-600 px-4 text-sm text-white">เปิด Job Timeline ที่บันทึกจริง</a> : null}
         </section>
       </aside>
     </div>
