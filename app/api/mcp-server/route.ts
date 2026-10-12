@@ -179,6 +179,9 @@ async function callTool(
     case 'list_app_builder_jobs': {
       // The old service-token fallback has no user principal or workspace.
       // It must never be treated as a logged-in Supabase/Auth0 user.
+      if (!incomingRequest.headers.get('authorization')?.startsWith('Bearer ')) {
+        return { ok: false, error: { code: 'DSG_MCP_USER_OAUTH_REQUIRED' } };
+      }
       const workspaceId = toolInput.workspaceId;
       if (typeof workspaceId !== 'string' ||
           !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId)) {
