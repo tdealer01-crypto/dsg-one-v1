@@ -9,6 +9,7 @@ import { RuntimeGatePanel } from './RuntimeGatePanel';
 import { GovernedToolPanel, collectPersistedRecords } from '@/components/dsg/governed-tools/GovernedToolPanels';
 import type { DsgAppBuilderPrd } from '@/lib/dsg/app-builder/types/prd';
 import type { AppBuilderJob } from '@/lib/dsg/app-builder/model';
+import type { DsgOutcomeIntake } from '@/lib/dsg/app-builder/outcome-intake';
 import type { DsgAppTemplate } from '@/lib/dsg/app-builder/templates/template-registry';
 import type { DsgPlanDraft, DsgPlanObserverResult } from '@/lib/dsg/app-builder/plan/types';
 import type { DsgAppBuilderApprovalGate, DsgRuntimeHandoffDraft } from '@/lib/dsg/app-builder/approval/types';
@@ -111,7 +112,7 @@ function extractCreatedJobId(url: string | null) {
   return url.split('/').filter(Boolean).at(-1) || 'ui-agent-loop';
 }
 
-export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = '' }: { initialGoal?: string; initialCriteria?: string }) {
+export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = '', acceptedIntake }: { initialGoal?: string; initialCriteria?: string; acceptedIntake?: DsgOutcomeIntake }) {
   const [goal, setGoal] = useState(initialGoal);
   const [criteria, setCriteria] = useState(initialCriteria);
   const [prd, setPrd] = useState<DsgAppBuilderPrd | null>(null);
@@ -286,6 +287,30 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
       return;
     }
 
+    if (acceptedIntake && trimmedGoal !== acceptedIntake.goal) {
+      setStatus('OUTCOME_INPUT_CHANGED_REVALIDATION_REQUIRED · submit the edited goal through Outcome Intake before creating a job');
+      return;
+    }
+    const requiresAuth = Boolean(
+      acceptedIntake?.productionIntent ||
+      (acceptedIntake && acceptedIntake.riskLevel !== 'low') ||
+      acceptedIntake?.requiredIntegrations.some(value => /auth|login|sso|oauth|rbac|identity/i.test(value)) ||
+      /auth|login|crm|membership|member|workspace role/i.test(trimmedGoal),
+    );
+    const constraints = [
+      'no production-ready claim without build/deploy/evidence proof',
+      'no mock data presented as production evidence',
+      'show a user-visible next action when blocked',
+      ...(acceptedIntake ? [
+        `Verified outcome risk level: ${acceptedIntake.riskLevel}`,
+        `Production intent: ${acceptedIntake.productionIntent}; do not claim production readiness without signed proof`,
+        `Target users: ${acceptedIntake.targetUsers.join(', ') || 'not specified'}`,
+        `Available data: ${acceptedIntake.availableData.join(', ') || 'not specified'}`,
+        `Required integrations: ${acceptedIntake.requiredIntegrations.join(', ') || 'none specified'}`,
+        `Accepted success outcome: ${acceptedIntake.successOutcome || 'not specified'}`,
+        ...(requiresAuth ? ['Require governed authentication and RBAC design; never silently substitute auth:none for accepted SSO or owner controls'] : []),
+      ] : []),
+    ];
     setLoadingJob(true);
     setCreatedJobUrl(null);
     setStatus('Creating governed App Builder job…');
@@ -296,8 +321,8 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
         body: JSON.stringify({
           goal: trimmedGoal,
           successCriteria: criteriaList,
-          targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'supabase-postgres', auth: 'none', deploy: 'vercel' },
-          constraints: ['no production-ready claim without build/deploy/evidence proof', 'no mock data presented as production evidence', 'show a user-visible next action when blocked'],
+          targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'supabase-postgres', auth: requiresAuth ? 'custom' : 'none', deploy: 'vercel' },
+          constraints,
           userNotes: 'Self-service builder job. App-builder UX reference: command, live preview, monitor, and evidence panel in one workspace.',
         }),
       });
@@ -683,5 +708,6 @@ export function AppBuilderConsoleWorkspace() {
     key={accepted?.revision ?? 0}
     initialGoal={accepted?.goal ?? ''}
     initialCriteria={accepted?.criteria.join('\n') ?? ''}
+    acceptedIntake={accepted?.intake}
   />;
 }
