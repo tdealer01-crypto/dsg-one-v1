@@ -112,6 +112,24 @@ function extractCreatedJobId(url: string | null) {
   return url.split('/').filter(Boolean).at(-1) || 'ui-agent-loop';
 }
 
+// Codes the Workspace Jobs panel is allowed to print. Anything else is replaced by a generic label, so no raw
+// upstream or exception text can reach the screen. Kept in sync with lib/dsg/server/app-builder/job-error.ts by a test.
+const JOBS_PANEL_CODES = new Set<string>([
+  'APP_BUILDER_DB_URL_NOT_CONFIGURED',
+  'APP_BUILDER_DB_SERVICE_ROLE_NOT_CONFIGURED',
+  'APP_BUILDER_DB_SERVICE_ROLE_INVALID',
+  'APP_BUILDER_DB_CONNECT_FAILED',
+  'APP_BUILDER_DB_ACCESS_DENIED',
+  'APP_BUILDER_DB_SCHEMA_OR_ROUTE_NOT_FOUND',
+  'APP_BUILDER_DB_UPSTREAM_UNAVAILABLE',
+  'APP_BUILDER_DB_REQUEST_REJECTED',
+  'APP_BUILDER_DB_RESPONSE_INVALID',
+  'APP_BUILDER_AUTH_BACKEND_UNAVAILABLE',
+  'JOBS_API_UNREACHABLE',
+  'LOGIN_REQUIRED_TO_LOAD_REAL_JOBS',
+  'WORKSPACE_ACCESS_DENIED',
+]);
+
 export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = '', acceptedIntake }: { initialGoal?: string; initialCriteria?: string; acceptedIntake?: DsgOutcomeIntake }) {
   const [goal, setGoal] = useState(initialGoal);
   const [criteria, setCriteria] = useState(initialCriteria);
@@ -157,23 +175,13 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
         cache: 'no-store',
         signal,
       });
-      const json: unknown = await response.json();
+      // A proxy error page (HTML 502/504) is not JSON: treat it as "API unreachable", never show a parse error.
+      const json: unknown = await response.json().catch(() => null);
       if (!response.ok || !json || typeof json !== 'object' || !('ok' in json) || json.ok !== true ||
           !('data' in json) || !Array.isArray(json.data)) {
         const failure = json && typeof json === 'object' && 'error' in json && json.error && typeof json.error === 'object' && 'code' in json.error
-          ? json.error.code : null;
-        const allowedCodes = [
-          'APP_BUILDER_DB_URL_NOT_CONFIGURED',
-          'APP_BUILDER_DB_SERVICE_ROLE_NOT_CONFIGURED',
-          'APP_BUILDER_DB_SERVICE_ROLE_INVALID',
-          'APP_BUILDER_DB_CONNECT_FAILED',
-          'APP_BUILDER_DB_ACCESS_DENIED',
-          'APP_BUILDER_DB_SCHEMA_OR_ROUTE_NOT_FOUND',
-          'APP_BUILDER_DB_UPSTREAM_UNAVAILABLE',
-          'APP_BUILDER_DB_REQUEST_REJECTED',
-          'APP_BUILDER_DB_RESPONSE_INVALID',
-        ];
-        const safeCode = typeof failure === 'string' && allowedCodes.includes(failure) ? failure : 'JOB_DATABASE_UNAVAILABLE';
+          ? json.error.code : json === null ? 'JOBS_API_UNREACHABLE' : null;
+        const safeCode = typeof failure === 'string' && JOBS_PANEL_CODES.has(failure) ? failure : 'JOB_DATABASE_UNAVAILABLE';
         throw new Error(response.status === 401 ? 'LOGIN_REQUIRED_TO_LOAD_REAL_JOBS'
           : response.status === 403 ? 'WORKSPACE_ACCESS_DENIED'
           : safeCode);
@@ -192,7 +200,10 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
       if (signal?.aborted) return;
       setSavedJobs([]);
       setJobsReadState('blocked');
-      setJobsReadMessage(error instanceof Error ? error.message : 'JOB_DATABASE_UNAVAILABLE');
+      // Only the codes produced above are shown. A network failure (fetch rejects) says so; any other exception
+      // text (for example a JavaScript parse error) is never printed as if it were a server code.
+      const shown = error instanceof Error ? error.message : '';
+      setJobsReadMessage(JOBS_PANEL_CODES.has(shown) ? shown : error instanceof TypeError ? 'JOBS_API_UNREACHABLE' : 'JOB_DATABASE_UNAVAILABLE');
     }
   }, []);
 
