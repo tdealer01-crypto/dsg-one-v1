@@ -1,12 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PRDViewer } from './PRDViewer';
+import { useAppBuilderGoalBridge } from './AppBuilderGoalBridge';
 import { PlanObserverPanel } from './PlanObserverPanel';
 import { HandoffPanel } from './HandoffPanel';
 import { RuntimeGatePanel } from './RuntimeGatePanel';
 import { GovernedToolPanel, collectPersistedRecords } from '@/components/dsg/governed-tools/GovernedToolPanels';
 import type { DsgAppBuilderPrd } from '@/lib/dsg/app-builder/types/prd';
+import type { AppBuilderJob } from '@/lib/dsg/app-builder/model';
+import type { DsgOutcomeIntake } from '@/lib/dsg/app-builder/outcome-intake';
 import type { DsgAppTemplate } from '@/lib/dsg/app-builder/templates/template-registry';
 import type { DsgPlanDraft, DsgPlanObserverResult } from '@/lib/dsg/app-builder/plan/types';
 import type { DsgAppBuilderApprovalGate, DsgRuntimeHandoffDraft } from '@/lib/dsg/app-builder/approval/types';
@@ -62,7 +65,6 @@ type AgentLoopResponse = {
 
 type PreviewMode = 'concept' | 'live' | 'monitor' | 'brain' | 'tools';
 
-const liveGeneratedAppPath = '/generated-apps/2f3b20b0-824c-4d4a-ae6a-250bd18f3392';
 
 // The verified identity and workspace are resolved server-side from the
 // authenticated session and membership; browser headers never assert a role.
@@ -110,10 +112,10 @@ function extractCreatedJobId(url: string | null) {
   return url.split('/').filter(Boolean).at(-1) || 'ui-agent-loop';
 }
 
-export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuilderPrd }) {
-  const [goal, setGoal] = useState('Build a CRM dashboard for small teams with contacts, tasks, notes, and workspace roles.');
-  const [criteria, setCriteria] = useState('User can create records\nUser can see saved data\nBackend/API/database proof is visible\nProduction claim stays blocked until evidence exists');
-  const [prd, setPrd] = useState(initialPrd);
+export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = '', acceptedIntake }: { initialGoal?: string; initialCriteria?: string; acceptedIntake?: DsgOutcomeIntake }) {
+  const [goal, setGoal] = useState(initialGoal);
+  const [criteria, setCriteria] = useState(initialCriteria);
+  const [prd, setPrd] = useState<DsgAppBuilderPrd | null>(null);
   const [plan, setPlan] = useState<DsgPlanDraft | null>(null);
   const [observer, setObserver] = useState<DsgPlanObserverResult | null>(null);
   const [approvalGate, setApprovalGate] = useState<DsgAppBuilderApprovalGate | null>(null);
@@ -123,6 +125,9 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
   const [templateName, setTemplateName] = useState('Initial product console');
   const [status, setStatus] = useState('Ready. Pick an example or describe an app, then create a governed job.');
   const [createdJobUrl, setCreatedJobUrl] = useState<string | null>(null);
+  const [savedJobs, setSavedJobs] = useState<AppBuilderJob[]>([]);
+  const [jobsReadState, setJobsReadState] = useState<'loading' | 'ready' | 'blocked'>('loading');
+  const [jobsReadMessage, setJobsReadMessage] = useState('กำลังตรวจงานจากฐานข้อมูลจริง…');
   const [previewMode, setPreviewMode] = useState<PreviewMode>('concept');
   const [loadingAgentLoop, setLoadingAgentLoop] = useState(false);
   const [loadingJob, setLoadingJob] = useState(false);
@@ -139,6 +144,78 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
   const [loadingGovernedTool, setLoadingGovernedTool] = useState(false);
 
   const criteriaList = useMemo(() => criteria.split('\n').map((line) => line.trim()).filter(Boolean), [criteria]);
+
+  // The owner-scoped server route reads persisted Supabase jobs. Never synthesize
+  // a saved job from a sample, localStorage or a guessed generated-app route.
+  const refreshSavedJobs = useCallback(async (signal?: AbortSignal) => {
+    setJobsReadState('loading');
+    setJobsReadMessage('กำลังอ่านงานที่บันทึกจริง…');
+    try {
+      const response = await fetch('/api/dsg/app-builder/jobs', {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        signal,
+      });
+      const json: unknown = await response.json();
+      if (!response.ok || !json || typeof json !== 'object' || !('ok' in json) || json.ok !== true ||
+          !('data' in json) || !Array.isArray(json.data)) {
+        throw new Error(response.status === 401 ? 'LOGIN_REQUIRED_TO_LOAD_REAL_JOBS' : 'JOB_DATABASE_UNAVAILABLE');
+      }
+      if (signal?.aborted) return;
+      const jobs = json.data.filter((entry: unknown): entry is AppBuilderJob => {
+        return typeof entry === 'object' && entry !== null && 'id' in entry &&
+          typeof entry.id === 'string' && /^[0-9a-f-]{36}$/i.test(entry.id) &&
+          'status' in entry && typeof entry.status === 'string' &&
+          'claimStatus' in entry && typeof entry.claimStatus === 'string';
+      });
+      setSavedJobs(jobs);
+      setJobsReadState('ready');
+      setJobsReadMessage(jobs.length ? `โหลดงานจริง ${jobs.length} รายการ` : 'ยังไม่มีงานที่บันทึกใน Workspace นี้');
+    } catch (error) {
+      if (signal?.aborted) return;
+      setSavedJobs([]);
+      setJobsReadState('blocked');
+      setJobsReadMessage(error instanceof Error ? error.message : 'JOB_DATABASE_UNAVAILABLE');
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    // Schedule after the effect callback returns to avoid synchronous
+    // setState during effect execution; AbortController handles unmount.
+    void Promise.resolve().then(() => {
+      if (!controller.signal.aborted) return refreshSavedJobs(controller.signal);
+      return undefined;
+    });
+    return () => controller.abort();
+  }, [refreshSavedJobs]);
+
+  function invalidateDerivedState() {
+    // A newly typed goal or criteria invalidates ALL artifacts from old input.
+    setPrd(null);
+    setPlan(null);
+    setObserver(null);
+    setApprovalGate(null);
+    setHandoff(null);
+    setRuntimeGate(null);
+    setAgentLoop(null);
+    setGovernedPrepared(null);
+    setGovernedResult(null);
+    setCreatedJobUrl(null);
+    setPreviewMode('concept');
+    setStatus('INPUT_CHANGED · generate a PRD and governed job for this exact goal');
+  }
+
+  function updateGoal(next: string) {
+    setGoal(next);
+    invalidateDerivedState();
+  }
+
+  function updateCriteria(next: string) {
+    setCriteria(next);
+    invalidateDerivedState();
+  }
   const timeline = useMemo(() => [
     { label: 'Goal', state: goal.trim() ? 'ready' : 'BLOCKED', detail: goal.trim() ? 'User command captured' : 'Goal required' },
     { label: 'Brain loop', state: agentLoop ? (agentLoop.ok ? 'PASS' : 'BLOCK_OR_REVIEW') : 'waiting', detail: agentLoop?.contextPack ? `Memory context ${agentLoop.contextPack.gateStatus}` : 'Run Brain Loop before execution' },
@@ -149,12 +226,24 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
     { label: 'Governed tool', state: governedResult?.outputVerification || governedPrepared?.status || 'waiting', detail: governedPrepared ? `${governedPrepared.tool}.${governedPrepared.action} · ${governedPrepared.audit.truth}` : 'Prepare or execute from Tools panel' },
   ], [goal, prd, plan, handoff, runtimeGate, agentLoop, governedPrepared, governedResult]);
 
+  const nextAction = !goal.trim()
+    ? 'กรอกเป้าหมายของแอปก่อน — ยังไม่มี PRD หรือ Job'
+    : !createdJobUrl
+      ? 'กด Create governed job เพื่อบันทึกงานนี้ใน Workspace จริง'
+      : !prd
+        ? 'กด Generate PRD จากเป้าหมายนี้ และตรวจสถานะ Job ที่บันทึก'
+        : !plan
+          ? 'กด Plan + Observer เพื่อสร้างแผนสำหรับ PRD ปัจจุบัน'
+          : !handoff
+            ? 'ตรวจ Approval Gate และ Handoff ก่อนใช้ Runtime'
+            : runtimeGate
+              ? 'ตรวจผล Runtime Gate และ Evidence ใน Job Timeline; ห้ามอ้างว่า Deploy แล้วหากยังไม่มี Proof'
+              : 'ตรวจ Handoff แล้วกด Start Runtime Gate; ยังไม่ใช่การ Execute';
+
   function applyStarter(app: (typeof starterApps)[number]) {
     setGoal(app.goal);
     setCriteria(app.criteria.join('\n'));
-    setPreviewMode('concept');
-    setCreatedJobUrl(null);
-    setAgentLoop(null);
+    invalidateDerivedState();
     setStatus(`Loaded example: ${app.label}. Review the goal, then run Brain Loop or create a governed job.`);
   }
 
@@ -198,6 +287,30 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
       return;
     }
 
+    if (acceptedIntake && trimmedGoal !== acceptedIntake.goal) {
+      setStatus('OUTCOME_INPUT_CHANGED_REVALIDATION_REQUIRED · submit the edited goal through Outcome Intake before creating a job');
+      return;
+    }
+    const requiresAuth = Boolean(
+      acceptedIntake?.productionIntent ||
+      (acceptedIntake && acceptedIntake.riskLevel !== 'low') ||
+      acceptedIntake?.requiredIntegrations.some(value => /auth|login|sso|oauth|rbac|identity/i.test(value)) ||
+      /auth|login|crm|membership|member|workspace role/i.test(trimmedGoal),
+    );
+    const constraints = [
+      'no production-ready claim without build/deploy/evidence proof',
+      'no mock data presented as production evidence',
+      'show a user-visible next action when blocked',
+      ...(acceptedIntake ? [
+        `Verified outcome risk level: ${acceptedIntake.riskLevel}`,
+        `Production intent: ${acceptedIntake.productionIntent}; do not claim production readiness without signed proof`,
+        `Target users: ${acceptedIntake.targetUsers.join(', ') || 'not specified'}`,
+        `Available data: ${acceptedIntake.availableData.join(', ') || 'not specified'}`,
+        `Required integrations: ${acceptedIntake.requiredIntegrations.join(', ') || 'none specified'}`,
+        `Accepted success outcome: ${acceptedIntake.successOutcome || 'not specified'}`,
+        ...(requiresAuth ? ['Require governed authentication and RBAC design; never silently substitute auth:none for accepted SSO or owner controls'] : []),
+      ] : []),
+    ];
     setLoadingJob(true);
     setCreatedJobUrl(null);
     setStatus('Creating governed App Builder job…');
@@ -208,8 +321,8 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
         body: JSON.stringify({
           goal: trimmedGoal,
           successCriteria: criteriaList,
-          targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'supabase-postgres', auth: 'none', deploy: 'vercel' },
-          constraints: ['no production-ready claim without build/deploy/evidence proof', 'no mock data presented as production evidence', 'show a user-visible next action when blocked'],
+          targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'supabase-postgres', auth: requiresAuth ? 'custom' : 'none', deploy: 'vercel' },
+          constraints,
           userNotes: 'Self-service builder job. App-builder UX reference: command, live preview, monitor, and evidence panel in one workspace.',
         }),
       });
@@ -217,6 +330,7 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
       if (!response.ok || !json.ok || !json.data?.id) throw new Error(json.error?.message || 'APP_BUILDER_JOB_CREATE_FAILED');
       const url = `/dsg/app-builder/${json.data.id}`;
       setCreatedJobUrl(url);
+      await refreshSavedJobs();
       setStatus(`${json.data.status || 'JOB_CREATED'} · claim=${json.data.claimStatus || 'PLANNED_ONLY'} · next=open job timeline`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'APP_BUILDER_JOB_CREATE_FAILED');
@@ -248,6 +362,10 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
   }
 
   async function generatePlan() {
+    if (!prd) {
+      setStatus('PRD_REQUIRED_FOR_THIS_GOAL · generate PRD before plan');
+      return;
+    }
     setLoadingPlan(true);
     setStatus('Deriving plan draft and running observer…');
     try {
@@ -374,8 +492,34 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
   }
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[0.95fr_1.05fr]">
+    <div id="dsg-app-builder-console" className="grid scroll-mt-4 gap-8 xl:grid-cols-[0.95fr_1.05fr]">
       <div className="space-y-8">
+
+        <section aria-label="Real saved app builder jobs" className="rounded-2xl border border-cyan-400/25 bg-slate-900 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-bold text-white">งานที่บันทึกจริง (Workspace Jobs)</h2>
+              <p role="status" className="mt-1 text-xs text-slate-400">{jobsReadMessage}</p>
+            </div>
+            <button type="button" onClick={() => void refreshSavedJobs()} disabled={jobsReadState === 'loading'}
+              className="min-h-11 rounded-xl border border-cyan-300/40 px-4 py-2 text-sm text-cyan-100 disabled:opacity-50">
+              {jobsReadState === 'loading' ? 'กำลังโหลด…' : 'รีเฟรชสถานะจริง'}
+            </button>
+          </div>
+          {jobsReadState === 'blocked' ? <p className="mt-3 text-xs text-rose-300">BLOCKED · ไม่มีการแทนที่ข้อมูลจากฐานข้อมูลด้วยตัวอย่าง</p> : null}
+          {jobsReadState === 'ready' && savedJobs.length > 0 ? (
+            <ul className="mt-4 space-y-2">
+              {savedJobs.slice(0, 8).map((job) => (
+                <li key={job.id} className="rounded-lg border border-slate-700 bg-slate-950 p-3">
+                  <a className="block break-words font-semibold text-cyan-200 underline-offset-2 hover:underline"
+                    href={`/dsg/app-builder/${job.id}`}>{job.goal?.originalGoal || job.id}</a>
+                  <p className="mt-1 text-xs text-slate-400">Job: {job.status} · Claim: {job.claimStatus} · Updated: {job.updatedAt}</p>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+
         <section className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
@@ -395,14 +539,14 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
             ))}
           </div>
 
-          <textarea value={goal} onChange={(event) => setGoal(event.target.value)} className="mt-5 min-h-32 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-100 outline-none focus:border-indigo-500" placeholder="Describe the app you want DSG to build…" />
-          <textarea value={criteria} onChange={(event) => setCriteria(event.target.value)} className="mt-3 min-h-24 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-100 outline-none focus:border-indigo-500" placeholder="Success criteria, one per line…" />
+          <textarea value={goal} onChange={(event) => updateGoal(event.target.value)} className="mt-5 min-h-32 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-100 outline-none focus:border-indigo-500" placeholder="Describe the app you want DSG to build…" />
+          <textarea value={criteria} onChange={(event) => updateCriteria(event.target.value)} className="mt-3 min-h-24 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-100 outline-none focus:border-indigo-500" placeholder="Success criteria, one per line…" />
 
           <div className="mt-4 flex flex-col gap-3 md:flex-row md:flex-wrap">
             <button onClick={() => void runAgentLoop('planning')} disabled={loadingAgentLoop} className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60">{loadingAgentLoop ? 'Thinking…' : 'Run Brain Loop'}</button>
             <button onClick={() => void createGovernedJob()} disabled={loadingJob} className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60">{loadingJob ? 'Creating job…' : 'Create governed job'}</button>
             <button onClick={() => void generatePrd()} disabled={loadingPrd} className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60">{loadingPrd ? 'Generating…' : 'Generate PRD'}</button>
-            <button onClick={() => void generatePlan()} disabled={loadingPlan} className="rounded-2xl border border-violet-400/40 bg-violet-500/10 px-5 py-3 text-sm font-black text-violet-100 hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60">{loadingPlan ? 'Observing…' : 'Plan + Observer'}</button>
+            <button onClick={() => void generatePlan()} disabled={loadingPlan || !prd} className="rounded-2xl border border-violet-400/40 bg-violet-500/10 px-5 py-3 text-sm font-black text-violet-100 hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60">{loadingPlan ? 'Observing…' : 'Plan + Observer'}</button>
             <button onClick={() => void createHandoff()} disabled={loadingHandoff || !plan || !observer} className="rounded-2xl border border-cyan-400/40 bg-cyan-500/10 px-5 py-3 text-sm font-black text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60">{loadingHandoff ? 'Hashing…' : 'Approval + Handoff'}</button>
             <button onClick={() => void startRuntimeGate()} disabled={loadingRuntimeGate || !handoff} className="rounded-2xl border border-rose-400/40 bg-rose-500/10 px-5 py-3 text-sm font-black text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60">{loadingRuntimeGate ? 'Checking…' : 'Start Runtime Gate'}</button>
             <button onClick={() => setPreviewMode('tools')} className="rounded-2xl border border-amber-400/40 bg-amber-500/10 px-5 py-3 text-sm font-black text-amber-100 hover:bg-amber-500/20">Governed Tools</button>
@@ -414,7 +558,11 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
           </div>
         </section>
 
-        <PRDViewer prd={prd} />
+        {prd ? <PRDViewer prd={prd} /> : (
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+            ยังไม่มี PRD ของงานนี้ — กรอกเป้าหมายแล้วกด Generate PRD เพื่อสร้าง Draft จริง
+          </div>
+        )}
         {plan && observer && <PlanObserverPanel plan={plan} observer={observer} />}
         {approvalGate && handoff && <HandoffPanel approvalGate={approvalGate} handoff={handoff} />}
         {runtimeGate && <RuntimeGatePanel result={runtimeGate} />}
@@ -438,19 +586,26 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
             <div className="mt-5 rounded-[2rem] border border-slate-800 bg-slate-950 p-4">
               <div className="rounded-[1.5rem] border border-slate-800 bg-gradient-to-br from-indigo-950 to-slate-950 p-5">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-200">Concept screen</p>
-                <h3 className="mt-3 text-2xl font-black text-white">{prd.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-slate-300">{prd.summary}</p>
+                <h3 className="mt-3 text-xl font-black text-white">{prd?.title || (goal.trim() ? 'ยังไม่ได้ Generate PRD' : 'ยังไม่ได้ระบุเป้าหมาย')}</h3>
+                <p className="mt-3 text-sm leading-6 text-slate-300">{prd?.summary || (goal.trim() ? goal : 'กรอกเป้าหมายของแอปก่อน หน้าจอนี้จะไม่แสดง Demo เป็นผลลัพธ์จริง')}</p>
+                <p className="mt-2 text-xs text-amber-300">{prd ? 'PRD_DRAFT_ONLY · ไม่ใช่แอปที่ Deploy' : 'USER_INPUT_ONLY · ยังไม่มี Build, Preview หรือ Execution'}</p>
                 <div className="mt-5 grid gap-3">
-                  {criteriaList.slice(0, 4).map((item) => <div key={item} className="rounded-2xl border border-slate-800 bg-slate-900 p-3 text-sm text-slate-200">✓ {item}</div>)}
+                  {criteriaList.slice(0, 4).map((item) => <div key={item} className="rounded-2xl border border-slate-800 bg-slate-900 p-3 text-sm text-slate-200">ข้อกำหนดที่ต้องทำ: {item}</div>)}
                 </div>
               </div>
             </div>
           ) : null}
 
           {previewMode === 'live' ? (
-            <div className="mt-5 overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950">
-              <iframe title="Generated app live preview" src={liveGeneratedAppPath} className="h-[620px] w-full bg-slate-950" />
-              <a href={liveGeneratedAppPath} className="block border-t border-slate-800 px-4 py-3 text-sm font-bold text-indigo-200 hover:bg-slate-900">Open generated app full page</a>
+            <div className="mt-5 rounded-2xl border border-amber-400/30 bg-slate-950 p-5">
+              <p className="text-sm font-black text-amber-200">LIVE_PREVIEW_NOT_VERIFIED</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                ยังไม่มี URL ของแอปที่สร้างจาก Job นี้พร้อมหลักฐาน Build/Deploy จริง
+                ระบบจะไม่เปิดแอปตัวอย่าง ID เดิมเพื่อแอบอ้างว่าเป็นผลลัพธ์ใหม่
+              </p>
+              {createdJobUrl ? <a href={createdJobUrl} className="mt-3 inline-flex rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white">ตรวจ Job Timeline และ Evidence จริง</a> : (
+                <p className="mt-2 text-xs text-amber-300">สร้าง Governed Job ก่อน แล้วตรวจสถานะในรายการงานที่บันทึก</p>
+              )}
             </div>
           ) : null}
 
@@ -535,17 +690,24 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
         </section>
 
         <section className="rounded-3xl border border-slate-800 bg-slate-900 p-5">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">User next action</p>
-          <div className="mt-4 grid gap-3 text-sm text-slate-300">
-            <p className="rounded-2xl bg-slate-950 p-3">1. Describe app or pick example.</p>
-            <p className="rounded-2xl bg-slate-950 p-3">2. Run Brain Loop to use memory and truth gate.</p>
-            <p className="rounded-2xl bg-slate-950 p-3">3. Create governed job.</p>
-            <p className="rounded-2xl bg-slate-950 p-3">4. Generate PRD and plan.</p>
-            <p className="rounded-2xl bg-slate-950 p-3">5. Approve handoff only when proof is visible.</p>
-            <p className="rounded-2xl bg-slate-950 p-3">6. Open live preview and verify output.</p>
-          </div>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">User next action · current goal</p>
+          <p role="status" className="mt-4 rounded-2xl border border-cyan-400/20 bg-slate-950 p-4 text-sm leading-6 text-cyan-100">{nextAction}</p>
+          <p className="mt-3 text-xs text-slate-400">สถานะ: {status} · ไม่มีการอ้าง Runtime/Deploy สำเร็จหากยังไม่มีหลักฐานจริง</p>
+          {createdJobUrl ? <a href={createdJobUrl} className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-indigo-600 px-4 text-sm text-white">เปิด Job Timeline ที่บันทึกจริง</a> : null}
         </section>
       </aside>
     </div>
   );
+}
+
+// A new user-accepted outcome remounts the editing console with fresh input.
+// No effect-based state copying or stale PRD/Plan/approval artifacts survives.
+export function AppBuilderConsoleWorkspace() {
+  const accepted = useAppBuilderGoalBridge()?.submitted;
+  return <AppBuilderConsoleClient
+    key={accepted?.revision ?? 0}
+    initialGoal={accepted?.goal ?? ''}
+    initialCriteria={accepted?.criteria.join('\n') ?? ''}
+    acceptedIntake={accepted?.intake}
+  />;
 }
