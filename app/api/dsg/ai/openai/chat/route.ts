@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { runOpenAIAdapter } from '@/lib/dsg/ai/openai-adapter';
+import { authorizeDsgRoute } from '@/lib/dsg/server/route-auth';
 
 export async function POST(req: Request) {
+  const auth = await authorizeDsgRoute(req.headers, 'job:plan');
+  if (!auth.ok) return auth.response;
+
   const body = await req.json().catch(() => null) as {
     input?: string;
     messages?: Array<{ role: 'system' | 'developer' | 'user' | 'assistant'; content: string }>;

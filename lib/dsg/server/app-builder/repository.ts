@@ -37,8 +37,13 @@ function mapJob(row: Row): AppBuilderJob {
   };
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// `id` comes from the URL. Spliced raw, "<uuid>#" would turn the rest of the query (the workspace filter)
+// into a URL fragment and let a member read or patch another workspace's job with the service role.
 function queryId(ctx: AppBuilderRequestContext, id: string): string {
-  return `?id=eq.${id}&workspace_id=eq.${ctx.workspaceId}&select=*`;
+  if (!UUID.test(id) || !UUID.test(ctx.workspaceId)) throw new Error('APP_BUILDER_JOB_ID_INVALID');
+  return `?id=eq.${encodeURIComponent(id)}&workspace_id=eq.${encodeURIComponent(ctx.workspaceId)}&select=*`;
 }
 
 export async function listAppBuilderJobs(ctx: AppBuilderRequestContext): Promise<AppBuilderJob[]> {

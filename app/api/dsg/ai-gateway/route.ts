@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { authorizeDsgRoute, requireActorPermission } from '@/lib/dsg/server/route-auth';
 import { executeDsgAiGatewayRequest, prepareDsgAiGatewayRequest, type DsgAiGatewayRequest } from '@/lib/dsg/connectors/ai-gateway';
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -42,9 +43,17 @@ function parseRequest(body: Record<string, unknown>): DsgAiGatewayRequest {
 }
 
 export async function POST(req: Request) {
+  // middleware.ts does not cover /api: verify the caller before any provider key can be used.
+  const auth = await authorizeDsgRoute(req.headers, 'job:plan');
+  if (!auth.ok) return auth.response;
+
   const body = asRecord(await req.json().catch(() => null));
   const input = parseRequest(body);
   const execute = body.execute === true;
+  if (execute) {
+    const denied = requireActorPermission(auth.actor, 'skill:execute');
+    if (denied) return denied;
+  }
 
   if (!['openai', 'gemini', 'anthropic'].includes(input.provider)) {
     return NextResponse.json({ ok: false, error: { code: 'DSG_AI_PROVIDER_UNSUPPORTED', message: 'provider must be openai, gemini, or anthropic' } }, { status: 400 });

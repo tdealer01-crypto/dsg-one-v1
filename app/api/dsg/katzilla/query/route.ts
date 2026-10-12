@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getKatzillaStatus, queryKatzilla } from '@/lib/dsg/connectors/katzilla';
+import { authorizeDsgRoute } from '@/lib/dsg/server/route-auth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -21,6 +22,10 @@ function sanitizeParams(value: unknown): Record<string, string | number | boolea
 }
 
 export async function POST(request: Request) {
+  // Spends the server's Katzilla key: planning is not enough, executing a provider call is.
+  const auth = await authorizeDsgRoute(request.headers, 'skill:execute');
+  if (!auth.ok) return auth.response;
+
   try {
     const status = getKatzillaStatus();
     if (!status.configured) {

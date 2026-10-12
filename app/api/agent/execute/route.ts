@@ -72,6 +72,16 @@ export async function POST(request: Request) {
     );
   }
 
+  // Human approval is made by the person, with their own Auth0 approver login (+MFA), through
+  // /dsg/approvals -> /api/dsg/spacetime/user-tools. These routes resolve approvals with the server's own
+  // credential, so a client-supplied APPROVE would let any operator approve their own request. REJECT stays allowed.
+  if (body.approvalDecision === 'APPROVE') {
+    return NextResponse.json({
+      ok: false,
+      error: { code: 'DSG_HUMAN_APPROVAL_REQUIRED', nextAction: 'Approve the request at /dsg/approvals with your approver account.' },
+    }, { status: 403 });
+  }
+
   const taskId = body.taskId?.trim() || `agent-browser-${crypto.randomUUID()}`;
   const planId = body.planId?.trim() || `agent-browser-plan-${crypto.randomUUID()}`;
   const agentId = body.agentId?.trim() || 'dsg-agent-runtime';

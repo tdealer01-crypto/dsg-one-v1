@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { runOpenAIAdapter, type OpenAIChatMessage } from '@/lib/dsg/ai/openai-adapter';
+import { authorizeDsgRoute } from '@/lib/dsg/server/route-auth';
 
 type DesignDraft = {
   goal: string;
@@ -118,6 +119,9 @@ async function buildDraft(message: string, history: OpenAIChatMessage[]) {
 }
 
 export async function POST(req: Request) {
+  const auth = await authorizeDsgRoute(req.headers, 'job:plan');
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await req.json().catch(() => null) as { message?: string; history?: unknown } | null;
     const history = normalizeHistory(body?.history);

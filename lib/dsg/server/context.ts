@@ -37,7 +37,9 @@ export function assertDsgPermission(actor: DsgServerActor | null, permission: Ds
   return actor;
 }
 
-type SupabaseUserResponse = { id?: string; sub?: string };
+type SupabaseUserResponse = { id?: string; sub?: string; email?: string };
+
+export type VerifiedDsgUser = { id: string; email: string | null };
 type WorkspaceMemberRow = { role: DsgServerActor['role'] };
 
 function getCookieValue(headers: Headers, name: string): string | undefined {
@@ -60,11 +62,8 @@ export function getDsgUserAccessToken(headers: Headers): string | undefined {
   return getBearerToken(headers) ?? getCookieValue(headers, 'sb-access-token');
 }
 
-export async function resolveVerifiedDsgActor(headers: Headers): Promise<DsgServerActor | null> {
-  const userAccessToken = getDsgUserAccessToken(headers);
-  const workspaceId = headers.get('x-dsg-workspace-id') ?? getCookieValue(headers, 'dsg-workspace-id');
-  if (!userAccessToken || !workspaceId) return null;
-
+// The token is only trusted after the auth server has accepted it.
+async function fetchVerifiedUser(userAccessToken: string): Promise<VerifiedDsgUser | null> {
   const config = getDsgSupabaseRpcConfig(userAccessToken);
   const userResponse = await fetch(`${config.url}/auth/v1/user`, {
     headers: {
@@ -76,8 +75,26 @@ export async function resolveVerifiedDsgActor(headers: Headers): Promise<DsgServ
 
   if (!userResponse.ok) return null;
   const user = (await userResponse.json()) as SupabaseUserResponse;
-  const actorId = user.id ?? user.sub;
-  if (!actorId) return null;
+  const id = user.id ?? user.sub;
+  if (!id) return null;
+  return { id, email: typeof user.email === 'string' && user.email.trim() ? user.email.trim().toLowerCase() : null };
+}
+
+// Identity only (no workspace): for actions that belong to the person, not to a workspace.
+export async function resolveVerifiedDsgUser(headers: Headers): Promise<VerifiedDsgUser | null> {
+  const userAccessToken = getDsgUserAccessToken(headers);
+  if (!userAccessToken) return null;
+  return fetchVerifiedUser(userAccessToken);
+}
+
+export async function resolveVerifiedDsgActor(headers: Headers): Promise<DsgServerActor | null> {
+  const userAccessToken = getDsgUserAccessToken(headers);
+  const workspaceId = headers.get('x-dsg-workspace-id') ?? getCookieValue(headers, 'dsg-workspace-id');
+  if (!userAccessToken || !workspaceId) return null;
+
+  const verified = await fetchVerifiedUser(userAccessToken);
+  if (!verified) return null;
+  const actorId = verified.id;
 
   const rows = await readDsgRest<WorkspaceMemberRow[]>(getDsgSupabaseRpcConfig(), 'dsg_workspace_members', {
     workspace_id: `eq.${workspaceId}`,
