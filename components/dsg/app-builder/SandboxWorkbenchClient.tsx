@@ -23,13 +23,8 @@ type SandboxResult = {
   productionReadyClaim?: false;
 };
 
-const dsgHeaders = {
-  'content-type': 'application/json',
-  'x-dsg-workspace-id': 'demo-workspace',
-  'x-dsg-actor-id': 'operator-ui',
-  'x-dsg-actor-role': 'operator',
-  'x-dsg-permissions': 'memory:read,memory:write',
-};
+// Workspace/role come from the HttpOnly session and verified membership.
+const dsgHeaders = { 'content-type': 'application/json' };
 
 const examples = [
   'สร้างเกม ABC เด็ก 3 ขวบ มีปุ่มใหญ่ พรีวิวข้างๆ และบันทึกคะแนนลงฐานข้อมูล',

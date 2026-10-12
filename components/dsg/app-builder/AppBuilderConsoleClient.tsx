@@ -64,13 +64,9 @@ type PreviewMode = 'concept' | 'live' | 'monitor' | 'brain' | 'tools';
 
 const liveGeneratedAppPath = '/generated-apps/2f3b20b0-824c-4d4a-ae6a-250bd18f3392';
 
-const dsgHeaders = {
-  'content-type': 'application/json',
-  'x-dsg-workspace-id': 'demo-workspace',
-  'x-dsg-actor-id': 'operator-ui',
-  'x-dsg-actor-role': 'operator',
-  'x-dsg-permissions': 'memory:read,memory:write',
-};
+// The verified identity and workspace are resolved server-side from the
+// authenticated session and membership; browser headers never assert a role.
+const dsgHeaders = { 'content-type': 'application/json' };
 
 const starterApps = [
   {
@@ -294,17 +290,16 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
   }
 
 
-  function parseToolArgs(approved = false) {
+  function parseToolArgs() {
     const parsed = JSON.parse(toolArgsText || '{}') as Record<string, unknown>;
     const allowedHosts = toolAllowedHosts.split('\n').map((host) => host.trim()).filter(Boolean);
     return {
       ...parsed,
       ...(allowedHosts.length ? { allowedHosts } : {}),
-      ...(approved ? { approved: true } : {}),
     };
   }
 
-  async function runGovernedTool(execute: boolean, approved = false) {
+  async function runGovernedTool() {
     const trimmedGoal = goal.trim();
     if (!trimmedGoal) {
       setStatus('APP_BUILDER_GOAL_REQUIRED');
@@ -312,7 +307,7 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
     }
 
     setLoadingGovernedTool(true);
-    setStatus(`${execute ? 'Executing' : 'Preparing'} governed ${toolKind}.${toolAction}…`);
+    setStatus(`Inspecting governed ${toolKind}.${toolAction} (no provider execution)…`);
     try {
       const response = await fetch('/api/dsg/tools', {
         method: 'POST',
@@ -321,10 +316,10 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
           tool: toolKind,
           action: toolAction,
           goal: trimmedGoal,
-          args: parseToolArgs(approved),
+          args: parseToolArgs(),
           evidence: ['ui:app-builder-console', plan?.jobId ? `plan:${plan.jobId}` : 'plan:not-generated'],
           history: timeline.map((item) => `${item.label}:${item.state}`),
-          execute,
+          execute: false,
         }),
       });
       const json = (await response.json()) as DsgGovernedToolPreparedRequest | DsgGovernedToolExecutionResult | { ok: false; error?: { message?: string; code?: string } };
@@ -494,11 +489,12 @@ export function AppBuilderConsoleClient({ initialPrd }: { initialPrd: DsgAppBuil
                   <textarea value={toolAllowedHosts} onChange={(event) => setToolAllowedHosts(event.target.value)} rows={3} className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-100" placeholder="api.example.com" />
                 </label>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button onClick={() => void runGovernedTool(false)} disabled={loadingGovernedTool} className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs font-black text-amber-100 disabled:opacity-60">Prepare only</button>
-                  <button onClick={() => void runGovernedTool(true)} disabled={loadingGovernedTool} className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-xs font-black text-emerald-100 disabled:opacity-60">Execute governed</button>
+                  <button onClick={() => void runGovernedTool()} disabled={loadingGovernedTool} className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs font-black text-amber-100 disabled:opacity-60">Inspect plan and policy</button>
+                  <a href="/dsg/autonomous-level" className="rounded-xl border border-indigo-400/40 bg-indigo-500/10 px-3 py-2 text-xs font-bold text-indigo-100">Verified user OAuth / signed read-only route</a>
+                  <p className="w-full text-xs text-amber-200">HTTP Tool Inspector does not authorize execution or human approval. Protected provider actions require separately verified user, exact plan, signed approval when required, and a provider receipt.</p>
                 </div>
               </div>
-              <GovernedToolPanel prepared={governedPrepared} result={governedResult} busy={loadingGovernedTool} onApprove={() => void runGovernedTool(true, true)} />
+              <GovernedToolPanel prepared={governedPrepared} result={governedResult} busy={loadingGovernedTool} />
             </div>
           ) : null}
 
