@@ -118,6 +118,46 @@ export default function ApprovalClient() {
     }
   }
 
+  async function checkMfaWithoutApproval() {
+    if (!client.current || !siteReady) return;
+    setBusy(true);
+    setStatus('กำลังเปิด Auth0 ให้ยืนยัน MFA (ทดสอบอย่างเดียว ไม่อนุมัติงาน)');
+    try {
+      // A deliberate user gesture is required. Never fall back to a silent
+      // cached access token for fresh MFA proof.
+      const token = await client.current.getTokenWithPopup({
+        authorizationParams: {
+          redirect_uri: CALLBACK,
+          audience: AUDIENCE,
+          scope: SCOPE,
+          prompt: 'login',
+          max_age: 0,
+          ext_dsg_stepup: '1',
+        },
+        cacheMode: 'off',
+      });
+      if (!token) throw Error('AUTH0_MFA_ACCESS_TOKEN_REQUIRED');
+      const response = await fetch('/api/dsg/approvals/mfa-check', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: token }),
+      });
+      const receipt = await response.json() as {
+        ok?: boolean; mfaVerified?: boolean; error?: string;
+      };
+      if (!response.ok || receipt.ok !== true || receipt.mfaVerified !== true) {
+        throw Error(receipt.error || 'MFA_PROOF_NOT_VERIFIED');
+      }
+      setStatus('MFA VERIFIED — ตรวจ JWT และหลักฐาน OTP ที่ลงลายเซ็นจริงสำเร็จ (ยังไม่ได้อนุมัติหรือ Execute งาน)');
+    } catch (error) {
+      setStatus('MFA NOT VERIFIED — ' + (error instanceof Error ? error.message : 'AUTH0_FAILED'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function load() {
     setBusy(true);
     setSelected(null);
@@ -193,6 +233,9 @@ export default function ApprovalClient() {
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => void login()} disabled={!siteReady || !authReady || busy}
             className="rounded-lg bg-indigo-600 px-4 py-2 disabled:opacity-40">เข้าสู่ระบบเพื่ออนุมัติ</button>
+          <button type="button" onClick={() => void checkMfaWithoutApproval()}
+            disabled={!siteReady || !authReady || busy}
+            className="rounded-lg border border-amber-400 px-4 py-2 disabled:opacity-40">ทดสอบ MFA (ไม่อนุมัติ)</button>
           <button type="button" onClick={() => void load()} disabled={!siteReady || !authReady || busy}
             className="rounded-lg border border-slate-500 px-4 py-2 disabled:opacity-40">ดูรายการรออนุมัติ</button>
           <a href="/dsg/autonomous-level" className="rounded-lg border border-slate-500 px-4 py-2">กลับหน้าสถานะระบบ</a>
