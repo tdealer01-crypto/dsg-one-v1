@@ -378,6 +378,7 @@ export function AgentCommandCenter() {
       <p className="mt-1 text-sm text-[#D7D9DE]">Commands are routed to their exact governed surface. Builder requests use App Builder; low-risk Cinema status reads use Core Spin → DSG Spacetime → provider evidence.</p>
 
       <textarea
+        aria-label="Command for the governed agent"
         value={command}
         onChange={(event) => setCommand(event.target.value)}
         className="mt-4 h-28 w-full rounded-xl border border-[#C8A24D]/50 bg-[#0C2340] p-3 text-sm text-white outline-none"
@@ -385,32 +386,35 @@ export function AgentCommandCenter() {
 
       <div className="mt-3 flex flex-wrap gap-2">
         <button
+          type="button"
           onClick={buildNow}
           disabled={running || !command.trim()}
-          className="inline-flex items-center gap-2 rounded-xl border border-[#C8A24D] bg-[#E0B95B] px-4 py-3 text-sm font-black text-[#071326] disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#C8A24D] bg-[#E0B95B] px-4 py-3 text-sm font-black text-[#071326] disabled:opacity-50"
         >
           {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
           Run Governed Action
         </button>
         <button
+          type="button"
           onClick={routeCommand}
           disabled={running || !command.trim()}
-          className="inline-flex items-center gap-2 rounded-xl border border-[#C8A24D] bg-[#0C2340] px-4 py-3 text-sm font-black text-[#E0B95B] disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#C8A24D] bg-[#0C2340] px-4 py-3 text-sm font-black text-[#E0B95B] disabled:opacity-50"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
           Route Only
         </button>
         <button
+          type="button"
           onClick={() => canRunCoreSpinRead ? runCoreSpinRead() : runBuilderRequest()}
           disabled={(!canRunBuilder && !canRunCoreSpinRead) || running}
-          className="inline-flex items-center gap-2 rounded-xl border border-[#C8A24D] bg-[#0C2340] px-4 py-3 text-sm font-black text-[#E0B95B] disabled:opacity-40"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#C8A24D] bg-[#0C2340] px-4 py-3 text-sm font-black text-[#E0B95B] disabled:opacity-40"
         >
           {builderBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
           {canRunCoreSpinRead ? 'Run Governed Read' : 'Run Builder Request'}
         </button>
       </div>
 
-      {error ? <div className="mt-3 rounded-xl border border-[#D9363E] bg-[#D9363E]/15 p-3 text-sm text-[#ffb4b8]">{error}</div> : null}
+      {error ? <div role="alert" className="mt-3 rounded-xl border border-[#D9363E] bg-[#D9363E]/15 p-3 text-sm text-[#ffb4b8]">{error}</div> : null}
 
       {result ? (
         <div className="mt-4 grid gap-3 rounded-xl border border-[#C8A24D]/40 bg-[#0C2340] p-3">

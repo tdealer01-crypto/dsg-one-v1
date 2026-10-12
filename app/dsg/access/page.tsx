@@ -1,7 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PublicProductionSnapshot } from '@/components/public-production-snapshot';
+import {
+  SESSION_LOADING,
+  SESSION_NEEDS_WORKSPACE,
+  SESSION_READY,
+  sessionLoadFailure,
+  workspaceActivationFailure,
+} from '@/lib/dsg/ui/session-notices';
 import { CircleCheck, ExternalLink, LogOut, RefreshCw, ShieldCheck } from 'lucide-react';
 
 type Membership = { workspace_id: string; role: 'OWNER' | 'ADMIN' | 'OPERATOR' | 'AUDITOR' | 'VIEWER' };
@@ -90,50 +97,84 @@ const toolCards: Array<{
 export default function DsgAccessPage() {
   const [session, setSession] = useState<SessionPayload | null>(null);
   const [runtime, setRuntime] = useState<RuntimeStatus | null>(null);
+  const [runtimeFailed, setRuntimeFailed] = useState(false);
   const [integrations, setIntegrations] = useState<IntegrationStatus | null>(null);
   const [busyWorkspace, setBusyWorkspace] = useState<string | null>(null);
-  const [message, setMessage] = useState('Loading authenticated DSG session…');
+  const [message, setMessage] = useState(SESSION_LOADING);
+  const [failed, setFailed] = useState(false);
+  // A single-membership account is activated automatically — once. After a failure the user retries by hand.
+  const autoTried = useRef(new Set<string>());
 
   const load = useCallback(async () => {
-    const [sessionResponse, runtimeResponse] = await Promise.all([
-      fetch('/api/dsg/access/session', { cache: 'no-store', credentials: 'include' }),
-      fetch('/api/agent/status', { cache: 'no-store' }),
-    ]);
-    if (sessionResponse.status === 401) {
-      window.location.assign('/login?next=/dsg/access');
-      return;
-    }
-    const nextSession = await sessionResponse.json() as SessionPayload;
-    setSession(nextSession);
-    if (runtimeResponse.ok) setRuntime(await runtimeResponse.json() as RuntimeStatus);
-    if (nextSession.selected) {
-      try {
-        const integrationResponse = await fetch('/api/dsg/integrations/status', { cache: 'no-store', credentials: 'include' });
-        setIntegrations(integrationResponse.ok ? await integrationResponse.json() as IntegrationStatus : null);
-      } catch {
+    setFailed(false);
+    // Runtime health is a separate, read-only signal: its failure must not hide the session.
+    const runtimeCheck = fetch('/api/agent/status', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('runtime');
+        setRuntime(await response.json() as RuntimeStatus);
+        setRuntimeFailed(false);
+      })
+      .catch(() => {
+        setRuntime(null);
+        setRuntimeFailed(true);
+      });
+    try {
+      const sessionResponse = await fetch('/api/dsg/access/session', { cache: 'no-store', credentials: 'include' });
+      if (sessionResponse.status === 401) {
+        window.location.assign('/login?next=/dsg/access');
+        return;
+      }
+      if (!sessionResponse.ok) {
+        setFailed(true);
+        setMessage(sessionLoadFailure(sessionResponse.status));
+        return;
+      }
+      const nextSession = await sessionResponse.json() as SessionPayload;
+      setSession(nextSession);
+      if (nextSession.selected) {
+        try {
+          const integrationResponse = await fetch('/api/dsg/integrations/status', { cache: 'no-store', credentials: 'include' });
+          setIntegrations(integrationResponse.ok ? await integrationResponse.json() as IntegrationStatus : null);
+        } catch {
+          setIntegrations(null);
+        }
+      } else {
         setIntegrations(null);
       }
-    } else {
-      setIntegrations(null);
+      setMessage(nextSession.selected ? SESSION_READY : SESSION_NEEDS_WORKSPACE);
+    } catch {
+      setFailed(true);
+      setMessage(sessionLoadFailure(null));
+    } finally {
+      await runtimeCheck;
     }
-    setMessage(nextSession.selected ? 'Authenticated DSG session is ready.' : 'Select a workspace to activate governed access.');
   }, []);
 
   const selectWorkspace = useCallback(async (workspaceId: string) => {
     setBusyWorkspace(workspaceId);
-    const response = await fetch('/api/dsg/access/workspace', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ workspaceId }),
-      credentials: 'include',
-    });
-    const payload = await response.json() as { ok?: boolean; error?: string };
-    setBusyWorkspace(null);
-    if (!response.ok || !payload.ok) {
-      setMessage(payload.error ?? 'Workspace activation failed.');
-      return;
+    setFailed(false);
+    let activated = false;
+    try {
+      const response = await fetch('/api/dsg/access/workspace', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId }),
+        credentials: 'include',
+      });
+      const payload = await response.json().catch(() => ({})) as { ok?: boolean };
+      if (response.ok && payload.ok) {
+        activated = true;
+      } else {
+        setFailed(true);
+        setMessage(workspaceActivationFailure(response.status));
+      }
+    } catch {
+      setFailed(true);
+      setMessage(workspaceActivationFailure(null));
+    } finally {
+      setBusyWorkspace(null);
     }
-    await load();
+    if (activated) await load();
   }, [load]);
 
   useEffect(() => {
@@ -146,14 +187,21 @@ export default function DsgAccessPage() {
   useEffect(() => {
     if (!session || session.selected || session.memberships?.length !== 1 || busyWorkspace) return undefined;
     const workspaceId = session.memberships[0].workspace_id;
+    if (autoTried.current.has(workspaceId)) return undefined;
     const timer = window.setTimeout(() => {
+      // Marked when it actually fires, so a StrictMode re-mount (which cancels the first timer) still activates.
+      autoTried.current.add(workspaceId);
       void selectWorkspace(workspaceId);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [session, busyWorkspace, selectWorkspace]);
 
   async function signOut() {
-    await fetch('/api/auth/session', { method: 'DELETE', credentials: 'include' });
+    try {
+      await fetch('/api/auth/session', { method: 'DELETE', credentials: 'include' });
+    } catch {
+      // Leave for the login page either way; a stale cookie there is rejected by the server.
+    }
     window.location.assign('/login?next=/dsg/access');
   }
 
@@ -172,12 +220,12 @@ export default function DsgAccessPage() {
               Email login establishes a Supabase-backed DSG session. Workspace membership controls access; provider credentials must remain server-side. MCP authorization through Auth0 is separate from this website session.
             </p>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:border-slate-500">
-              <RefreshCw className="h-4 w-4" /> Refresh
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => void load()} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:border-slate-500">
+              <RefreshCw className="h-4 w-4" aria-hidden="true" /> Refresh
             </button>
-            <button onClick={() => void signOut()} className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-4 py-2 text-sm font-bold text-red-200 hover:bg-red-500/10">
-              <LogOut className="h-4 w-4" /> Sign out
+            <button type="button" onClick={() => void signOut()} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-red-500/30 px-4 py-2 text-sm font-bold text-red-200 hover:bg-red-500/10">
+              <LogOut className="h-4 w-4" aria-hidden="true" /> Sign out
             </button>
           </div>
         </header>
@@ -187,21 +235,21 @@ export default function DsgAccessPage() {
         <section className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
             <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Authenticated actor</div>
-            <div className="mt-3 text-lg font-bold text-white">{session?.actor?.email ?? 'Loading…'}</div>
+            <div className="mt-3 text-lg font-bold text-white">{session?.actor?.email ?? (failed ? '—' : 'Loading…')}</div>
             <div className="mt-1 break-all font-mono text-xs text-slate-500">{session?.actor?.id ?? '—'}</div>
-            <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-300">{message}</div>
+            <div role="status" aria-live="polite" className={`mt-5 rounded-2xl border p-4 text-sm ${failed ? 'border-amber-500/40 bg-amber-500/10 text-amber-100' : 'border-slate-800 bg-slate-950 text-slate-300'}`}>{message}</div>
           </div>
           <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Runtime</div>
-                <div className="mt-2 text-xl font-black">{runtime?.ok ? 'APP HEALTHY' : 'CHECKING'}</div>
+                <div className="mt-2 text-xl font-black">{runtime?.ok ? 'APP HEALTHY' : runtimeFailed ? 'UNAVAILABLE' : 'CHECKING'}</div>
               </div>
               {runtime?.ok && <CircleCheck className="h-8 w-8 text-emerald-400" />}
             </div>
-            <div className="mt-3 font-mono text-xs text-slate-500">{runtime?.version ?? 'version pending'}</div>
-            <a className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-indigo-300 hover:text-indigo-200" href="/api/agent/status" target="_blank" rel="noreferrer">
-              Open runtime status <ExternalLink className="h-4 w-4" />
+            <div className="mt-3 font-mono text-xs text-slate-500">{runtime?.version ?? (runtimeFailed ? 'status check failed — press Refresh' : 'version pending')}</div>
+            <a className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-indigo-300 hover:text-indigo-200" href="/api/agent/status">
+              Open runtime status <ExternalLink className="h-4 w-4" aria-hidden="true" />
             </a>
           </div>
         </section>
@@ -236,7 +284,7 @@ export default function DsgAccessPage() {
               <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
                 <div className="font-bold">Previously verified signed read-only production E2E · {integrations.historical_readonly_e2e.historical_result} (dated {integrations.historical_readonly_e2e.accepted_on})</div>
                 <div className="mt-1 text-xs leading-5">Scope: {integrations.historical_readonly_e2e.scope}. This is a dated verified acceptance, not a fresh OAuth operation in this website session. Cinema Connect/Execute, Quest/Unity and whole-system E2E are NOT VERIFIED.</div>
-                <a href={integrations.historical_readonly_e2e.source} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex text-xs font-bold underline underline-offset-2">Read public evidence</a>
+                <a href={integrations.historical_readonly_e2e.source} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-11 items-center text-xs font-bold underline underline-offset-2">Read public evidence</a>
               </div>
             </>
           ) : (
@@ -256,7 +304,7 @@ export default function DsgAccessPage() {
             {(session?.memberships ?? []).map((membership) => {
               const active = selected?.workspace_id === membership.workspace_id;
               return (
-                <button key={membership.workspace_id} onClick={() => void selectWorkspace(membership.workspace_id)} disabled={busyWorkspace !== null} className={`rounded-2xl border p-4 text-left transition ${active ? 'border-emerald-400/40 bg-emerald-400/10' : 'border-slate-800 bg-slate-950 hover:border-slate-600'}`}>
+                <button key={membership.workspace_id} onClick={() => void selectWorkspace(membership.workspace_id)} disabled={busyWorkspace !== null} className={`min-h-11 rounded-2xl border p-4 text-left transition disabled:opacity-60 ${active ? 'border-emerald-400/40 bg-emerald-400/10' : 'border-slate-800 bg-slate-950 hover:border-slate-600'}`}>
                   <div className="text-sm font-black text-white">{membership.role}</div>
                   <div className="mt-2 break-all font-mono text-xs text-slate-500">{membership.workspace_id}</div>
                   <div className="mt-3 text-xs font-bold text-indigo-300">{active ? 'Active session workspace' : busyWorkspace === membership.workspace_id ? 'Activating…' : 'Use this workspace'}</div>
@@ -281,8 +329,8 @@ export default function DsgAccessPage() {
                 <h3 className="mt-3 text-xl font-black text-white">{tool.name}</h3>
                 <p className="mt-3 flex-1 text-sm leading-6 text-slate-400">{tool.description}</p>
                 {tool.href && selected ? (
-                  <a className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-indigo-300 hover:text-indigo-200" href={tool.href} target="_blank" rel="noreferrer">
-                    Open {tool.name} <ExternalLink className="h-4 w-4" />
+                  <a className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-indigo-300 hover:text-indigo-200" href={tool.href} {...(tool.href.startsWith('/') ? {} : { target: '_blank', rel: 'noreferrer' })}>
+                    Open {tool.name} <ExternalLink className="h-4 w-4" aria-hidden="true" />
                   </a>
                 ) : (
                   <span className="mt-5 text-sm font-bold text-slate-500">

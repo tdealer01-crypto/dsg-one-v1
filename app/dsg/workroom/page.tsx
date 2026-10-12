@@ -1,8 +1,14 @@
 'use client';
 
-import Link from 'next/link';
 import { PublicProductionSnapshot } from '@/components/public-production-snapshot';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  SESSION_LOADING,
+  SESSION_NEEDS_WORKSPACE,
+  SESSION_READY,
+  sessionLoadFailure,
+  workspaceActivationFailure,
+} from '@/lib/dsg/ui/session-notices';
 import { ExternalLink, RefreshCw, ShieldCheck } from 'lucide-react';
 import { LiveAgentChat } from '@/components/live-agent-chat';
 import { AgentCommandCenter } from '@/components/agent-command-center';
@@ -58,34 +64,58 @@ const controlSurfaces = [
 export default function DsgWorkroomPage() {
   const [session, setSession] = useState<SessionPayload | null>(null);
   const [busyWorkspace, setBusyWorkspace] = useState<string | null>(null);
-  const [message, setMessage] = useState('Loading authenticated workspace…');
+  const [message, setMessage] = useState(SESSION_LOADING);
+  const [failed, setFailed] = useState(false);
+  // A single-membership account is activated automatically — once. After a failure the user retries by hand.
+  const autoTried = useRef(new Set<string>());
 
   const load = useCallback(async () => {
-    const response = await fetch('/api/dsg/access/session', { cache: 'no-store', credentials: 'include' });
-    if (response.status === 401) {
-      window.location.assign('/login?next=/dsg/workroom');
-      return;
+    setFailed(false);
+    try {
+      const response = await fetch('/api/dsg/access/session', { cache: 'no-store', credentials: 'include' });
+      if (response.status === 401) {
+        window.location.assign('/login?next=/dsg/workroom');
+        return;
+      }
+      if (!response.ok) {
+        setFailed(true);
+        setMessage(sessionLoadFailure(response.status));
+        return;
+      }
+      const payload = await response.json() as SessionPayload;
+      setSession(payload);
+      setMessage(payload.selected ? SESSION_READY : SESSION_NEEDS_WORKSPACE);
+    } catch {
+      setFailed(true);
+      setMessage(sessionLoadFailure(null));
     }
-    const payload = await response.json() as SessionPayload;
-    setSession(payload);
-    setMessage(payload.selected ? 'Authenticated workspace is active.' : 'Select a governed workspace before using Workroom.');
   }, []);
 
   const selectWorkspace = useCallback(async (workspaceId: string) => {
     setBusyWorkspace(workspaceId);
-    const response = await fetch('/api/dsg/access/workspace', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ workspaceId }),
-      credentials: 'include',
-    });
-    const payload = await response.json() as { ok?: boolean; error?: string };
-    setBusyWorkspace(null);
-    if (!response.ok || !payload.ok) {
-      setMessage(payload.error ?? 'Workspace activation failed.');
-      return;
+    setFailed(false);
+    let activated = false;
+    try {
+      const response = await fetch('/api/dsg/access/workspace', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId }),
+        credentials: 'include',
+      });
+      const payload = await response.json().catch(() => ({})) as { ok?: boolean };
+      if (response.ok && payload.ok) {
+        activated = true;
+      } else {
+        setFailed(true);
+        setMessage(workspaceActivationFailure(response.status));
+      }
+    } catch {
+      setFailed(true);
+      setMessage(workspaceActivationFailure(null));
+    } finally {
+      setBusyWorkspace(null);
     }
-    await load();
+    if (activated) await load();
   }, [load]);
 
   useEffect(() => {
@@ -95,7 +125,13 @@ export default function DsgWorkroomPage() {
 
   useEffect(() => {
     if (!session || session.selected || session.memberships?.length !== 1 || busyWorkspace) return undefined;
-    const timer = window.setTimeout(() => void selectWorkspace(session.memberships![0].workspace_id), 0);
+    const workspaceId = session.memberships[0].workspace_id;
+    if (autoTried.current.has(workspaceId)) return undefined;
+    const timer = window.setTimeout(() => {
+      // Marked when it actually fires, so a StrictMode re-mount (which cancels the first timer) still activates.
+      autoTried.current.add(workspaceId);
+      void selectWorkspace(workspaceId);
+    }, 0);
     return () => window.clearTimeout(timer);
   }, [session, busyWorkspace, selectWorkspace]);
 
@@ -115,8 +151,8 @@ export default function DsgWorkroomPage() {
                 Desktop UI, command center, Remote Desktop Commander, Secret Manager status, Cinema/BrowserOS, Agent v0 and Agent Chat live behind one verified workspace. Spacetime remains execution authority; approval and evidence gates still apply.
               </p>
             </div>
-            <button onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:border-slate-500">
-              <RefreshCw className="h-4 w-4" /> Refresh
+            <button type="button" onClick={() => void load()} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:border-slate-500">
+              <RefreshCw className="h-4 w-4" aria-hidden="true" /> Refresh
             </button>
           </div>
         </header>
@@ -125,13 +161,13 @@ export default function DsgWorkroomPage() {
 
         <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6">
           <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Workspace authority</div>
-          <div className="mt-2 text-lg font-black text-white">{session?.actor?.email ?? 'Loading…'}</div>
-          <p className="mt-2 text-sm text-slate-400">{message}</p>
+          <div className="mt-2 text-lg font-black text-white">{session?.actor?.email ?? (failed ? '—' : 'Loading…')}</div>
+          <p role="status" aria-live="polite" className={`mt-2 rounded-xl text-sm ${failed ? 'border border-amber-500/40 bg-amber-500/10 p-3 text-amber-100' : 'text-slate-400'}`}>{message}</p>
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {(session?.memberships ?? []).map((membership) => {
               const active = selected?.workspace_id === membership.workspace_id;
               return (
-                <button key={membership.workspace_id} onClick={() => void selectWorkspace(membership.workspace_id)} disabled={busyWorkspace !== null} className={`rounded-2xl border p-4 text-left transition ${active ? 'border-emerald-400/40 bg-emerald-400/10' : 'border-slate-800 bg-slate-950 hover:border-slate-600'}`}>
+                <button key={membership.workspace_id} onClick={() => void selectWorkspace(membership.workspace_id)} disabled={busyWorkspace !== null} className={`min-h-11 rounded-2xl border p-4 text-left transition disabled:opacity-60 ${active ? 'border-emerald-400/40 bg-emerald-400/10' : 'border-slate-800 bg-slate-950 hover:border-slate-600'}`}>
                   <div className="text-sm font-black text-white">{membership.role}</div>
                   <div className="mt-2 break-all font-mono text-xs text-slate-500">{membership.workspace_id}</div>
                   <div className="mt-3 text-xs font-bold text-indigo-300">{active ? 'Active workspace' : busyWorkspace === membership.workspace_id ? 'Activating…' : 'Use this workspace'}</div>
@@ -154,8 +190,8 @@ export default function DsgWorkroomPage() {
                     <h3 className="mt-2 text-lg font-black text-white">{surface.name}</h3>
                     <p className="mt-2 flex-1 text-sm leading-6 text-slate-400">{surface.description}</p>
                     {surface.href ? (
-                      <a href={surface.href} target={surface.href.startsWith('http') ? '_blank' : undefined} rel={surface.href.startsWith('http') ? 'noreferrer' : undefined} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-indigo-300 hover:text-indigo-200">
-                        Open {surface.name} <ExternalLink className="h-4 w-4" />
+                      <a href={surface.href} target={surface.href.startsWith('http') ? '_blank' : undefined} rel={surface.href.startsWith('http') ? 'noreferrer' : undefined} className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-indigo-300 hover:text-indigo-200">
+                        Open {surface.name} <ExternalLink className="h-4 w-4" aria-hidden="true" />
                       </a>
                     ) : (
                       <span className="mt-4 text-xs font-bold text-slate-500">No client-side secret or direct executor binding</span>
@@ -166,9 +202,11 @@ export default function DsgWorkroomPage() {
             </section>
 
             <div className="grid gap-3 md:grid-cols-3">
-              <Link href="/dsg/app-builder" className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">App Builder <ExternalLink className="ml-2 inline h-4 w-4" /></Link>
-              <Link href="/dsg/governance" className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">Governance <ExternalLink className="ml-2 inline h-4 w-4" /></Link>
-              <a href="https://aws.dsg.pics/docs" target="_blank" rel="noreferrer" className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">Runtime Docs <ExternalLink className="ml-2 inline h-4 w-4" /></a>
+              {/* Native anchors on purpose (same reason as the #212 sidebar): a full navigation works on Android even when client routing stalls. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a href="/dsg/app-builder" className="min-h-11 rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">App Builder <ExternalLink className="ml-2 inline h-4 w-4" aria-hidden="true" /></a>
+              <a href="/dsg/governance" className="min-h-11 rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">Governance <ExternalLink className="ml-2 inline h-4 w-4" aria-hidden="true" /></a>
+              <a href="https://aws.dsg.pics/docs" target="_blank" rel="noreferrer" className="min-h-11 rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">Runtime Docs <ExternalLink className="ml-2 inline h-4 w-4" aria-hidden="true" /></a>
             </div>
 
             <LiveAgentChat />
