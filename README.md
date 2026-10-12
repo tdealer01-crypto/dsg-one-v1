@@ -10,7 +10,7 @@
 > [!IMPORTANT]
 > **Production migration authority — AWS.** Current production claims must be bound to the AWS release manifest, immutable ECR source-SHA image, provider readback, and fresh E2E evidence. Azure is historical/manual rollback proof only.
 > **Historical DSG ONE website image checkpoint (2026-09-27, not current Spacetime runtime):** DSG ONE ECR image source `d80efe7aecb34ae8b06e6ac7e1a0417965fcc7e5`, digest `sha256:1b458ccb13b5e8e456b381f2a1faab3802ff64e7db2c78d6a2881b4cfce94a48`, ECR scan COMPLETE with 0 Critical / 3 High.
-> **Historical 2026-09-27 checkpoint only:** container security PASS; live AWS runtime E2E then NOT_RUN; public HTTPS cutover then NOT_DONE. As of 2026-10-12, Spacetime Marketplace READ is separately VERIFIED (above); whole-system production remains NOT VERIFIED.
+> **Historical 2026-09-27 checkpoint only:** container security PASS; live AWS runtime E2E then NOT_RUN; public HTTPS cutover then NOT_DONE. As of 2026-10-12, Spacetime Marketplace public catalog READ: **PASS** with real OAuth and a valid 142-record chain; whole-system Production: **BLOCKED** (nextAction: verify seller writes, buyer orders/checkout/payout, Marketplace-specific signed Provider v2 receipt, approved Cinema connect/execute, Unity/Quest and fresh overall evidence).
 
 DSG ONE V1 is a governed app-builder and autonomous runtime control plane.  
 Includes **DSG SkillGate** — open-source GitHub skill discovery, inspection, verification, lock, and governed-run pipeline.
