@@ -7,8 +7,11 @@ const ctx = { workspaceId: WS, actorId: 'user-1', actorRole: 'OPERATOR' as const
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  // Both naming schemes: main reads SUPABASE_*, PR #214 (scoped repair) reads only DSG_ONE_V1_SUPABASE_*.
   process.env.SUPABASE_URL = 'http://db.invalid';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'local-test-key';
+  process.env.DSG_ONE_V1_SUPABASE_URL = 'http://db.invalid';
+  process.env.DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY = 'local-test-key';
   fetchMock = vi.fn(async () => new Response(JSON.stringify([{ id: JOB, workspace_id: WS, status: 'GOAL_LOCKED', claim_status: 'NOT_STARTED', created_at: 'x', updated_at: 'x' }]), { status: 200 }));
   vi.stubGlobal('fetch', fetchMock);
 });
