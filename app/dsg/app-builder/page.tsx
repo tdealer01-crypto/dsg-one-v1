@@ -1,4 +1,4 @@
-import { AppBuilderConsoleClient } from '@/components/dsg/app-builder/AppBuilderConsoleClient';
+import { AppBuilderConsoleWorkspace } from '@/components/dsg/app-builder/AppBuilderConsoleClient';
 import { AppBuilderGoalProvider } from '@/components/dsg/app-builder/AppBuilderGoalBridge';
 import { AppBuilderProofPanel, type ProofPanelItem } from '@/components/dsg/app-builder/AppBuilderProofPanel';
 import { OutcomeIntakePanel } from '@/components/dsg/app-builder/OutcomeIntakePanel';
@@ -231,7 +231,7 @@ export default function DsgAppBuilderPage() {
           </div>
         </section>
 
-        <AppBuilderConsoleClient />
+        <AppBuilderConsoleWorkspace />
 
         <section className="mt-8 rounded-[2rem] border border-white/10 bg-[#0f151f]/78 p-6 backdrop-blur-xl">
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
