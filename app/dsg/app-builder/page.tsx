@@ -204,6 +204,7 @@ export default function DsgAppBuilderPage() {
         </section>
 
         <section className="mt-8">
+          <p className="mb-3 text-sm text-slate-400">Static product readiness checklist — ไม่ใช่สถานะของ Job ผู้ใช้ ตรวจงานที่บันทึกจริงและ Evidence แยกที่ Workspace Console ด้านล่าง</p>
           <AppBuilderProofPanel items={proofPanelItems} productionReadyClaim={false} />
         </section>
 
