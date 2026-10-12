@@ -14,7 +14,9 @@ function getSupabaseRestConfig() {
 
   if (!url) throw new Error('APP_BUILDER_DB_URL_NOT_CONFIGURED');
   if (!key) throw new Error('APP_BUILDER_DB_SERVICE_ROLE_NOT_CONFIGURED');
-  if (key.startsWith('sb_publishable_')) throw new Error('APP_BUILDER_DB_SERVICE_ROLE_INVALID');
+  if (key.startsWith('sb_') && !key.startsWith('sb_secret_')) {
+    throw new Error('APP_BUILDER_DB_SERVICE_ROLE_INVALID');
+  }
 
   return { url: url.replace(/\/+$/, ''), key };
 }
