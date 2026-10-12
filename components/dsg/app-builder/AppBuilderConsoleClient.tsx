@@ -160,7 +160,23 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
       const json: unknown = await response.json();
       if (!response.ok || !json || typeof json !== 'object' || !('ok' in json) || json.ok !== true ||
           !('data' in json) || !Array.isArray(json.data)) {
-        throw new Error(response.status === 401 ? 'LOGIN_REQUIRED_TO_LOAD_REAL_JOBS' : 'JOB_DATABASE_UNAVAILABLE');
+        const failure = json && typeof json === 'object' && 'error' in json && json.error && typeof json.error === 'object' && 'code' in json.error
+          ? json.error.code : null;
+        const allowedCodes = [
+          'APP_BUILDER_DB_URL_NOT_CONFIGURED',
+          'APP_BUILDER_DB_SERVICE_ROLE_NOT_CONFIGURED',
+          'APP_BUILDER_DB_SERVICE_ROLE_INVALID',
+          'APP_BUILDER_DB_CONNECT_FAILED',
+          'APP_BUILDER_DB_ACCESS_DENIED',
+          'APP_BUILDER_DB_SCHEMA_OR_ROUTE_NOT_FOUND',
+          'APP_BUILDER_DB_UPSTREAM_UNAVAILABLE',
+          'APP_BUILDER_DB_REQUEST_REJECTED',
+          'APP_BUILDER_DB_RESPONSE_INVALID',
+        ];
+        const safeCode = typeof failure === 'string' && allowedCodes.includes(failure) ? failure : 'JOB_DATABASE_UNAVAILABLE';
+        throw new Error(response.status === 401 ? 'LOGIN_REQUIRED_TO_LOAD_REAL_JOBS'
+          : response.status === 403 ? 'WORKSPACE_ACCESS_DENIED'
+          : safeCode);
       }
       if (signal?.aborted) return;
       const jobs = json.data.filter((entry: unknown): entry is AppBuilderJob => {
