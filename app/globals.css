@@ -166,3 +166,18 @@ pre,
   color: #9ee8ff !important;
   text-shadow: 0 0 8px rgba(55, 216, 255, 0.28);
 }
+
+/* Chrome Custom Tabs / Android "Desktop site" can expose a wide CSS viewport
+   while the actual device still has a coarse touch pointer. Force an
+   accessible menu drawer instead of a tiny untappable desktop sidebar. */
+@media (pointer: coarse) {
+  .dsg-sidebar-desktop {
+    display: none !important;
+  }
+  .dsg-sidebar-mobile-header {
+    display: flex !important;
+  }
+  .dsg-sidebar-mobile-overlay {
+    display: flex !important;
+  }
+}
