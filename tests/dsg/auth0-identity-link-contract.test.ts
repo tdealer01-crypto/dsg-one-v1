@@ -13,7 +13,9 @@ describe('DSG Auth0 account binding safety contract', () => {
     expect(route).toContain('resolveVerifiedDsgActor(request.headers)');
     expect(route).toContain('verifyDsgAuth0Principal(data?.accessToken)');
     expect(verifier).toContain('jwtVerify(token, jwks,');
-    expect(verifier).toContain('payload.azp !== DSG_AUTH0_CLIENT_ID');
+    expect(verifier).toContain('payload.azp !== expectedClientId');
+    expect(verifier).toContain("requiredScope === 'dsg.approve'");
+    expect(verifier).toContain('DSG_AUTH0_APPROVER_CLIENT_ID');
     expect(verifier).toContain("payload.scope.split(' ').includes('dsg.use')");
   });
 
