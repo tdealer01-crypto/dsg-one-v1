@@ -67,11 +67,44 @@ describe('App Builder truth: user goal and real jobs, not a frozen demo', () => 
     expect(page).toContain('<AppBuilderGoalProvider>');
     expect(bridge).toContain('createContext<GoalBridge | null>');
     expect(intake).toContain("json.ok === true");
-    expect(intake).toContain('bridge?.publish(goal');
+    expect(intake).toContain('bridge?.publish(json.intake)');
+    expect(bridge).toContain('intake: DsgOutcomeIntake');
+    expect(consoleSource).toContain('acceptedIntake={accepted?.intake}');
     expect(consoleSource).toContain('initialGoal={accepted?.goal');
     expect(consoleSource).toContain('initialCriteria={accepted?.criteria.join');
     expect(consoleSource).toContain('id="dsg-app-builder-console"');
     expect(bridge).not.toContain('APPROVED');
     expect(bridge).not.toContain('EXECUTED');
+  });
+
+  it('uses the normalized server-accepted intake snapshot, not mutable form values', () => {
+    expect(intake).toContain('bridge?.publish(json.intake)');
+    expect(intake).not.toContain('bridge?.publish(goal,');
+    expect(bridge).toContain('publish(acceptedIntake: DsgOutcomeIntake)');
+    expect(bridge).toContain('requiredIntegrations: [...acceptedIntake.requiredIntegrations]');
+  });
+
+  it('preserves production intent, risk, SSO, data and target users in governed job', () => {
+    expect(consoleSource).toContain('OUTCOME_INPUT_CHANGED_REVALIDATION_REQUIRED');
+    expect(consoleSource).toContain('acceptedIntake.productionIntent');
+    expect(consoleSource).toContain('acceptedIntake.riskLevel');
+    expect(consoleSource).toContain('acceptedIntake.requiredIntegrations');
+    expect(consoleSource).toContain('acceptedIntake.availableData');
+    expect(consoleSource).toContain('acceptedIntake.targetUsers');
+    expect(consoleSource).toContain("auth: requiresAuth ? 'custom' : 'none'");
+    expect(consoleSource).toContain('constraints,');
+  });
+
+  it('limits real jobs to 8 selected columns and scopes job detail to workspace identity', () => {
+    const repository = source('lib/dsg/server/app-builder/repository.ts');
+    const route = source('app/api/dsg/app-builder/jobs/[jobId]/route.ts');
+    const detail = source('components/dsg/app-builder/AppBuilderJobDetailClient.tsx');
+    expect(repository).toContain('&limit=8');
+    expect(repository).toContain('select=id,workspace_id,created_by,status,claim_status,goal,created_at,updated_at');
+    expect(route).toContain("getAppBuilderRequestContext(req, 'job:read')");
+    expect(route).toContain('getAppBuilderJob(actor, jobId)');
+    expect(detail).toContain('LIVE_PREVIEW_NOT_VERIFIED');
+    expect(detail).not.toContain('2f3b20b0-824c-4d4a-ae6a-250bd18f3392');
+    expect(detail).not.toContain('<iframe');
   });
 });
