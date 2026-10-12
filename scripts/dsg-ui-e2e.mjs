@@ -9,6 +9,9 @@
 // Requirements: `node scripts/dsg-next-build.mjs` already run; `playwright-core` resolvable (or set
 // PLAYWRIGHT_CORE to its path); a Chromium binary (CHROME=/path/to/chrome).
 // Optional: SHOT=/dir to save screenshots, E2E_APP_PORT / E2E_FAKE_PORT to change ports.
+// Login-flow scenario (B9): the script gives the app process a fake
+// NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY. Verified: /api/auth/session reads it at run time, so a
+// normal build works. If an app build ever stops seeing it, B9 is reported as SKIPPED (never as a pass).
 import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -33,6 +36,8 @@ const jwtFor = (sub) => {
   return `${enc({ alg: 'none' })}.${enc({ sub, exp: Math.floor(Date.now() / 1000) + 3600 })}.sig-${sub.slice(0, 4)}`;
 };
 const TOKEN = { alice: jwtFor(ID.alice), bob: jwtFor(ID.bob), carol: jwtFor(ID.carol) };
+const EMAIL_BY_ID = { [ID.alice]: 'alice@example.test', [ID.bob]: 'bob@example.test', [ID.carol]: 'carol@example.test' };
+const LOGIN = { email: 'alice@example.test', password: 'correct-password', token: TOKEN.alice };
 const USER_BY_TOKEN = new Map(Object.entries(TOKEN).map(([name, tok]) => [tok, ID[name]]));
 const MEMBERS = [
   { workspace_id: WS.one, actor_id: ID.alice, role: 'OPERATOR' },
@@ -61,11 +66,26 @@ const fakeServer = http.createServer((req, res) => {
   if (url.pathname === '/auth/v1/user') {
     const token = (req.headers.authorization || '').replace(/^Bearer /i, '');
     const id = USER_BY_TOKEN.get(token);
-    return id ? send(200, { id }) : send(401, { message: 'invalid JWT' });
+    return id ? send(200, { id, email: EMAIL_BY_ID[id] }) : send(401, { message: 'invalid JWT' });
+  }
+  if (url.pathname === '/auth/v1/token' && req.method === 'POST') {
+    let text = '';
+    req.on('data', (c) => { text += c; });
+    req.on('end', () => {
+      let body = {};
+      try { body = JSON.parse(text); } catch { /* invalid body -> rejected below */ }
+      return body.email === LOGIN.email && body.password === LOGIN.password
+        ? send(200, { access_token: LOGIN.token, refresh_token: 'refresh-e2e', expires_in: 3600 })
+        : send(400, { error_description: 'Invalid login credentials' });
+    });
+    return undefined;
   }
   if (url.pathname === '/rest/v1/dsg_workspace_members') {
-    const rows = MEMBERS.filter((m) => m.workspace_id === eq(url.searchParams.get('workspace_id')) && m.actor_id === eq(url.searchParams.get('actor_id')));
-    return send(200, rows.slice(0, 1).map((m) => ({ role: m.role })));
+    const ws = eq(url.searchParams.get('workspace_id'));
+    const actor = eq(url.searchParams.get('actor_id'));
+    const rows = MEMBERS.filter((m) => (!ws || m.workspace_id === ws) && (!actor || m.actor_id === actor));
+    const limit = Number(url.searchParams.get('limit') || rows.length);
+    return send(200, rows.slice(0, limit).map((m) => ({ workspace_id: m.workspace_id, role: m.role })));
   }
   if (url.pathname === '/rest/v1/dsg_app_builds') {
     if (fake.mode === 'dberror') return send(400, { message: `relation "dsg_app_builds" does not exist (${DB_ERROR_MARKER})` });
@@ -82,9 +102,10 @@ await new Promise((resolve) => fakeServer.listen(FAKE_PORT, '127.0.0.1', resolve
 const env = { ...process.env, NODE_ENV: 'production', NEXT_TELEMETRY_DISABLED: '1' };
 for (const name of ['DSG_ONE_V1_SUPABASE_URL', 'NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL', 'SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL',
   'DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'DSG_ALLOW_DEV_HEADER_ACTOR', 'DSG_ALLOW_DEV_AUTH_HEADERS']) delete env[name];
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY', 'DSG_ALLOW_DEV_HEADER_ACTOR', 'DSG_ALLOW_DEV_AUTH_HEADERS']) delete env[name];
 env.DSG_ONE_V1_SUPABASE_URL = `http://127.0.0.1:${FAKE_PORT}`;
 env.DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY = 'local-e2e-fake-key-not-a-secret';
+env.NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY = 'local-e2e-fake-publishable-key';
 const nextBin = path.join(process.cwd(), 'node_modules', '.bin', 'next');
 const app = spawn(nextBin, ['start', '-p', String(APP_PORT), '-H', '127.0.0.1'], { env, stdio: 'ignore' });
 const shutdown = () => { app.kill('SIGTERM'); fakeServer.close(); };
@@ -325,7 +346,7 @@ const raw = (method, pathname, headers = {}, body) => new Promise((resolve, reje
   const req = http.request({ host: '127.0.0.1', port: APP_PORT, path: pathname, method, headers }, (res) => {
     let text = '';
     res.on('data', (c) => { text += c; });
-    res.on('end', () => resolve({ status: res.statusCode, text }));
+    res.on('end', () => resolve({ status: res.statusCode, text, headers: res.headers }));
   });
   req.on('error', reject);
   if (body) req.write(body);
@@ -475,6 +496,46 @@ const cardNames = (page) => page.locator('article p.font-bold').allTextContents(
   const marker = await page.evaluate(() => window.__spaMarker);
   check('[B8] clicking Verify is a real navigation (document reloaded, not a client-side transition)', marker === undefined, String(marker));
   await ctx.close();
+}
+
+// B9: the whole chain: login -> HttpOnly/Secure cookie -> workspace selection (membership checked) -> real data
+{
+  const post = (pathname, payload, cookie) => raw('POST', pathname, { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) }, JSON.stringify(payload));
+  const probe = await post('/api/auth/session', { email: LOGIN.email, password: LOGIN.password });
+  if (probe.status === 500 && /DSG_AUTH_CONFIG_REQUIRED/.test(probe.text)) {
+    console.log('SKIPPED  [B9] login flow: the app has no NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY (the app process could not read it; see the header of this script). NOT counted as a pass.');
+  } else {
+    const wrong = await post('/api/auth/session', { email: LOGIN.email, password: 'wrong' });
+    check('[B9] wrong password -> 401 and no session cookie is issued', wrong.status === 401 && !(wrong.headers['set-cookie'] || []).some((c) => c.startsWith('sb-access-token=')), `${wrong.status}`);
+    const cookies = probe.headers['set-cookie'] || [];
+    const access = cookies.find((c) => c.startsWith('sb-access-token=')) || '';
+    check('[B9] login issues the session cookie as HttpOnly + Secure + SameSite=Lax', probe.status === 200 && /HttpOnly/i.test(access) && /Secure/i.test(access) && /SameSite=lax/i.test(access), access.replace(/=[^;]+/, '=<token>'));
+
+    const { ctx, page } = await sessionPage({});
+    await page.goto(`${BASE}/login?next=/dsg/access`, { waitUntil: 'networkidle' });
+    await page.locator('input[type=email]').fill(LOGIN.email);
+    await page.locator('input[type=password]').fill(LOGIN.password);
+    await page.locator('button[type=submit]').click();
+    await page.waitForURL(/\/dsg\/access/, { timeout: 15000 });
+    await page.getByText('Active session workspace').waitFor({ timeout: 15000 });
+    check('[B9] UI sign-in lands on /dsg/access and the single membership is activated (server-verified)', true);
+    const jar = await ctx.cookies();
+    const byName = Object.fromEntries(jar.map((c) => [c.name, c]));
+    check('[B9] browser holds the session + workspace cookies, both HttpOnly and not readable by page scripts', !!byName['sb-access-token']?.httpOnly && !!byName['dsg-workspace-id']?.httpOnly && byName['dsg-workspace-id']?.value === WS.one && !(await page.evaluate(() => document.cookie)).includes('sb-access-token'));
+    await page.goto(`${BASE}/dsg/history`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('article');
+    const names = await cardNames(page);
+    check('[B9] after the real login, History shows alice\'s real rows', names.length === 10 && names.every((n) => n.startsWith('Alice App ')), names.slice(0, 2).join(', '));
+
+    const cookieHeader = `sb-access-token=${TOKEN.alice}`;
+    const nonMember = await post('/api/dsg/access/workspace', { workspaceId: WS.two }, cookieHeader);
+    check('[B9] selecting a workspace the user is NOT a member of -> 403 and no workspace cookie', nonMember.status === 403 && !(nonMember.headers['set-cookie'] || []).some((c) => c.startsWith('dsg-workspace-id=')), `${nonMember.status} ${nonMember.text.slice(0, 70)}`);
+    const noSession = await post('/api/dsg/access/workspace', { workspaceId: WS.one });
+    check('[B9] selecting a workspace without a session -> 401', noSession.status === 401, `${noSession.status}`);
+    const forgedSession = await post('/api/dsg/access/workspace', { workspaceId: WS.one }, `sb-access-token=${jwtFor(ID.alice)}x`);
+    check('[B9] selecting a workspace with a forged session token -> 401', forgedSession.status === 401, `${forgedSession.status}`);
+    await ctx.close();
+  }
 }
 
 await browser.close();
