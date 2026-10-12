@@ -1,3 +1,11 @@
+# Production scope — 12 October 2026
+
+> **Verified AWS Marketplace PUBLIC CATALOG READ.** DSG Spacetime owner-gated atomic activation [#38221386222](https://github.com/tdealer01-crypto/DSG-Private-Production-Runtime/actions/runs/38221386222) completed on immutable ECR image `sha256:fd718ca2ed2ab3de5da40fe987d83f45788636eb0d0edc0251f27b53e8e4f701`, with 5/5 AWS services healthy, 30 configured routes, 33 entitled. Real end-user OAuth-bound `route.marketplace.listings-read` executed with policy **ALLOW** and result `{"items":[]}`. Evidence chain was valid at 142 records and cross-user Principal was BLOCKED. [Full evidence](https://github.com/tdealer01-crypto/DSG-Private-Production-Runtime/issues/656#issuecomment-6120341073).
+
+> **Still NOT VERIFIED:** seller/catalog writes, orders/payments, Marketplace-specific independently verified signed Provider v2 receipt, Cinema connect/execute under signed approval, Unity/Quest, and whole-system Production. Earlier Azure statuses below are historical only; AWS is sole current runtime authority.
+
+---
+
 # DSG ONE V1 — Autonomous Governed Runtime
 > [!IMPORTANT]
 > **Production migration authority — AWS.** Current production claims must be bound to the AWS release manifest, immutable ECR source-SHA image, provider readback, and fresh E2E evidence. Azure is historical/manual rollback proof only.

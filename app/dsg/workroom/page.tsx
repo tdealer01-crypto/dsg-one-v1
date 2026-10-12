@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { PublicProductionSnapshot } from '@/components/public-production-snapshot';
 import { useCallback, useEffect, useState } from 'react';
 import { ExternalLink, RefreshCw, ShieldCheck } from 'lucide-react';
 import { LiveAgentChat } from '@/components/live-agent-chat';
@@ -119,6 +120,8 @@ export default function DsgWorkroomPage() {
             </button>
           </div>
         </header>
+
+        <div className="mt-6"><PublicProductionSnapshot compact /></div>
 
         <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6">
           <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Workspace authority</div>

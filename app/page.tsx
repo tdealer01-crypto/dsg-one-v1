@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { PublicProductionSnapshot } from '@/components/public-production-snapshot';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -111,6 +112,7 @@ export default function HomePage() {
       </section>
 
       <div className="mx-auto max-w-6xl space-y-20 px-5 py-16 sm:px-8">
+        <PublicProductionSnapshot />
         <section id="how-it-works" className="scroll-mt-24">
           <div className="mx-auto max-w-2xl text-center">
             <p className="font-mono text-xs uppercase tracking-[0.22em] text-cyan-300">First value</p>
