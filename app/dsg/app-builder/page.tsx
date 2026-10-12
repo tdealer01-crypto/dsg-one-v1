@@ -2,42 +2,6 @@ import { AppBuilderConsoleClient } from '@/components/dsg/app-builder/AppBuilder
 import { AppBuilderProofPanel, type ProofPanelItem } from '@/components/dsg/app-builder/AppBuilderProofPanel';
 import { OutcomeIntakePanel } from '@/components/dsg/app-builder/OutcomeIntakePanel';
 import { DSG_APP_TEMPLATES, DSG_MARKET_TEMPLATES } from '@/lib/dsg/app-builder/templates/template-registry';
-import type { DsgAppBuilderPrd } from '@/lib/dsg/app-builder/types/prd';
-
-const demoPrd: DsgAppBuilderPrd = {
-  title: 'Market-Ready Agent App Builder',
-  summary:
-    'A governed app-builder workspace that turns a plain-language goal into a PRD, execution plan, approval gate, runtime evidence, and generated-app proof without claiming production readiness before evidence exists.',
-  useCase: 'Enterprise Agent Builder Workspace',
-  userProblem:
-    'Users want to describe the outcome they need, see a realistic preview, approve the plan, and verify proof without navigating scattered tools or trusting black-box AI claims.',
-  targetUsers: ['founder', 'operator', 'SMB owner', 'enterprise reviewer', 'developer'],
-  coreFeatures: [
-    'Outcome-first app request',
-    'Prompt to PRD preview',
-    'Template and risk registry',
-    'Z3 feasibility observer boundary',
-    'Approval and runtime proof gate',
-    'Visible next action for every blocked state',
-  ],
-  nonGoals: [
-    'No hidden autonomous execution',
-    'No direct model-to-secret access',
-    'No production-ready claim without build, deploy, database, auth, and proof evidence',
-    'No mock data presented as production evidence',
-  ],
-  acceptanceCriteria: [
-    'User can state the app outcome in plain language',
-    'User can see PRD and plan before approval',
-    'User can inspect risk, proof, and blocked reasons',
-    'User can open a generated app preview when available',
-    'Production claim remains blocked until runtime evidence exists',
-  ],
-  frontend: ['Next.js App Router', 'React', 'Tailwind'],
-  backend: ['Next API routes', 'DSG controlled executor', 'Governed tool boundary'],
-  database: ['Supabase Postgres', 'Evidence-first persistence boundary'],
-  deployment: ['Vercel', 'GitHub PR flow', 'CI and deployment proof required'],
-};
 
 const marketPillars = [
   {
@@ -265,7 +229,7 @@ export default function DsgAppBuilderPage() {
           </div>
         </section>
 
-        <AppBuilderConsoleClient initialPrd={demoPrd} />
+        <AppBuilderConsoleClient />
 
         <section className="mt-8 rounded-[2rem] border border-white/10 bg-[#0f151f]/78 p-6 backdrop-blur-xl">
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
