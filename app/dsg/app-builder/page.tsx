@@ -1,4 +1,5 @@
 import { AppBuilderConsoleClient } from '@/components/dsg/app-builder/AppBuilderConsoleClient';
+import { AppBuilderGoalProvider } from '@/components/dsg/app-builder/AppBuilderGoalBridge';
 import { AppBuilderProofPanel, type ProofPanelItem } from '@/components/dsg/app-builder/AppBuilderProofPanel';
 import { OutcomeIntakePanel } from '@/components/dsg/app-builder/OutcomeIntakePanel';
 import { DSG_APP_TEMPLATES, DSG_MARKET_TEMPLATES } from '@/lib/dsg/app-builder/templates/template-registry';
@@ -120,6 +121,7 @@ const builderStages = [
 
 export default function DsgAppBuilderPage() {
   return (
+    <AppBuilderGoalProvider>
     <main className="min-h-screen overflow-hidden bg-[#090b0f] text-[#eef3f8]">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_15%_8%,rgba(242,202,80,0.20),transparent_30%),radial-gradient(circle_at_90%_18%,rgba(56,189,248,0.16),transparent_28%),linear-gradient(135deg,#090b0f_0%,#111827_48%,#050608_100%)]" />
       <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.028)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(circle_at_center,black,transparent_82%)]" />
@@ -284,5 +286,6 @@ export default function DsgAppBuilderPage() {
         </section>
       </div>
     </main>
+    </AppBuilderGoalProvider>
   );
 }
