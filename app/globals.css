@@ -180,4 +180,7 @@ pre,
   .dsg-sidebar-mobile-overlay {
     display: flex !important;
   }
+  .dsg-sidebar-mobile-tabs {
+    display: flex !important;
+  }
 }

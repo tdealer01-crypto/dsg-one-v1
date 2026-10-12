@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Sparkles,
   LayoutTemplate,
@@ -12,14 +12,26 @@ import {
   Shield,
   Cpu,
   Bell,
-  Settings,
   ArrowLeft,
+  ClipboardCheck,
+  House,
+  Monitor,
+  ShieldCheck,
   Menu,
   X,
   Key,
 } from 'lucide-react';
 
 const navSections = [
+  {
+    label: 'Operate',
+    items: [
+      { label: 'Workspace', href: '/dsg/access', iconName: 'home' },
+      { label: 'Workroom', href: '/dsg/workroom', iconName: 'workroom' },
+      { label: 'Approvals', href: '/dsg/approvals', iconName: 'approvals' },
+      { label: 'Verify', href: '/dsg/verify', iconName: 'verify' },
+    ],
+  },
   {
     label: 'Build',
     items: [
@@ -48,7 +60,14 @@ const navSections = [
 
 const bottomItems = [
   { label: 'Notifications', href: '/dsg/notifications', iconName: 'bell' },
-  { label: 'Settings', href: '/dsg/settings', iconName: 'settings' },
+];
+
+// Thumb-reach shortcuts on phones (same destinations as the menu); the fifth tab opens the full menu.
+const mobileTabs = [
+  { label: 'Workroom', href: '/dsg/workroom', iconName: 'workroom' },
+  { label: 'Approvals', href: '/dsg/approvals', iconName: 'approvals' },
+  { label: 'Verify', href: '/dsg/verify', iconName: 'verify' },
+  { label: 'App Builder', href: '/dsg/app-builder', iconName: 'sparkles' },
 ];
 
 function NavIcon({ name }: { name: string }) {
@@ -63,7 +82,10 @@ function NavIcon({ name }: { name: string }) {
     case 'shield':         return <Shield className={cls} />;
     case 'cpu':            return <Cpu className={cls} />;
     case 'bell':           return <Bell className={cls} />;
-    case 'settings':       return <Settings className={cls} />;
+    case 'home':           return <House className={cls} />;
+    case 'workroom':       return <Monitor className={cls} />;
+    case 'approvals':      return <ClipboardCheck className={cls} />;
+    case 'verify':         return <ShieldCheck className={cls} />;
     case 'key':            return <Key className={cls} />;
     default:               return null;
   }
@@ -73,12 +95,13 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <aside className="relative z-10 flex h-full w-64 max-w-[86vw] shrink-0 flex-col border-r border-slate-800 bg-slate-950">
+    // The global skin makes bg-slate-950 translucent; the phone drawer must be opaque.
+    <aside className={`relative z-10 flex h-full w-64 max-w-[86vw] shrink-0 flex-col border-r border-slate-800 ${onClose ? 'bg-[#030a17]' : 'bg-slate-950'}`}>
       {/* logo row */}
       <div className="flex h-14 items-center justify-between border-b border-slate-800 px-4">
         <a
           href="/"
-          className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-white"
+          className="flex min-h-11 items-center gap-2 text-xs font-black uppercase tracking-widest text-white"
         >
           <Sparkles className="h-3.5 w-3.5 text-indigo-400" /> DSG ONE
         </a>
@@ -122,10 +145,9 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
             })}
           </div>
         ))}
-      </nav>
 
-      {/* bottom */}
-      <div className="border-t border-slate-800 py-2">
+        {/* bottom */}
+        <div className="mt-2 border-t border-slate-800 py-2">
         {bottomItems.map((item) => {
           const active = pathname === item.href;
           return (
@@ -151,16 +173,69 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
         >
           <ArrowLeft className="h-4 w-4" /> Home
         </a>
-      </div>
+        </div>
+      </nav>
     </aside>
+  );
+}
+
+function MobileTabs({ menuOpen, onOpenMenu }: { menuOpen: boolean; onOpenMenu: () => void }) {
+  const pathname = usePathname();
+  const tab = 'flex min-h-14 flex-1 touch-manipulation flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-300';
+
+  return (
+    <nav
+      aria-label="DSG ONE shortcuts"
+      className="dsg-sidebar-mobile-tabs flex shrink-0 border-t border-slate-800 bg-slate-950 pb-[env(safe-area-inset-bottom)] md:hidden"
+    >
+      {mobileTabs.map((item) => {
+        const active = pathname === item.href || pathname.startsWith(item.href + '/');
+        return (
+          <a
+            key={item.href}
+            href={item.href}
+            aria-current={active ? 'page' : undefined}
+            className={`${tab} ${active ? 'text-indigo-300' : 'text-slate-400'}`}
+          >
+            <NavIcon name={item.iconName} />
+            {item.label}
+          </a>
+        );
+      })}
+      <button
+        type="button"
+        onClick={onOpenMenu}
+        aria-expanded={menuOpen}
+        className={`${tab} text-slate-400`}
+      >
+        <Menu className="h-4 w-4" />
+        Menu
+      </button>
+    </nav>
   );
 }
 
 export default function DsgLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileOpen]);
+
   return (
     <div className="flex h-dvh min-h-0 overflow-hidden bg-slate-950 text-slate-100">
+      <a
+        href="#dsg-main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[60] focus:rounded-lg focus:bg-indigo-600 focus:px-3 focus:py-2 focus:text-sm focus:font-bold focus:text-white"
+      >
+        Skip to content
+      </a>
+
       {/* desktop sidebar */}
       <div className="dsg-sidebar-desktop hidden h-full md:flex">
         <Sidebar />
@@ -168,7 +243,7 @@ export default function DsgLayout({ children }: { children: React.ReactNode }) {
 
       {/* mobile overlay */}
       {mobileOpen && (
-        <div className="dsg-sidebar-mobile-overlay fixed inset-0 z-50 flex md:hidden">
+        <div role="dialog" aria-modal="true" aria-label="DSG ONE menu" className="dsg-sidebar-mobile-overlay fixed inset-0 z-50 flex md:hidden">
           <Sidebar onClose={() => setMobileOpen(false)} />
           <div
             className="flex-1 bg-black/60 backdrop-blur-sm"
@@ -191,7 +266,10 @@ export default function DsgLayout({ children }: { children: React.ReactNode }) {
             DSG ONE
           </span>
         </div>
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</div>
+        <div id="dsg-main" tabIndex={-1} className="min-h-0 min-w-0 flex-1 overflow-y-auto focus:outline-none">
+          {children}
+        </div>
+        <MobileTabs menuOpen={mobileOpen} onOpenMenu={() => setMobileOpen(true)} />
       </div>
     </div>
   );
