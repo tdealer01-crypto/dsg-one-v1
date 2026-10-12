@@ -1,14 +1,9 @@
+import {StatusBadge} from '@/components/status-badge';
 import {assessProductReadiness} from '@/lib/dsg/product-ready/readiness';
 
 // Reads process.env on every request; a static prerender would freeze the build-time
 // (secret-less) result into the public page.
 export const dynamic = 'force-dynamic';
-
-function badgeClass(status: string) {
-  if (status === 'PASS') return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
-  if (status === 'WARN') return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
-  return 'border-rose-500/40 bg-rose-500/10 text-rose-200';
-}
 
 export default function ProductReadyPage() {
   const report = assessProductReadiness();
@@ -50,11 +45,11 @@ export default function ProductReadyPage() {
               {report.checks.map((check) => (
                 <div key={check.id} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-bold text-slate-100">{check.label}</p>
-                      <p className="mt-1 text-xs font-mono text-slate-500">{check.evidence}</p>
+                      <p className="mt-1 break-words text-xs font-mono text-slate-500">{check.evidence}</p>
                     </div>
-                    <span className={`rounded-full border px-3 py-1 text-xs font-bold ${badgeClass(check.status)}`}>{check.status}</span>
+                    <StatusBadge status={check.status} className="self-start md:self-auto" />
                   </div>
                   {check.requiredForProduction && <p className="mt-3 text-xs text-slate-500">Required before production claim.</p>}
                 </div>
