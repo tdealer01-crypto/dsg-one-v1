@@ -9,7 +9,7 @@ const pendingAcceptance = [
   { title: 'Marketplace-specific signed Provider v2 receipt', status: 'REVIEW', nextAction: 'Independently verify Marketplace result and Ed25519 signature against the pinned public key.' },
   { title: 'Cinema approved Connect / Execute', status: 'BLOCKED', nextAction: 'Bind signed user approval to plan/principal/payload and verify live Connect/Execute and negative case.' },
   { title: 'Unity / Quest end-to-end', status: 'REVIEW', nextAction: 'Run Unity simulator or Quest with governed request and receipt hash readback.' },
-  { title: 'Whole-system Production', status: 'BLOCKED', nextAction: 'Close all remaining seller, approval, Cinema and XR evidence gates before overall acceptance.' },
+  { title: 'Whole-system Production', status: 'BLOCKED', nextAction: 'Verify seller writes, buyer orders/checkout/payout, independent Marketplace Provider v2 signature, approved Cinema connect/execute, XR and final fresh evidence before overall acceptance.' },
 ] as const;
 
 export function PublicProductionSnapshot({ compact = false }: { compact?: boolean }) {
@@ -75,7 +75,8 @@ export function PublicProductionSnapshot({ compact = false }: { compact?: boolea
       </p>
       <div className="mt-5 flex flex-wrap gap-4 text-xs font-semibold">
         <a href="https://dsg-3.gitbook.io/dsg-docs/control-plane/dsg-one-control-plane-current-aws-state/dsg-marketplace-verified-oauth-read-e2e-12-october-2026" target="_blank" rel="noopener noreferrer" className="text-cyan-200 underline-offset-4 hover:underline">Public sanitized acceptance ↗</a>
-        <a href="https://github.com/tdealer01-crypto/DSG-Private-Production-Runtime/actions/runs/38221386222" target="_blank" rel="noopener noreferrer" className="text-cyan-200 underline-offset-4 hover:underline">Owner audit — GitHub access required ↗</a>
+        <a href="https://github.com/tdealer01-crypto/DSG-Private-Production-Runtime/issues/656#issuecomment-6120341073" target="_blank" rel="noopener noreferrer" className="text-cyan-200 underline-offset-4 hover:underline">Owner detailed audit — GitHub access required ↗</a>
+        <a href="https://github.com/tdealer01-crypto/DSG-Private-Production-Runtime/actions/runs/38221386222" target="_blank" rel="noopener noreferrer" className="text-cyan-200 underline-offset-4 hover:underline">Owner activation workflow ↗</a>
       </div>
     </section>
   );
