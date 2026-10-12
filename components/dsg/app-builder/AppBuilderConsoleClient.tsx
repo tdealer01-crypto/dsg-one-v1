@@ -111,10 +111,9 @@ function extractCreatedJobId(url: string | null) {
   return url.split('/').filter(Boolean).at(-1) || 'ui-agent-loop';
 }
 
-export function AppBuilderConsoleClient() {
-  const sharedOutcome = useAppBuilderGoalBridge()?.submitted;
-  const [goal, setGoal] = useState('');
-  const [criteria, setCriteria] = useState('');
+export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = '' }: { initialGoal?: string; initialCriteria?: string }) {
+  const [goal, setGoal] = useState(initialGoal);
+  const [criteria, setCriteria] = useState(initialCriteria);
   const [prd, setPrd] = useState<DsgAppBuilderPrd | null>(null);
   const [plan, setPlan] = useState<DsgPlanDraft | null>(null);
   const [observer, setObserver] = useState<DsgPlanObserverResult | null>(null);
@@ -144,25 +143,6 @@ export function AppBuilderConsoleClient() {
   const [loadingGovernedTool, setLoadingGovernedTool] = useState(false);
 
   const criteriaList = useMemo(() => criteria.split('\n').map((line) => line.trim()).filter(Boolean), [criteria]);
-
-  useEffect(() => {
-    if (!sharedOutcome) return;
-    setGoal(sharedOutcome.goal);
-    setCriteria(sharedOutcome.criteria.join('\n'));
-    setPrd(null);
-    setPlan(null);
-    setObserver(null);
-    setApprovalGate(null);
-    setHandoff(null);
-    setRuntimeGate(null);
-    setAgentLoop(null);
-    setCreatedJobUrl(null);
-    setGovernedPrepared(null);
-    setGovernedResult(null);
-    setPreviewMode('concept');
-    setStatus('OUTCOME_ACCEPTED · create governed job and PRD from the new input');
-  }, [sharedOutcome]);
-
 
   // The owner-scoped server route reads persisted Supabase jobs. Never synthesize
   // a saved job from a sample, localStorage or a guessed generated-app route.
@@ -201,7 +181,12 @@ export function AppBuilderConsoleClient() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void refreshSavedJobs(controller.signal);
+    // Schedule after the effect callback returns to avoid synchronous
+    // setState during effect execution; AbortController handles unmount.
+    void Promise.resolve().then(() => {
+      if (!controller.signal.aborted) return refreshSavedJobs(controller.signal);
+      return undefined;
+    });
     return () => controller.abort();
   }, [refreshSavedJobs]);
 
@@ -679,4 +664,15 @@ export function AppBuilderConsoleClient() {
       </aside>
     </div>
   );
+}
+
+// A new user-accepted outcome remounts the editing console with fresh input.
+// No effect-based state copying or stale PRD/Plan/approval artifacts survives.
+export function AppBuilderConsoleWorkspace() {
+  const accepted = useAppBuilderGoalBridge()?.submitted;
+  return <AppBuilderConsoleClient
+    key={accepted?.revision ?? 0}
+    initialGoal={accepted?.goal ?? ''}
+    initialCriteria={accepted?.criteria.join('\\n') ?? ''}
+  />;
 }
