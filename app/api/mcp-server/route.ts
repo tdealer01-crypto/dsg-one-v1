@@ -24,7 +24,14 @@ const TOOLS = [
   {
     name: 'list_app_builder_jobs',
     description: 'List all App Builder jobs in the current DSG workspace.',
-    inputSchema: { type: 'object', properties: {} },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspaceId: { type: 'string', description: 'Selected DSG Workspace UUID; membership verified server-side.' },
+      },
+      required: ['workspaceId'],
+      additionalProperties: false,
+    },
   },
   {
     name: 'create_app_builder_job',
@@ -170,7 +177,21 @@ async function callTool(
       return res.json();
     }
     case 'list_app_builder_jobs': {
-      const res = await fetch(`${base}/api/dsg/app-builder/jobs`, { headers });
+      // The old service-token fallback has no user principal or workspace.
+      // It must never be treated as a logged-in Supabase/Auth0 user.
+      const workspaceId = toolInput.workspaceId;
+      if (typeof workspaceId !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId)) {
+        return { ok: false, error: { code: 'DSG_MCP_WORKSPACE_SELECTION_REQUIRED' } };
+      }
+      const res = await fetch(`${base}/api/dsg/app-builder/jobs/oauth`, {
+        method: 'GET',
+        headers: {
+          ...(authHeader ? { Authorization: authHeader } : {}),
+          'x-dsg-workspace-id': workspaceId,
+        },
+        cache: 'no-store',
+      });
       return res.json();
     }
     case 'create_app_builder_job': {
