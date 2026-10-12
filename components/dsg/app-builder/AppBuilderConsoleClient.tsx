@@ -673,6 +673,6 @@ export function AppBuilderConsoleWorkspace() {
   return <AppBuilderConsoleClient
     key={accepted?.revision ?? 0}
     initialGoal={accepted?.goal ?? ''}
-    initialCriteria={accepted?.criteria.join('\\n') ?? ''}
+    initialCriteria={accepted?.criteria.join('\n') ?? ''}
   />;
 }
