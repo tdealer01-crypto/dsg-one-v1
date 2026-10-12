@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { PublicProductionSnapshot } from '@/components/public-production-snapshot';
 import { CircleCheck, ExternalLink, LogOut, RefreshCw, ShieldCheck } from 'lucide-react';
 
 type Membership = { workspace_id: string; role: 'OWNER' | 'ADMIN' | 'OPERATOR' | 'AUDITOR' | 'VIEWER' };
@@ -180,6 +181,8 @@ export default function DsgAccessPage() {
             </button>
           </div>
         </header>
+
+        <div className="mt-6"><PublicProductionSnapshot compact /></div>
 
         <section className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6">

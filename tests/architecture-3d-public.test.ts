@@ -16,7 +16,9 @@ describe('public interactive DSG architecture', () => {
 
   it('publishes dated verified AWS image status without claiming full E2E success', () => {
     expect(html).toContain('VERIFIED · 11 OCT 2026');
-    expect(html).toContain('VALID · 140 RECORDS');
+    expect(html).toContain('VALID · 142 RECORDS');
+    expect(html).toContain('Marketplace public READ');
+    expect(html).toContain('38221386222');
     expect(html).toContain('OAuth → GitHub read-only → signed Ed25519 E2E');
     expect(html).toContain('VERIFIED · SCOPED PASS');
     expect(html).toContain('NOT VERIFIED');
