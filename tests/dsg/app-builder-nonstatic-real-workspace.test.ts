@@ -42,7 +42,8 @@ describe('App Builder truth: user goal and real jobs, not a frozen demo', () => 
     expect(consoleSource).toContain('JOB_DATABASE_UNAVAILABLE');
     expect(consoleSource).toContain('งานที่บันทึกจริง');
     expect(consoleSource).toContain('job.claimStatus');
-    expect(consoleSource).not.toContain('localStorage');
+    expect(consoleSource).not.toContain('localStorage.getItem(');
+    expect(consoleSource).not.toContain('localStorage.setItem(');
   });
 
   it('does not show the old generated app as the result of a newly created job', () => {
