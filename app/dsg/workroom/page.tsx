@@ -42,7 +42,7 @@ const controlSurfaces = [
     href: null,
   },
   {
-    name: 'Cinema / BrowserOS',
+    name: 'DSG OS / Cinema',
     badge: 'AWS · approval gated',
     description: 'Public Cinema UI and browser contract are on AWS. Browser execution still requires the existing API-key, plan and approval boundaries.',
     href: 'https://aws.dsg.pics/app',
@@ -118,7 +118,7 @@ export default function DsgWorkroomPage() {
             <div>
               <h1 className="text-3xl font-black tracking-tight md:text-5xl">One Workroom. All operator surfaces.</h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-                Desktop UI, command center, Remote Desktop Commander, Secret Manager status, Cinema/BrowserOS, Agent v0 and Agent Chat live behind one verified workspace. Spacetime remains execution authority; approval and evidence gates still apply.
+                Desktop UI, command center, Remote Desktop Commander, Secret Manager status, DSG OS / Cinema, Agent v0 and Agent Chat live behind one verified workspace. Spacetime remains execution authority; approval and evidence gates still apply.
               </p>
             </div>
             <button onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:border-slate-500">
