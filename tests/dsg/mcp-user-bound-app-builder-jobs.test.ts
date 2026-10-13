@@ -193,7 +193,7 @@ describe('MCP App Builder signed route/plan delegation (inactive until signer wi
     tokenVerifier.mockRejectedValue(new Error('JWT signature verification failed'));
     const response = await GET(request());
     expect(response.status).toBe(401);
-    expect((await response.json()).error.code).toBe('DSG_MCP_USER_OAUTH_INVALID');
+    expect((await response.json()).error.code).toBe('DSG_MCP_DELEGATION_INVALID');
     expect(db).not.toHaveBeenCalled();
   });
 
