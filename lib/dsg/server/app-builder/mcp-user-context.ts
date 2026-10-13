@@ -86,6 +86,7 @@ export async function verifiedMcpAppBuilderReadContext(headers: Headers): Promis
     });
     const now = Math.floor(Date.now() / 1000);
     if (typeof payload.sub !== 'string' || !payload.sub || payload.sub.length > 220 ||
+        payload.iss !== DELEGATION_ISSUER || payload.aud !== DELEGATION_AUDIENCE ||
         payload.azp !== expectedClient || payload.auth0_iss !== DSG_AUTH0_ISSUER ||
         payload.scope !== 'dsg.jobs.read' || payload.route_id !== DELEGATED_ROUTE ||
         payload.workspace_id !== workspaceId || payload.verdict !== 'ALLOW' ||
