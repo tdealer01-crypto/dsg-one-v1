@@ -54,10 +54,10 @@ function signedClaims(overrides: Record<string, unknown> = {}) {
       decision_hash: 'b'.repeat(64),
       verdict: 'ALLOW',
       jti: 'unpredictable-test-nonce-215',
-      nbf: Math.floor(Date.now() / 1000) - 30,
+      nbf: Math.floor(Date.now() / 1000) - 5,
       azp: pluginClient,
-      iat: Math.floor(Date.now() / 1000) - 30,
-      exp: Math.floor(Date.now() / 1000) - 10,
+      iat: Math.floor(Date.now() / 1000) - 5,
+      exp: Math.floor(Date.now() / 1000) + 20,
       scope: 'dsg.jobs.read',
       ...overrides,
     },
@@ -215,6 +215,7 @@ describe('MCP App Builder signed route/plan delegation (inactive until signer wi
   it('rejects an OAuth user who is not a member of the selected workspace', async () => {
     db.mockReset().mockResolvedValueOnce([linkedAccount()] as never)
       .mockResolvedValueOnce([] as never);
+    tokenVerifier.mockResolvedValue(signedClaims({ workspace_id: otherWorkspaceId }) as never);
     const response = await GET(request({ workspace: otherWorkspaceId }));
     expect(response.status).toBe(403);
     expect((await response.json()).error.code).toBe('DSG_MCP_WORKSPACE_ACCESS_DENIED');
