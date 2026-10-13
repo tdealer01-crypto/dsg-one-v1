@@ -4,6 +4,7 @@ import {
   composeWorkroomRoute,
   composeWorkroomRoutes,
   publicWorkroomReceipt,
+  spacetimePayloadHash,
   uniqueWorkroomRoute,
   workroomReceiptMatches,
   type WorkroomExecution,
@@ -65,32 +66,45 @@ describe('DSG Workroom route and receipt contract', () => {
       .toEqual(['browser.remote.connect', 'browser.remote.run']);
   });
 
-  it('requires exact execution evidence before treating a provider response as completed work', () => {
+  it('cryptographically binds each execution receipt to the exact plan, payload and decision', async () => {
     const request: WorkroomExecution = {
       plan_id: 'plan-1',
-      plan_hash: 'bound-plan-hash',
+      plan_hash: 'd'.repeat(64),
       route_id: 'route.execute',
       agent,
-      payload: { action: 'browser.remote.run', arguments: {} },
+      payload: { action: 'browser.remote.run', arguments: { url: 'https://dsg.pics' } },
     };
-    const hash = 'a'.repeat(64);
+    const result = { ok: true, text: 'done' };
+    const payloadHash = await spacetimePayloadHash(request.payload);
+    const requestHash = await spacetimePayloadHash({
+      plan_id: request.plan_id, plan_hash: request.plan_hash, route_id: request.route_id,
+      agent: request.agent, approval_id: null,
+    });
+    const reason = 'ROUTE_ALLOWED';
+    const decisionHash = await spacetimePayloadHash({
+      verdict: 'ALLOW', reason, plan_id: request.plan_id, route_id: request.route_id,
+      agent_id: request.agent.agent_id, payload_hash: payloadHash, request_hash: requestHash,
+    });
     const receipt = {
-      decision: { verdict: 'ALLOW' },
-      result: { ok: true, text: 'done' },
+      decision: { verdict: 'ALLOW', reason, plan_id: request.plan_id, route_id: request.route_id, decision_hash: decisionHash },
+      result,
       evidence: {
         plan_id: request.plan_id,
         route_id: request.route_id,
         agent_id: request.agent.agent_id,
-        evidence_hash: hash,
-        request_hash: hash,
-        result_hash: hash,
-        decision_hash: hash,
+        evidence_hash: 'a'.repeat(64),
+        request_hash: payloadHash,
+        result_hash: await spacetimePayloadHash(result),
+        decision_hash: decisionHash,
       },
     };
-
-    expect(workroomReceiptMatches(receipt, request)).toBe(true);
-    expect(workroomReceiptMatches({ ...receipt, result: { ok: false } }, request)).toBe(false);
-    expect(workroomReceiptMatches({ ...receipt, evidence: { ...receipt.evidence, route_id: 'route.other' } }, request)).toBe(false);
+    expect(await workroomReceiptMatches(receipt, request)).toBe(true);
+    expect(await workroomReceiptMatches(receipt, { ...request, plan_hash: 'e'.repeat(64) })).toBe(false);
+    expect(await workroomReceiptMatches(receipt, { ...request, payload: { action: 'device.shell.exec' } })).toBe(false);
+    expect(await workroomReceiptMatches(receipt, request, 'forged-approval')).toBe(false);
+    expect(await workroomReceiptMatches({ ...receipt, result: { ok: true, text: 'forged' } }, request)).toBe(false);
+    expect(await workroomReceiptMatches({ ...receipt, evidence: { ...receipt.evidence, route_id: 'route.other' } }, request)).toBe(false);
+    expect(await workroomReceiptMatches({ ...receipt, decision: { ...receipt.decision, decision_hash: 'f'.repeat(64) } }, request)).toBe(false);
   });
 
   it('redacts approval and credential material before rendering receipts', () => {
