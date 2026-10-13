@@ -15,7 +15,7 @@ export async function getAppBuilderRequestContext(
 ): Promise<AppBuilderRequestContext> {
   let actor: DsgServerActor;
   try {
-    actor = await requireVerifiedDsgActor(req.headers, permission);
+    actor = await requireVerifiedDsgActor(req.headers, permission, { distinguishAuthBackendFailure: true });
   } catch (error) {
     // Known authorization outcomes pass through. Anything else comes from the verification backend (token check,
     // membership read, env configuration) and can carry PostgREST text or env names: report only that this backend
