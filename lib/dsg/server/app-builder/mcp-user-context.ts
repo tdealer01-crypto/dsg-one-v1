@@ -50,7 +50,7 @@ export async function verifiedMcpAppBuilderReadContext(headers: Headers): Promis
   }
 
   const auth = headers.get('authorization');
-  if (!auth?.startsWith('Bearer ') || auth.length > TOKEN_MAX_LENGTH + 7) {
+  if (!auth?.toLowerCase().startsWith('bearer ') || auth.length > TOKEN_MAX_LENGTH + 7) {
     throw new McpUserJobsDenied('DSG_MCP_USER_OAUTH_REQUIRED', 401);
   }
   const token = auth.slice(7).trim();
