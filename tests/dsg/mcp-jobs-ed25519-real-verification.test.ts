@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { SignJWT } from 'jose';
 import { callDsgRpc, getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
 import { verifiedMcpAppBuilderReadContext, McpUserJobsDenied } from '@/lib/dsg/server/app-builder/mcp-user-context';
+import { POST as mcpPost } from '../../app/api/mcp-server/route';
 
 vi.mock('@/lib/dsg/server/supabase-rpc', () => ({
   callDsgRpc: vi.fn(),
@@ -70,6 +71,32 @@ describe('Real Ed25519 user-bound delegation verification (no JOSE mocks)', () =
   });
   afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
+  it('accepts lowercase Bearer for a verified, signed user assertion', async () => {
+    const token = await assertion();
+    const selected = headers(token);
+    selected.set('authorization', 'bearer ' + token);
+    await expect(verifiedMcpAppBuilderReadContext(selected)).resolves.toMatchObject({
+      actorId: 'actor-test', workspaceId: workspace, permission: 'job:read',
+    });
+    expect(consume).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the MCP Jobs forwarding disabled without owner-gated activation', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://example.invalid');
+    vi.stubEnv('DSG_SPACETIME_JOBS_DELEGATION_ACTIVE', '');
+    const response = await mcpPost(new Request('https://example.invalid/api/mcp-server', {
+      method: 'POST',
+      headers: { authorization: 'bearer test-placeholder' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 14, method: 'tools/call',
+        params: { name: 'list_app_builder_jobs', arguments: { workspaceId: workspace } } }),
+    }));
+    const envelope = await response.json();
+    expect(JSON.parse(envelope.result.content[0].text)).toEqual({
+      ok: false, error: { code: 'DSG_MCP_JOBS_DELEGATION_NOT_ACTIVE' },
+    });
+    expect(read).not.toHaveBeenCalled();
+    expect(consume).not.toHaveBeenCalled();
+  });
   it('verifies the exact actual Python signer vector with real JOSE', async () => {
     const vector = JSON.parse(readFileSync(new URL('../fixtures/jobs-delegation-ed25519-vector.json', import.meta.url), 'utf8'));
     expect(vector.test_only).toBe(true);
