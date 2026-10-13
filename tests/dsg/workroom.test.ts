@@ -53,6 +53,8 @@ describe('AWS native Workroom governance', () => {
     expect(page).toContain('Remote Desktop Commander');
     expect(page).toContain('Secret Manager');
     expect(page).toContain('dsg-agent-v0-qwen3-30b-a3b-t4x2');
+    expect(page).toContain('route.agent.dsg-v0.plan');
+    expect(page).toContain('action.plan · discovery only');
     expect(page).toContain('Spacetime remains execution authority');
     expect(commandRoute).toContain("requireVerifiedDsgActor(req.headers, 'job:read')");
     expect(commandCenter).toContain("credentials: 'include'");

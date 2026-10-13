@@ -48,6 +48,12 @@ const controlSurfaces = [
     href: 'https://aws.dsg.pics/app',
   },
   {
+    name: 'DSG Agent v0 / MCP',
+    badge: 'action.plan · discovery only',
+    description: 'Canonical route: route.agent.dsg-v0.plan (node.agent.dsg-v0, Kaggle T4x2). Discover it through the existing OAuth-protected https://aws.dsg.pics/mcp connector. A missing user-bound OAuth principal or unavailable Kaggle kernel blocks execution; no automatic provider fallback, no false plan/evidence claim.',
+    href: '/dsg/access',
+  },
+  {
     name: 'Agent v0 / Kaggle',
     badge: 'Kaggle GPU · proposal only',
     description: 'Open the DSG Agent v0 Kaggle worker notebook. The notebook is an ephemeral proposal/GPU lane; live kernel health and execution evidence must be verified separately before use.',
