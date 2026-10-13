@@ -1,25 +1,21 @@
-# DSG ONE ↔ Spacetime: user-bound App Builder Jobs (Issue #215)
+# DSG ONE ↔ Spacetime App Builder Jobs — Issue #215
 
-## Status
-**STAGED / NOT ACTIVATED.** This endpoint and its tests are not a working ChatGPT MCP route. Do not merge or activate until Spacetime delivers the actual verified end-user OAuth access token via a reviewed, non-model-controlled delegation mechanism.
+## DRAFT / NOT DEPLOYED
+DSG ONE PR #217 depends on DSG-Private-Production-Runtime PR #681. No claim of working authenticated Production Jobs read.
 
-## Server read boundary
-- Dedicated GET /api/dsg/app-builder/jobs/oauth read-only route: no write, approval, runtime, or deploy operations.
-- Require Authorization: Bearer <end-user Auth0 JWT>; neither an internal token, x-dsg-api-key, cookie nor model principal can substitute.
-- Workspace ID is a user-selected UUID selector, not proof. Verify JWT with JWKS RS256, issuer, audience, signed azp pinned by DSG_SPACETIME_CHATGPT_CLIENT_ID, dsg.use and token lifetime before DB access.
-- Verify the subject against the existing dual-authenticated dsg_auth0_identity_links mapping with exact issuer and DSG website client.
-- Independently verify membership from dsg_workspace_members for actor + selected workspace before calling existing listAppBuilderJobs.
-- Use only repo-scoped server-only Supabase connection; bounded errors, private no-store, no tokens or SQL in responses.
+## Exact read-only delegation protocol
+- The incoming ChatGPT OAuth access token is verified by Spacetime only for https://aws.dsg.pics. It must never be forwarded as a DSG ONE API Bearer.
+- Spacetime separately signs a 25-second Ed25519 JWT with exact issuer urn:dsg:spacetime:jobs-delegation and audience https://dsg.pics/api/dsg/app-builder/jobs/oauth.
+- The DSG ONE read-only endpoint receives that signed assertion as Bearer and the selected Workspace UUID via x-dsg-workspace-id. A service token, cookie, actor-role header or unsigned JWT is not an identity.
+- DSG ONE verifies the pinned public key from DSG_SPACETIME_JOBS_DELEGATION_PUBLIC_KEY_B64; exact client azp from DSG_SPACETIME_CHATGPT_CLIENT_ID; subject, scope dsg.jobs.read, route, plan_id, plan_hash, decision_hash, selected workspace UUID, ALLOW verdict and iat/nbf/exp <= 30 seconds.
+- After cryptographic verification, require preexisting Auth0-to-website actor link (via Auth0 website client) and workspace membership in Supabase; use existing read-only scoped Jobs repository.
+- Never bypass approvals or allow Create/Execute/Deploy from this token.
 
-## Spacetime prerequisites (NOT IMPLEMENTED)
-1. Bind real independently-verified HTTP OAuth Bearer to the current caller, never generate a credential from model-supplied principal or static service token.
-2. Add dedicated read-only token delegation into list_app_builder_jobs adapter, never evidence/payload/logs nor other routes; review process boundary and token lifetime.
-3. Require explicit workspace selector bound to request, independently check Supabase membership; never use demo-workspace or a guessed workspace.
-4. Pin DSG_SPACETIME_CHATGPT_CLIENT_ID only after independent verification of actual signed azp in live OAuth credential. Fail closed if unavailable or changed.
-5. Test forged identity, swapped client, wrong workspace, revoked link, absent membership, missing token, and upstream errors.
-6. E2E: governed OAuth caller → Spacetime Plan/Route → verified delegated JWT → DSG ONE Jobs (real rows or truthful empty list) → evidence-chain verification.
+## Pending before Merge / Production
+1. Independent key generation, server-side private/public key distribution and pinning; no keys stored in repository.
+2. Actual signed ChatGPT azp verification and server configuration; no guessed OAuth client.
+3. Exact-head CI for both repositories, cross-language test vector and independent Security Review.
+4. Replay-risk review: signed random jti alone is not proof of one-time use; 25-second expiry bounds but does not eliminate replay.
+5. Controlled coordinated deployment with rollback; signed-in workspace read + wrong workspace / forged principal / wrong client negative checks and Evidence Chain.
 
-## Release policy
-- DSG ONE half remains a draft PR until the Spacetime half and cross-repo acceptance are ready.
-- No AWS environment or secret changes, no database migrations, no demo jobs, no bypass of Approval Gate.
-- Passing CI establishes source/test readiness only, not functioning Production delegation.
+**Truth boundary:** CI proves source tests only. Production remains unchanged until activation and E2E evidence pass.
