@@ -79,6 +79,9 @@ describe('MCP App Builder signed route/plan delegation (inactive until signer wi
   beforeEach(() => {
     vi.resetAllMocks();
     consume.mockResolvedValue(true);
+    // These cases exercise signed authorization behind the owner-controlled
+    // feature flag. Separate direct-endpoint tests assert the default-off gate.
+    vi.stubEnv('DSG_SPACETIME_JOBS_DELEGATION_ACTIVE', 'true');
     vi.stubEnv('DSG_SPACETIME_CHATGPT_CLIENT_ID', pluginClient);
     vi.stubEnv('DSG_SPACETIME_JOBS_DELEGATION_PUBLIC_KEY_B64', Buffer.alloc(32, 7).toString('base64'));
     vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://dsg-project.supabase.co');
@@ -100,7 +103,7 @@ describe('MCP App Builder signed route/plan delegation (inactive until signer wi
     expect(await response.json()).toEqual({ ok: true, data: [] });
     expect(jobs).toHaveBeenCalledWith({
       actorId: 'actor-1', workspaceId, actorRole: 'OWNER', permission: 'job:read',
-    });
+    }, { timeoutMs: 5_000 });
     expect(db).toHaveBeenCalledTimes(2);
     expect(db.mock.calls[0]?.[1]).toBe('dsg_auth0_identity_links');
     expect(db.mock.calls[1]?.[1]).toBe('dsg_workspace_members');
@@ -236,7 +239,7 @@ describe('MCP App Builder signed route/plan delegation (inactive until signer wi
       .mockResolvedValueOnce([{ role: 'VIEWER' }] as never);
     const response = await GET(request());
     expect(response.status).toBe(200);
-    expect(jobs).toHaveBeenCalledWith(expect.objectContaining({ actorRole: 'VIEWER', permission: 'job:read' }));
+    expect(jobs).toHaveBeenCalledWith(expect.objectContaining({ actorRole: 'VIEWER', permission: 'job:read' }), { timeoutMs: 5_000 });
   });
 
   it('returns bounded database failure without SQL or private row disclosure', async () => {
