@@ -4,14 +4,15 @@ import { join } from 'node:path';
 import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
 
 const bridge = readFileSync(join(process.cwd(), 'app/dsg/autonomous-level/identity-bridge.tsx'), 'utf8');
+const browserSession = readFileSync(join(process.cwd(), 'lib/dsg/user-bound/browser-session.ts'), 'utf8');
 
 describe('DSG memory-only Auth0 token renewal without reconnect loop', () => {
   it('opts into rotating refresh token instead of hidden iframe fallback', () => {
-    expect(bridge).toContain("scope: 'openid profile email dsg.use offline_access'");
-    expect(bridge).toContain('useRefreshTokens: true');
-    expect(bridge).toContain('useRefreshTokensFallback: false');
-    expect(bridge).toContain("cacheLocation: 'memory'");
-    expect(bridge).not.toContain("cacheLocation: 'localstorage'");
+    expect(browserSession).toContain("scope: 'openid profile email dsg.use offline_access'");
+    expect(browserSession).toContain('useRefreshTokens: true');
+    expect(browserSession).toContain('useRefreshTokensFallback: false');
+    expect(browserSession).toContain("cacheLocation: 'memory'");
+    expect(browserSession).not.toContain("cacheLocation: 'localstorage'");
     expect(bridge).not.toContain('localStorage.setItem');
     expect(bridge).not.toContain('sessionStorage.setItem');
   });
@@ -45,7 +46,7 @@ describe('DSG memory-only Auth0 token renewal without reconnect loop', () => {
   });
 
   it('preserves delegated audience and authorization gates', () => {
-    expect(bridge).toContain("audience: 'https://aws.dsg.pics'");
+    expect(browserSession).toContain("audience: 'https://aws.dsg.pics'");
     expect(bridge).toContain("body: JSON.stringify({ accessToken, tool: toolName, arguments: {} })");
     expect(bridge).toContain("if (!response.ok || !body.ok || !body.userPrincipalVerified)");
     expect(bridge).not.toContain('X-DSG-API-Key');

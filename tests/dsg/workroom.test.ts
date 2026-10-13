@@ -48,7 +48,7 @@ describe('AWS native Workroom governance', () => {
     expect(page).toContain("fetch('/api/dsg/access/session'");
     expect(page).toContain("fetch('/api/dsg/access/workspace'");
     expect(page).toContain("window.location.assign('/login?next=/dsg/workroom')");
-    expect(page).toContain('<LiveAgentChat />');
+    expect(page).toContain('<DsgLiveWorkroom key={selected.workspace_id} />');
     expect(page).toContain('<AgentCommandCenter />');
     expect(page).toContain('Remote Desktop Commander');
     expect(page).toContain('Secret Manager');
@@ -59,6 +59,7 @@ describe('AWS native Workroom governance', () => {
     expect(commandRoute).toContain("requireVerifiedDsgActor(req.headers, 'job:read')");
     expect(commandCenter).toContain("credentials: 'include'");
     expect(commandCenter).toContain("deploy: 'none'");
+    expect(readFileSync(join(root, 'components/dsg-live-workroom.tsx'), 'utf8')).toContain("tool('spacetime_capability_catalog', {})");
     expect(commandCenter).not.toContain("'x-dsg-workspace-id': '00000000-0000-4000-8000-000000000001'");
     expect(commandCenter).not.toContain("'x-dsg-actor-id': 'customer'");
     expect(page).not.toMatch(/azurecontainerapps\.io|westus3|appdeploy\.ai/i);

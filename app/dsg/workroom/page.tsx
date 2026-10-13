@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { PublicProductionSnapshot } from '@/components/public-production-snapshot';
 import { useCallback, useEffect, useState } from 'react';
 import { ExternalLink, RefreshCw, ShieldCheck } from 'lucide-react';
-import { LiveAgentChat } from '@/components/live-agent-chat';
+import { DsgLiveWorkroom } from '@/components/dsg-live-workroom';
 import { AgentCommandCenter } from '@/components/agent-command-center';
 
 type Membership = { workspace_id: string; role: 'OWNER' | 'ADMIN' | 'OPERATOR' | 'AUDITOR' | 'VIEWER' };
@@ -116,9 +116,9 @@ export default function DsgWorkroomPage() {
           </div>
           <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <h1 className="text-3xl font-black tracking-tight md:text-5xl">One Workroom. All operator surfaces.</h1>
+              <h1 className="text-3xl font-black tracking-tight md:text-5xl">สั่งงานและควบคุมรีโมต</h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-                Desktop UI, command center, Remote Desktop Commander, Secret Manager status, DSG OS / Cinema, Agent v0 and Agent Chat live behind one verified workspace. Spacetime remains execution authority; approval and evidence gates still apply.
+                ใช้ Agent v0 ผ่านภาษาธรรมชาติ ตรวจ Remote Browser และ Remote Desktop จาก workspace ของคุณ
               </p>
             </div>
             <button onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:border-slate-500">
@@ -126,8 +126,6 @@ export default function DsgWorkroomPage() {
             </button>
           </div>
         </header>
-
-        <div className="mt-6"><PublicProductionSnapshot compact /></div>
 
         <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6">
           <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Workspace authority</div>
@@ -150,7 +148,9 @@ export default function DsgWorkroomPage() {
 
         {selected ? (
           <section className="mt-6 space-y-4">
-            <section className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
+            <DsgLiveWorkroom key={selected.workspace_id} />
+            <details className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
+              <summary className="cursor-pointer text-sm font-semibold">ข้อมูลการเชื่อมต่อและเครื่องมืออื่น</summary>
               <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Operator control hub</div>
               <h2 className="mt-2 text-2xl font-black text-white">Desktop UI · CLI · RDC · Secrets · Browser · Agent v0</h2>
               <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -169,7 +169,7 @@ export default function DsgWorkroomPage() {
                   </article>
                 ))}
               </div>
-            </section>
+            </details>
 
             <div className="grid gap-3 md:grid-cols-3">
               <Link href="/dsg/app-builder" className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">App Builder <ExternalLink className="ml-2 inline h-4 w-4" /></Link>
@@ -177,14 +177,21 @@ export default function DsgWorkroomPage() {
               <a href="https://aws.dsg.pics/docs" target="_blank" rel="noreferrer" className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm font-bold text-indigo-300">Runtime Docs <ExternalLink className="ml-2 inline h-4 w-4" /></a>
             </div>
 
-            <LiveAgentChat />
-            <AgentCommandCenter />
+            <details className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
+              <summary className="cursor-pointer text-sm font-semibold">Command Center</summary>
+              <div className="mt-4"><AgentCommandCenter /></div>
+            </details>
           </section>
         ) : (
           <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-400">
             Select a verified workspace before chat or operator actions become available.
           </div>
         )}
+
+        <details className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6">
+          <summary className="cursor-pointer text-sm font-semibold">หลักฐานการติดตั้งและขอบเขตที่ตรวจไว้</summary>
+          <div className="mt-4"><PublicProductionSnapshot compact /></div>
+        </details>
 
         <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 text-sm leading-6 text-slate-400">
           <strong className="text-slate-200">Truth boundary:</strong> Workroom unifies operator surfaces, not authority. Remote Desktop Commander and Agent v0 remain external providers; Secret Manager values remain server-side; CLI/chat are request surfaces. No model response, notebook state, connector reachability or secret-name listing is execution evidence by itself. Mutating browser, desktop, deployment, purchase, secret or out-of-plan actions still require the existing governance and approval path.

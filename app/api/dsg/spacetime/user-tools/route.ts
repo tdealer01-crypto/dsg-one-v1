@@ -18,6 +18,7 @@ const HUMAN_APPROVER_TOOLS = new Set([
   'spacetime_resolve_approval',
 ]);
 const ALLOWED: Record<string, DsgPermission> = {
+  spacetime_capability_catalog: 'job:read',
   spacetime_control_surface: 'job:read',
   spacetime_discover: 'job:read',
   spacetime_compose: 'job:plan',
@@ -199,7 +200,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       redirect: 'error',
       cache: 'no-store',
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(body.tool === 'spacetime_execute' ? 120_000 : 30_000),
       headers: {
         Authorization: 'Bearer ' + body.accessToken,
         Accept: 'application/json, text/event-stream',

@@ -18,6 +18,7 @@ export function toolArgumentsBoundToUser(name: string, args: unknown, subject: s
     case 'spacetime_read_public_repo':
     case 'spacetime_verify_evidence':
     case 'spacetime_control_surface':
+    case 'spacetime_capability_catalog':
       return Object.keys(args).length === 0;
     case 'spacetime_discover':
       return Array.isArray(args.capabilities) && args.capabilities.length > 0 &&
