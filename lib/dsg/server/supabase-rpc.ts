@@ -70,6 +70,7 @@ export async function callDsgRpc<T>(
   config: DsgSupabaseRpcConfig,
   functionName: string,
   body: Record<string, unknown>,
+  options?: { timeoutMs?: number },
 ): Promise<T> {
   const response = await fetch(`${config.url}/rest/v1/rpc/${functionName}`, {
     method: 'POST',
@@ -80,6 +81,7 @@ export async function callDsgRpc<T>(
     }),
     body: JSON.stringify(body),
     cache: 'no-store',
+    signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
   });
 
   const payload = parseJsonBody<T>(await response.text());
@@ -96,6 +98,7 @@ export async function readDsgRest<T>(
   config: DsgSupabaseRpcConfig,
   tableName: string,
   searchParams: Record<string, string>,
+  options?: { timeoutMs?: number },
 ): Promise<T> {
   const url = new URL(`${config.url}/rest/v1/${tableName}`);
   for (const [key, value] of Object.entries(searchParams)) {
@@ -108,6 +111,7 @@ export async function readDsgRest<T>(
       'Accept-Profile': 'public',
     }),
     cache: 'no-store',
+    signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
   });
 
   const payload = parseJsonBody<T>(await response.text());
