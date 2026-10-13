@@ -177,9 +177,14 @@ async function callTool(
       return res.json();
     }
     case 'list_app_builder_jobs': {
+      // Disabled until owner-gated, coordinated production activation.
+      // An absent/off flag never grants a service-token fallback.
+      if (process.env.DSG_SPACETIME_JOBS_DELEGATION_ACTIVE !== 'true') {
+        return { ok: false, error: { code: 'DSG_MCP_JOBS_DELEGATION_NOT_ACTIVE' } };
+      }
       // The old service-token fallback has no user principal or workspace.
       // It must never be treated as a logged-in Supabase/Auth0 user.
-      if (!incomingRequest.headers.get('authorization')?.startsWith('Bearer ')) {
+      if (!incomingRequest.headers.get('authorization')?.toLowerCase().startsWith('bearer ')) {
         return { ok: false, error: { code: 'DSG_MCP_USER_OAUTH_REQUIRED' } };
       }
       const workspaceId = toolInput.workspaceId;
