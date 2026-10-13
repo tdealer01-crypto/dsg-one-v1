@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { importJWK, jwtVerify } from 'jose';
-import { getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
+import { callDsgRpc, getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
 import { listAppBuilderJobs } from '@/lib/dsg/server/app-builder/repository';
 import { GET } from '../../app/api/dsg/app-builder/jobs/oauth/route';
 
@@ -10,6 +10,7 @@ vi.mock('jose', () => ({
   jwtVerify: vi.fn(),
 }));
 vi.mock('@/lib/dsg/server/supabase-rpc', () => ({
+  callDsgRpc: vi.fn(),
   getDsgSupabaseRpcConfig: vi.fn(),
   readDsgRest: vi.fn(),
   getBearerToken: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('@/lib/dsg/server/app-builder/repository', () => ({
 
 const tokenVerifier = vi.mocked(jwtVerify);
 const keyImporter = vi.mocked(importJWK);
+const consume = vi.mocked(callDsgRpc);
 const db = vi.mocked(readDsgRest);
 const dbConfig = vi.mocked(getDsgSupabaseRpcConfig);
 const jobs = vi.mocked(listAppBuilderJobs);
@@ -76,6 +78,7 @@ function linkedAccount() {
 describe('MCP App Builder signed route/plan delegation (inactive until signer wiring)', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    consume.mockResolvedValue(true);
     vi.stubEnv('DSG_SPACETIME_CHATGPT_CLIENT_ID', pluginClient);
     vi.stubEnv('DSG_SPACETIME_JOBS_DELEGATION_PUBLIC_KEY_B64', Buffer.alloc(32, 7).toString('base64'));
     vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://dsg-project.supabase.co');

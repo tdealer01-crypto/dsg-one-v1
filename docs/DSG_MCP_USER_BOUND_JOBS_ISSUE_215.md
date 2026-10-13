@@ -11,11 +11,15 @@ DSG ONE PR #217 depends on DSG-Private-Production-Runtime PR #681. No claim of w
 - After cryptographic verification, require preexisting Auth0-to-website actor link (via Auth0 website client) and workspace membership in Supabase; use existing read-only scoped Jobs repository.
 - Never bypass approvals or allow Create/Execute/Deploy from this token.
 
+## Verified staging (not production activation)
+- The purpose-specific keypair already exists in the two stage-only SSM paths. Private runtime PR #689 merged at 467fdbeb18859831a68a9522aea5979b3dfc5b2b. Do not recreate the IAM role or keys.
+- Public Ed25519 fingerprint (SHA-256): 0104e394520ee253a683826ceb2a6e4d3a01b058c5af17d4a08e21f976770f71. Production containers have not been wired by this work.
+
 ## Pending before Merge / Production
-1. Independent key generation, server-side private/public key distribution and pinning; no keys stored in repository.
+1. Owner-gated distribution and pinning of the existing staged keys; no keys stored in repository.
 2. Actual signed ChatGPT azp verification and server configuration; no guessed OAuth client.
 3. Exact-head CI for both repositories, cross-language test vector and independent Security Review.
-4. Replay-risk review: signed random jti alone is not proof of one-time use; 25-second expiry bounds but does not eliminate replay.
+4. Replay protection source now consumes a SHA-256 hash of issuer/jti via the service-role-only consume_dsg_jobs_delegation RPC after signature/link/membership verification. The unique primary key arbitrates across replicas. Repeated receipts return 409; missing/unavailable/malformed RPC returns bounded 503 and no Jobs read. There is no consume retry, including uncertain writes. A failed Jobs read leaves the receipt spent; obtain a fresh governed execution. Apply the included migration only through the coordinated activation gate. Require exact-head CI including real PostgreSQL concurrent-session tests and independent security review; local tests do not prove production enforcement.
 5. Controlled coordinated deployment with rollback; signed-in workspace read + wrong workspace / forged principal / wrong client negative checks and Evidence Chain.
 
 **Truth boundary:** CI proves source tests only. Production remains unchanged until activation and E2E evidence pass.

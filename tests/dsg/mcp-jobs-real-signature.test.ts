@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
-import { readDsgRest, getDsgSupabaseRpcConfig } from '@/lib/dsg/server/supabase-rpc';
+import { callDsgRpc, readDsgRest, getDsgSupabaseRpcConfig } from '@/lib/dsg/server/supabase-rpc';
 import { listAppBuilderJobs } from '@/lib/dsg/server/app-builder/repository';
 import { GET } from '../../app/api/dsg/app-builder/jobs/oauth/route';
 
 // JOSE is NOT mocked: this suite verifies a real Ed25519 signature and
 // intended downstream audience before any workspace data access.
 vi.mock('@/lib/dsg/server/supabase-rpc', () => ({
+  callDsgRpc: vi.fn(),
   getDsgSupabaseRpcConfig: vi.fn(),
   readDsgRest: vi.fn(),
   getBearerToken: vi.fn(),
@@ -15,6 +16,7 @@ vi.mock('@/lib/dsg/server/app-builder/repository', () => ({
   listAppBuilderJobs: vi.fn(),
 }));
 
+const consume = vi.mocked(callDsgRpc);
 const db = vi.mocked(readDsgRest);
 const cfg = vi.mocked(getDsgSupabaseRpcConfig);
 const jobs = vi.mocked(listAppBuilderJobs);
@@ -34,6 +36,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
+  consume.mockReset().mockResolvedValue(true);
   vi.stubEnv('DSG_SPACETIME_CHATGPT_CLIENT_ID', client);
   vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://fake-test-project.supabase.co');
   vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'sb_secret_test_only');

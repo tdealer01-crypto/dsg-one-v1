@@ -1,6 +1,7 @@
+import { createHash } from 'node:crypto';
 import { importJWK, jwtVerify } from 'jose';
 import { assertDsgPermission, type DsgServerActor } from '@/lib/dsg/server/context';
-import { getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
+import { callDsgRpc, getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
 import { DSG_AUTH0_CLIENT_ID, DSG_AUTH0_ISSUER } from '@/lib/dsg/server/auth0-identity';
 import type { AppBuilderRequestContext } from './context';
 
@@ -72,6 +73,8 @@ export async function verifiedMcpAppBuilderReadContext(headers: Headers): Promis
   }
 
   let subject = '';
+  let receiptHash = '';
+  let expiresAt = 0;
   try {
     const rawKey = Buffer.from(publicKeyB64, 'base64');
     if (rawKey.length !== 32 || rawKey.toString('base64') !== publicKeyB64) throw new Error('PIN_INVALID');
@@ -94,13 +97,18 @@ export async function verifiedMcpAppBuilderReadContext(headers: Headers): Promis
         typeof payload.plan_hash !== 'string' || !HASH_SHA256.test(payload.plan_hash) ||
         typeof payload.decision_hash !== 'string' || !HASH_SHA256.test(payload.decision_hash) ||
         typeof payload.jti !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(payload.jti) ||
+        !Number.isSafeInteger(payload.iat) || !Number.isSafeInteger(payload.nbf) ||
+        !Number.isSafeInteger(payload.exp) ||
         typeof payload.iat !== 'number' || typeof payload.nbf !== 'number' ||
         typeof payload.exp !== 'number' || payload.nbf < payload.iat ||
+        payload.exp <= payload.nbf || payload.exp <= payload.iat ||
         payload.iat > now + 2 || now - payload.iat > DELEGATION_MAX_SECONDS ||
         payload.exp <= now || payload.exp - payload.iat > DELEGATION_MAX_SECONDS) {
       throw new Error('DELEGATION_CLAIMS_REJECTED');
     }
     subject = payload.sub;
+    receiptHash = createHash('sha256').update(JSON.stringify([DELEGATION_ISSUER, payload.jti])).digest('hex');
+    expiresAt = payload.exp;
   } catch {
     throw new McpUserJobsDenied('DSG_MCP_DELEGATION_INVALID', 401);
   }
@@ -142,5 +150,21 @@ export async function verifiedMcpAppBuilderReadContext(headers: Headers): Promis
   } catch {
     throw new McpUserJobsDenied('DSG_MCP_WORKSPACE_ACCESS_DENIED', 403);
   }
+
+  // Consume only after signature, linked identity and permission checks. The
+  // durable DB unique key arbitrates across processes/replicas, not local memory.
+  // Never retry an uncertain consume: it may already have committed. A failed
+  // Jobs read also leaves the receipt spent; a fresh governed execution is needed.
+  let consumed: unknown;
+  try {
+    consumed = await callDsgRpc<unknown>(config, 'consume_dsg_jobs_delegation', {
+      p_receipt_sha256: receiptHash,
+      p_expires_at: expiresAt,
+    });
+  } catch {
+    throw new McpUserJobsDenied('DSG_MCP_REPLAY_STORE_UNAVAILABLE', 503);
+  }
+  if (consumed === false) throw new McpUserJobsDenied('DSG_MCP_DELEGATION_REPLAYED', 409);
+  if (consumed !== true) throw new McpUserJobsDenied('DSG_MCP_REPLAY_STORE_UNAVAILABLE', 503);
   return { actorId, workspaceId, actorRole: role, permission: 'job:read' };
 }

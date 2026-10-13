@@ -1,10 +1,11 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
 import { SignJWT } from 'jose';
-import { getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
+import { callDsgRpc, getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
 import { verifiedMcpAppBuilderReadContext, McpUserJobsDenied } from '@/lib/dsg/server/app-builder/mcp-user-context';
 
 vi.mock('@/lib/dsg/server/supabase-rpc', () => ({
+  callDsgRpc: vi.fn(),
   getDsgSupabaseRpcConfig: vi.fn(),
   readDsgRest: vi.fn(),
   getBearerToken: vi.fn(),
@@ -12,6 +13,7 @@ vi.mock('@/lib/dsg/server/supabase-rpc', () => ({
 
 const config = vi.mocked(getDsgSupabaseRpcConfig);
 const read = vi.mocked(readDsgRest);
+const consume = vi.mocked(callDsgRpc);
 const user = 'auth0|verified-test-user';
 const client = 'tpc_testVerifiedClient123456';
 const workspace = 'f372bca8-1a9b-49ea-9cb3-52af54235cf0';
@@ -53,6 +55,7 @@ function headers(token: string, selection = workspace) {
 describe('Real Ed25519 user-bound delegation verification (no JOSE mocks)', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    consume.mockResolvedValue(true);
     vi.stubEnv('DSG_SPACETIME_CHATGPT_CLIENT_ID', client);
     vi.stubEnv('DSG_SPACETIME_JOBS_DELEGATION_PUBLIC_KEY_B64', pubB64);
     vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://example.supabase.co');
@@ -109,4 +112,41 @@ describe('Real Ed25519 user-bound delegation verification (no JOSE mocks)', () =
       .rejects.toMatchObject({ code: 'DSG_MCP_DELEGATION_INVALID', status: 401 });
     expect(read).not.toHaveBeenCalled();
   });
+  it('rejects a repeated real signed assertion after membership checks', async () => {
+    const token = await assertion();
+    consume.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    await verifiedMcpAppBuilderReadContext(headers(token));
+    read.mockResolvedValueOnce([{
+      actor_id: 'actor-test', auth0_sub: user,
+      auth0_issuer: 'https://dev-kcddqmnusbxxo25s.us.auth0.com/',
+      auth0_client_id: 'mLIAcMEAhuVDaUvzXn8Qo54zj2llFp3X',
+    }] as never).mockResolvedValueOnce([{ role: 'VIEWER' }] as never);
+    await expect(verifiedMcpAppBuilderReadContext(headers(token)))
+      .rejects.toMatchObject({ code: 'DSG_MCP_DELEGATION_REPLAYED', status: 409 });
+    expect(consume).toHaveBeenCalledTimes(2);
+    expect(consume.mock.calls[0]?.[2]).toEqual(consume.mock.calls[1]?.[2]);
+    expect(JSON.stringify(consume.mock.calls)).not.toContain(token);
+    expect(JSON.stringify(consume.mock.calls)).not.toContain(user);
+  });
+
+  it.each([null, 'true', { ok: true }])('fails closed on malformed consume response %s', async (response) => {
+    consume.mockResolvedValue(response);
+    await expect(verifiedMcpAppBuilderReadContext(headers(await assertion())))
+      .rejects.toMatchObject({ code: 'DSG_MCP_REPLAY_STORE_UNAVAILABLE', status: 503 });
+  });
+
+  it('does not retry an uncertain consume or expose backend details', async () => {
+    consume.mockRejectedValue(new Error('private SQL internal details'));
+    await expect(verifiedMcpAppBuilderReadContext(headers(await assertion())))
+      .rejects.toMatchObject({ message: 'DSG_MCP_REPLAY_STORE_UNAVAILABLE', status: 503 });
+    expect(consume).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not consume receipts for an unlinked user', async () => {
+    read.mockReset().mockResolvedValue([]);
+    await expect(verifiedMcpAppBuilderReadContext(headers(await assertion())))
+      .rejects.toMatchObject({ status: 403 });
+    expect(consume).not.toHaveBeenCalled();
+  });
+
 });

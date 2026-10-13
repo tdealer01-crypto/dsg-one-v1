@@ -1,0 +1,50 @@
+name: Jobs delegation replay database
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  replay-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test-only
+          POSTGRES_DB: jobs_replay_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: isolated-test-only
+      PGDATABASE: jobs_replay_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify SQL, privileges and concurrent one-time consume
+        run: bash scripts/test-jobs-delegation-replay-db.sh
+  delegation-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Verify real signatures, replay denial and HTTP boundaries
+        run: >-
+          npx vitest run
+          tests/dsg/mcp-jobs-ed25519-real-verification.test.ts
+          tests/dsg/mcp-jobs-real-signature.test.ts
+          tests/dsg/mcp-user-bound-app-builder-jobs.test.ts
+          tests/dsg/mcp-user-jobs-forwarding-boundary.test.ts
