@@ -23,3 +23,23 @@ DSG ONE PR #217 depends on DSG-Private-Production-Runtime PR #681. No claim of w
 5. Controlled coordinated deployment with rollback; signed-in workspace read + wrong workspace / forged principal / wrong client negative checks and Evidence Chain.
 
 **Truth boundary:** CI proves source tests only. Production remains unchanged until activation and E2E evidence pass.
+
+
+## Source-only release guard (2026-10-13)
+
+`list_app_builder_jobs` via the website MCP bridge is **disabled by default**.
+Only an explicitly configured `DSG_SPACETIME_JOBS_DELEGATION_ACTIVE=true`
+after the separate, owner-gated coordinated rollout enables the new route.
+Absent/off returns `DSG_MCP_JOBS_DELEGATION_NOT_ACTIVE` without falling back
+to a static service token or claiming production readiness. The flag itself
+does not bypass Ed25519 verification, OAuth issuer/client binding, replay
+consume or the workspace membership check.
+
+All three sequential identity-link, membership and replay-store requests
+use explicit 5-second request timeouts and fail closed on a timeout.
+No uncertain replay consume is retried.
+
+Review findings, both exact-head CIs, production key/client readbacks,
+database migration and rollback readiness, and signed-in positive/negative
+E2E must pass before enabling this flag. No source-only PR is authority to
+deploy or mutate production credentials. Existing stage keys must be reused.
