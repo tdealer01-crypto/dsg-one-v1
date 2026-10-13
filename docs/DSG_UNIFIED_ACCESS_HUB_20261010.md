@@ -10,10 +10,10 @@ The homepage `app/page.tsx` includes a mobile-responsive **DSG ONE — System Ac
 | --- | --- | --- |
 | Access Hub | `https://dsg.pics/dsg/access` | DSG website sign-in and workspace membership |
 | Workroom / operator hub | `https://dsg.pics/dsg/workroom` | DSG website sign-in and workspace membership |
-| Desktop Control UI | `https://dsg.pics/control/` | UI is reachable; real remote operation needs a separate governed receipt |
+| DSG Native Desktop | `https://dsg.pics/control/` | Activation/device enrollment/E2E pending; no claim of device access |
 | DSG OS | `https://dsg.pics/dsg-os` | Local adapter/evidence tools, never execution authority |
 | Cinema Remote Browser | `https://aws.dsg.pics/app` | Separate Cinema app; high-risk connect/execute needs signed approval |
-| Remote Desktop Commander | `https://mcp.desktopcommander.app/` | External connector; account/device authentication required |
+| GitBook Docs | `https://dsg-3.gitbook.io/dsg-docs/dsg-docs/dsg-one-canonical-7-docs/` | Canonical Git-synced documents; dated snapshots are not live telemetry |
 | Human Approvals | `https://dsg.pics/dsg/approvals` | Linked Auth0 human approver with `dsg.approve`; MFA/production gates apply |
 | App Builder | `https://dsg.pics/dsg/app-builder` | DSG authenticated workspace |
 | Browser Pilot | `https://dsg.pics/remote-browser-execution` | Public early-access information only |
