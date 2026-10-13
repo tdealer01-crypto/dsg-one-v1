@@ -30,8 +30,17 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const ctx = await getAppBuilderRequestContext(req, 'job:create');
-    const rawGoal = (await req.json()) as AppBuilderGoalInput;
-    const lockedGoal = lockAppBuilderGoal(rawGoal);
+    // A body that is not a JSON object is the caller's mistake (400), not a server fault.
+    const body: unknown = await req.json().catch(() => null);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('APP_BUILDER_REQUEST_INVALID');
+    const rawGoal = body as AppBuilderGoalInput;
+    let lockedGoal: ReturnType<typeof lockAppBuilderGoal>;
+    try {
+      lockedGoal = lockAppBuilderGoal(rawGoal);
+    } catch (error) {
+      // A wrongly typed field (goal not a string, criteria not a list of strings) is the caller's mistake.
+      throw error instanceof TypeError ? new Error('APP_BUILDER_REQUEST_INVALID') : error;
+    }
     const job = await createAppBuilderJob({ ctx, rawGoal, lockedGoal });
     return NextResponse.json({ ok: true, data: job }, {
       headers: { 'Cache-Control': 'private, no-store' },
