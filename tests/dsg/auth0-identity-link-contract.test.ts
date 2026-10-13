@@ -7,6 +7,7 @@ const route = readFileSync(join(root, 'app/api/dsg/identity/link/route.ts'), 'ut
 const verifier = readFileSync(join(root, 'lib/dsg/server/auth0-identity.ts'), 'utf8');
 const migration = readFileSync(join(root, 'ops/auth0/dsg_auth0_identity_links.sql'), 'utf8');
 const bridge = readFileSync(join(root, 'app/dsg/autonomous-level/identity-bridge.tsx'), 'utf8');
+const browserSession = readFileSync(join(root, 'lib/dsg/user-bound/browser-session.ts'), 'utf8');
 
 describe('DSG Auth0 account binding safety contract', () => {
   it('requires verified DSG workspace membership and signed Auth0 principal', () => {
@@ -33,10 +34,13 @@ describe('DSG Auth0 account binding safety contract', () => {
   });
 
   it('preserves existing DSG login and never exposes a privileged token in source', () => {
-    expect(bridge).toContain('createAuth0Client');
+    expect(browserSession).toContain('new Auth0Client');
     expect(bridge).toContain('loginWithRedirect');
-    expect(bridge).toContain("cacheLocation: 'memory'");
+    expect(bridge).toContain('getDsgBrowserSession');
+    expect(browserSession).toContain("cacheLocation: 'memory'");
     expect(bridge).not.toContain('localStorage.setItem');
+    expect(browserSession).not.toContain('localStorage.setItem');
     expect(bridge).not.toContain('client_secret');
+    expect(browserSession).not.toContain('client_secret');
   });
 });
