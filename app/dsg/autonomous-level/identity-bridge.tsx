@@ -1,9 +1,11 @@
 'use client';
 
-import { createAuth0Client, type Auth0Client } from '@auth0/auth0-spa-js';
+import { type Auth0Client } from '@auth0/auth0-spa-js';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { verifiedGovernedReadProof } from '@/lib/dsg/user-bound/read-proof';
 import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
+import { getDsgBrowserSession, finishDsgBrowserRedirect } from '@/lib/dsg/user-bound/browser-session';
 
 const callback = 'https://dsg.pics/dsg/autonomous-level';
 
@@ -25,6 +27,7 @@ type ToolBridgeResponse = {
 };
 
 export default function DsgIdentityBridge() {
+  const router = useRouter();
   const authClient = useRef<Auth0Client | null>(null);
   const [busy, setBusy] = useState(true);
   const [authReady, setAuthReady] = useState(false);
@@ -66,18 +69,7 @@ export default function DsgIdentityBridge() {
           setMessage('Use the Auth0 sign-in button to bind this DSG workspace actor to the same tenant used by Spacetime.');
         }
 
-        const client = await createAuth0Client({
-          domain: 'dev-kcddqmnusbxxo25s.us.auth0.com',
-          clientId: 'mLIAcMEAhuVDaUvzXn8Qo54zj2llFp3X',
-          authorizationParams: {
-            redirect_uri: callback,
-            audience: 'https://aws.dsg.pics',
-            scope: 'openid profile email dsg.use offline_access',
-          },
-          cacheLocation: 'memory',
-          useRefreshTokens: true,
-          useRefreshTokensFallback: false,
-        });
+        const client = getDsgBrowserSession();
         if (cancelled) return;
         authClient.current = client;
         setAuthReady(true);
@@ -90,7 +82,7 @@ export default function DsgIdentityBridge() {
           return;
         }
         if (params.has('code') && params.has('state')) {
-          await client.handleRedirectCallback();
+          const completed = await finishDsgBrowserRedirect();
           window.history.replaceState(null, '', callback);
           setStatus('VERIFYING_DUAL_IDENTITY');
           const accessToken = await client.getTokenSilently();
@@ -113,6 +105,9 @@ export default function DsgIdentityBridge() {
           setTokenReady(true);
           setStatus('AUTH0_ACCOUNT_LINKED');
           setMessage('Auth0 token verified for this session. The SDK refreshes through a rotating refresh token when the Auth0 client allows offline_access. N2N remains governed.');
+          const appState = completed.appState && typeof completed.appState === 'object'
+            ? completed.appState as { returnTo?: unknown } : null;
+          if (appState?.returnTo === '/dsg/workroom') router.replace('/dsg/workroom');
         } else {
           // Linked account != live delegated authorization. Never present a stored
           // Auth0 subject as an authenticated connector/session after a reload.
@@ -138,7 +133,7 @@ export default function DsgIdentityBridge() {
     }
     void start();
     return () => { cancelled = true; };
-  }, []);
+  }, [router]);
 
   async function connect() {
     if (!authClient.current) return;

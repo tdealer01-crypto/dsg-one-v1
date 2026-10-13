@@ -35,6 +35,7 @@ export default function ApprovalClient() {
   const client = useRef<Auth0Client | null>(null);
   const [siteReady, setSiteReady] = useState(false);
   const [authReady, setAuthReady] = useState(false);
+  const [tokenReady, setTokenReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [selected, setSelected] = useState<Approval | null>(null);
@@ -74,7 +75,11 @@ export default function ApprovalClient() {
           await c.handleRedirectCallback();
           window.history.replaceState(null, '', CALLBACK);
         }
-        setStatus('พร้อมตรวจรายการรออนุมัติ — ต้องมี Auth0 scope dsg.approve');
+        const authenticated = await c.isAuthenticated();
+        setTokenReady(authenticated);
+        setStatus(authenticated
+          ? 'เข้าสู่ระบบ Auth0 แล้ว พร้อมตรวจรายการรออนุมัติ'
+          : 'กดเข้าสู่ระบบเพื่อรับสิทธิ์ dsg.approve สำหรับเซสชันนี้');
       } catch {
         if (live) setStatus('ไม่สามารถยืนยันเซสชันเว็บไซต์ / Auth0 ได้');
       }
@@ -85,10 +90,11 @@ export default function ApprovalClient() {
 
   async function obtainToken() {
     if (!client.current) throw new Error('AUTH0_SESSION_NOT_READY');
-    // Always obtain a fresh access token at the tap. No localStorage or logs.
+    // Reuse the unexpired token issued by the explicit login. Forcing a silent
+    // iframe here loses a valid session when third-party cookies are blocked.
+    // The SDK renews expired tokens; high-risk MFA below stays interactive.
     return client.current.getTokenSilently({
       authorizationParams: { audience: AUDIENCE, scope: SCOPE },
-      cacheMode: 'off',
     });
   }
 
@@ -236,7 +242,7 @@ export default function ApprovalClient() {
           <button type="button" onClick={() => void checkMfaWithoutApproval()}
             disabled={!siteReady || !authReady || busy}
             className="rounded-lg border border-amber-400 px-4 py-2 disabled:opacity-40">ทดสอบ MFA (ไม่อนุมัติ)</button>
-          <button type="button" onClick={() => void load()} disabled={!siteReady || !authReady || busy}
+          <button type="button" onClick={() => void load()} disabled={!siteReady || !authReady || !tokenReady || busy}
             className="rounded-lg border border-slate-500 px-4 py-2 disabled:opacity-40">ดูรายการรออนุมัติ</button>
           <a href="/dsg/autonomous-level" className="rounded-lg border border-slate-500 px-4 py-2">กลับหน้าสถานะระบบ</a>
         </div>
