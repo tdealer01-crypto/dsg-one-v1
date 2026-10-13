@@ -10,8 +10,13 @@ export const dynamic = 'force-dynamic';
 // No deployment or build claims are created by reading Workspace Jobs.
 export async function GET(request: Request) {
   try {
+    // Protect the direct public endpoint, not only the MCP forwarding path.
+    // This must remain off until owner-authorized coordinated activation.
+    if (process.env.DSG_SPACETIME_JOBS_DELEGATION_ACTIVE !== 'true') {
+      throw new McpUserJobsDenied('DSG_MCP_JOBS_DELEGATION_NOT_ACTIVE', 503);
+    }
     const context = await verifiedMcpAppBuilderReadContext(request.headers);
-    const jobs = await listAppBuilderJobs(context);
+    const jobs = await listAppBuilderJobs(context, { timeoutMs: 5_000 });
     return NextResponse.json({ ok: true, data: jobs }, {
       headers: { 'Cache-Control': 'private, no-store' },
     });
