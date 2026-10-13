@@ -16,6 +16,8 @@ const HASH_SHA256 = /^[0-9a-f]{64}$/;
 const DELEGATION_MAX_SECONDS = 30;
 const WORKSPACE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TOKEN_MAX_LENGTH = 15_000;
+// Each read fails closed well within the 25-second signed delegation lifetime.
+const JOBS_DB_TIMEOUT_MS = 5_000;
 type LinkRow = {
   actor_id: string;
   auth0_sub: string;
@@ -120,7 +122,7 @@ export async function verifiedMcpAppBuilderReadContext(headers: Headers): Promis
       auth0_sub: 'eq.' + subject,
       select: 'actor_id,auth0_sub,auth0_issuer,auth0_client_id',
       limit: '2',
-    });
+    }, { timeoutMs: JOBS_DB_TIMEOUT_MS });
   } catch {
     throw new McpUserJobsDenied('DSG_MCP_IDENTITY_LINK_STORE_UNAVAILABLE', 503);
   }
@@ -139,7 +141,7 @@ export async function verifiedMcpAppBuilderReadContext(headers: Headers): Promis
       actor_id: 'eq.' + actorId,
       select: 'role',
       limit: '1',
-    });
+    }, { timeoutMs: JOBS_DB_TIMEOUT_MS });
   } catch {
     throw new McpUserJobsDenied('DSG_MCP_WORKSPACE_STORE_UNAVAILABLE', 503);
   }
@@ -160,7 +162,7 @@ export async function verifiedMcpAppBuilderReadContext(headers: Headers): Promis
     consumed = await callDsgRpc<unknown>(config, 'consume_dsg_jobs_delegation', {
       p_receipt_sha256: receiptHash,
       p_expires_at: expiresAt,
-    });
+    }, { timeoutMs: JOBS_DB_TIMEOUT_MS });
   } catch {
     throw new McpUserJobsDenied('DSG_MCP_REPLAY_STORE_UNAVAILABLE', 503);
   }
