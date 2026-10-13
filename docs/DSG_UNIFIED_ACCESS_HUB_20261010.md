@@ -1,5 +1,28 @@
 # DSG Unified Access Hub — governed integration contract (2026-10-10)
 
+## Landing page navigation — 13 October 2026
+
+The single public entry point is **https://dsg.pics/**, served by the existing `dsg-one-v1` website. Repository name **DSG ONE V1** is not a second live website or a different production authority.
+
+The homepage `app/page.tsx` includes a mobile-responsive **DSG ONE — System Access Hub** with these existing routes:
+
+| Surface | Entry | Boundary |
+| --- | --- | --- |
+| Access Hub | `https://dsg.pics/dsg/access` | DSG website sign-in and workspace membership |
+| Workroom / operator hub | `https://dsg.pics/dsg/workroom` | DSG website sign-in and workspace membership |
+| DSG Native Desktop | `https://dsg.pics/control/` | Activation/device enrollment/E2E pending; no claim of device access |
+| DSG OS | `https://dsg.pics/dsg-os` | Local adapter/evidence tools, never execution authority |
+| Cinema Remote Browser | `https://aws.dsg.pics/app` | Separate Cinema app; high-risk connect/execute needs signed approval |
+| GitBook Docs | `https://dsg-3.gitbook.io/dsg-docs/dsg-docs/dsg-one-canonical-7-docs/` | Canonical Git-synced documents; dated snapshots are not live telemetry |
+| Human Approvals | `https://dsg.pics/dsg/approvals` | Linked Auth0 human approver with `dsg.approve`; MFA/production gates apply |
+| App Builder | `https://dsg.pics/dsg/app-builder` | DSG authenticated workspace |
+| Browser Pilot | `https://dsg.pics/remote-browser-execution` | Public early-access information only |
+
+**Transport boundary:** `https://aws.dsg.pics/mcp` remains the OAuth-protected production Spacetime execution/governance MCP; `https://aws.dsg.pics/api/v1/mcp` is a separate verification JSON-RPC surface. Do not redirect the browser landing entry or human approvals to either MCP transport.
+
+**Evidence rule:** HTTP 200/307 confirms only surface reachability/login protection, not authorized high-risk execution. Signed read-only provider E2E was verified for its constrained scope; Cinema signed connect/execute, Quest/Unity and whole-system E2E are still NOT VERIFIED. This documentation describes the proposed homepage change until code merges, deploys, and independent public readback passes.
+
+
 ## Existing components (no replacement)
 
 - **DSG ONE** (`https://dsg.pics`): authenticated Workroom and workspace membership using its own Supabase-backed website session.
