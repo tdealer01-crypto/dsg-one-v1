@@ -182,7 +182,12 @@ describe('MCP App Builder signed route/plan delegation (inactive until signer wi
     [{ sub: 'x'.repeat(221) }, 'oversized principal'],
     [{ iat: Math.floor(Date.now() / 1000) + 600 }, 'future issue time'],
   ])('rejects %s (%s) without querying membership', async (payload, _description) => {
-    tokenVerifier.mockResolvedValue(signedClaims(payload) as never);
+    if ('aud' in payload) {
+      // JOSE itself enforces configured JWT audience before returning claims.
+      tokenVerifier.mockRejectedValue(new Error('JWTClaimValidationFailed: audience'));
+    } else {
+      tokenVerifier.mockResolvedValue(signedClaims(payload) as never);
+    }
     const response = await GET(request());
     expect(response.status).toBe(401);
     expect((await response.json()).error.code).toBe('DSG_MCP_DELEGATION_INVALID');
