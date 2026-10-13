@@ -1,16 +1,18 @@
-import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { importJWK, jwtVerify } from 'jose';
 import { assertDsgPermission, type DsgServerActor } from '@/lib/dsg/server/context';
 import { getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
-import { DSG_AUTH0_AUDIENCE, DSG_AUTH0_CLIENT_ID, DSG_AUTH0_ISSUER } from '@/lib/dsg/server/auth0-identity';
+import { DSG_AUTH0_CLIENT_ID, DSG_AUTH0_ISSUER } from '@/lib/dsg/server/auth0-identity';
 import type { AppBuilderRequestContext } from './context';
 
-// This read-only identity bridge deliberately does not accept internal service
-// tokens, user-supplied principal headers, workspace-role headers, or cookies.
-// It is not connected to the Spacetime adapter until signed end-user OAuth
-// forwarding has been reviewed and verified across both MCP servers.
-const jwks = createRemoteJWKSet(new URL('.well-known/jwks.json', DSG_AUTH0_ISSUER), {
-  timeoutDuration: 5000,
-});
+// This downstream resource accepts ONLY a purpose-bound signed Spacetime delegation
+// assertion (Ed25519/EdDSA), NOT the Auth0 Bearer intended for aws.dsg.pics.
+// The Spacetime signer must first verify the real Auth0 user and the governed
+// route/plan decision. Public verification key must be pinned out of band.
+const DELEGATION_ISSUER = 'urn:dsg:spacetime:jobs-delegation';
+const DELEGATION_AUDIENCE = 'https://dsg.pics/api/dsg/app-builder/jobs/oauth';
+const DELEGATED_ROUTE = 'route.dsg-one-v1.mcp.list-app-builder-jobs';
+const HASH_SHA256 = /^[0-9a-f]{64}$/;
+const DELEGATION_MAX_SECONDS = 30;
 const WORKSPACE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TOKEN_MAX_LENGTH = 15_000;
 type LinkRow = {
@@ -62,26 +64,44 @@ export async function verifiedMcpAppBuilderReadContext(headers: Headers): Promis
     throw new McpUserJobsDenied('DSG_MCP_WORKSPACE_SELECTION_REQUIRED', 400);
   }
 
+  // No ChatGPT/AWS-audience OAuth token is usable as a downstream website bearer.
+  // The signer-specific public key is mandatory and is never supplied by the caller.
+  const publicKeyB64 = process.env.DSG_SPACETIME_JOBS_DELEGATION_PUBLIC_KEY_B64?.trim();
+  if (!publicKeyB64 || !/^[A-Za-z0-9+/]{43}=$/.test(publicKeyB64)) {
+    throw new McpUserJobsDenied('DSG_MCP_DELEGATION_KEY_NOT_CONFIGURED', 503);
+  }
+
   let subject = '';
   try {
-    const { payload } = await jwtVerify(token, jwks, {
-      issuer: DSG_AUTH0_ISSUER,
-      audience: DSG_AUTH0_AUDIENCE,
-      algorithms: ['RS256'],
-      clockTolerance: 5,
+    const rawKey = Buffer.from(publicKeyB64, 'base64');
+    if (rawKey.length !== 32 || rawKey.toString('base64') !== publicKeyB64) throw new Error('PIN_INVALID');
+    const publicKey = await importJWK({
+      kty: 'OKP', crv: 'Ed25519', x: rawKey.toString('base64url'),
+    }, 'EdDSA');
+    const { payload } = await jwtVerify(token, publicKey, {
+      issuer: DELEGATION_ISSUER,
+      audience: DELEGATION_AUDIENCE,
+      algorithms: ['EdDSA'],
+      clockTolerance: 2,
     });
+    const now = Math.floor(Date.now() / 1000);
     if (typeof payload.sub !== 'string' || !payload.sub || payload.sub.length > 220 ||
-        payload.azp !== expectedClient || !payload.exp || !payload.iat ||
-        payload.iat > Date.now() / 1000 + 5 || typeof payload.scope !== 'string') {
-      throw new Error('CLAIMS_REJECTED');
-    }
-    const scopes = payload.scope.split(/\s+/);
-    if (!scopes.includes('dsg.use') || scopes.includes('dsg.approve')) {
-      throw new Error('SCOPE_REJECTED');
+        payload.azp !== expectedClient || payload.auth0_iss !== DSG_AUTH0_ISSUER ||
+        payload.scope !== 'dsg.jobs.read' || payload.route_id !== DELEGATED_ROUTE ||
+        payload.workspace_id !== workspaceId || payload.verdict !== 'ALLOW' ||
+        typeof payload.plan_id !== 'string' || !payload.plan_id || payload.plan_id.length > 192 ||
+        typeof payload.plan_hash !== 'string' || !HASH_SHA256.test(payload.plan_hash) ||
+        typeof payload.decision_hash !== 'string' || !HASH_SHA256.test(payload.decision_hash) ||
+        typeof payload.jti !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(payload.jti) ||
+        typeof payload.iat !== 'number' || typeof payload.nbf !== 'number' ||
+        typeof payload.exp !== 'number' || payload.nbf < payload.iat ||
+        payload.iat > now + 2 || now - payload.iat > DELEGATION_MAX_SECONDS ||
+        payload.exp <= now || payload.exp - payload.iat > DELEGATION_MAX_SECONDS) {
+      throw new Error('DELEGATION_CLAIMS_REJECTED');
     }
     subject = payload.sub;
   } catch {
-    throw new McpUserJobsDenied('DSG_MCP_USER_OAUTH_INVALID', 401);
+    throw new McpUserJobsDenied('DSG_MCP_DELEGATION_INVALID', 401);
   }
 
   const config = serviceConfig();
