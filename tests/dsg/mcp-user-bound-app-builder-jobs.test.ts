@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { jwtVerify } from 'jose';
+import { importJWK, jwtVerify } from 'jose';
 import { getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
 import { listAppBuilderJobs } from '@/lib/dsg/server/app-builder/repository';
 import { GET } from '../../app/api/dsg/app-builder/jobs/oauth/route';
 
 vi.mock('jose', () => ({
-  createRemoteJWKSet: vi.fn(() => () => undefined),
+  importJWK: vi.fn(async () => ({})),
   jwtVerify: vi.fn(),
 }));
 vi.mock('@/lib/dsg/server/supabase-rpc', () => ({
@@ -18,12 +18,13 @@ vi.mock('@/lib/dsg/server/app-builder/repository', () => ({
 }));
 
 const tokenVerifier = vi.mocked(jwtVerify);
+const keyImporter = vi.mocked(importJWK);
 const db = vi.mocked(readDsgRest);
 const dbConfig = vi.mocked(getDsgSupabaseRpcConfig);
 const jobs = vi.mocked(listAppBuilderJobs);
 const workspaceId = 'f372bca8-1a9b-49ea-9cb3-52af54235cf0';
 const otherWorkspaceId = '3bbf89a3-82c7-487b-ae52-3091c593cc42';
-const jwt = 'x'.repeat(120);
+const jwt = 'x'.repeat(120); // mock signed delegation assertion, never an upstream Auth0 access token
 const user = 'auth0|linked-user';
 const websiteClient = 'mLIAcMEAhuVDaUvzXn8Qo54zj2llFp3X';
 const pluginClient = 'tpc_testVerifiedClient123456';
@@ -43,12 +44,21 @@ function signedClaims(overrides: Record<string, unknown> = {}) {
   return {
     payload: {
       sub: user,
-      iss: 'https://dev-kcddqmnusbxxo25s.us.auth0.com/',
-      aud: 'https://aws.dsg.pics',
+      iss: 'urn:dsg:spacetime:jobs-delegation',
+      aud: 'https://dsg.pics/api/dsg/app-builder/jobs/oauth',
+      auth0_iss: 'https://dev-kcddqmnusbxxo25s.us.auth0.com/',
+      workspace_id: workspaceId,
+      route_id: 'route.dsg-one-v1.mcp.list-app-builder-jobs',
+      plan_id: 'bound-plan-215',
+      plan_hash: 'a'.repeat(64),
+      decision_hash: 'b'.repeat(64),
+      verdict: 'ALLOW',
+      jti: 'unpredictable-test-nonce-215',
+      nbf: Math.floor(Date.now() / 1000) - 30,
       azp: pluginClient,
       iat: Math.floor(Date.now() / 1000) - 30,
-      exp: Math.floor(Date.now() / 1000) + 300,
-      scope: 'dsg.use',
+      exp: Math.floor(Date.now() / 1000) - 10,
+      scope: 'dsg.jobs.read',
       ...overrides,
     },
   };
@@ -62,10 +72,11 @@ function linkedAccount() {
   };
 }
 
-describe('MCP App Builder signed OAuth workspace read (inactive until delegated wiring)', () => {
+describe('MCP App Builder signed route/plan delegation (inactive until signer wiring)', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.stubEnv('DSG_SPACETIME_CHATGPT_CLIENT_ID', pluginClient);
+    vi.stubEnv('DSG_SPACETIME_JOBS_DELEGATION_PUBLIC_KEY_B64', Buffer.alloc(32, 7).toString('base64'));
     vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://dsg-project.supabase.co');
     vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'sb_secret_test_only');
     dbConfig.mockReturnValue({ url: 'https://dsg-project.supabase.co', key: 'sb_secret_test_only' });
@@ -79,7 +90,7 @@ describe('MCP App Builder signed OAuth workspace read (inactive until delegated 
     vi.unstubAllGlobals();
   });
 
-  it('reads only the linked user membership for the requested workspace, never a static service principal', async () => {
+  it('reads only linked user membership after an EdDSA signed plan-bound delegation', async () => {
     const response = await GET(request());
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, data: [] });
@@ -91,14 +102,15 @@ describe('MCP App Builder signed OAuth workspace read (inactive until delegated 
     expect(db.mock.calls[1]?.[1]).toBe('dsg_workspace_members');
     expect(db.mock.calls[1]?.[2]).toMatchObject({ workspace_id: 'eq.' + workspaceId, actor_id: 'eq.actor-1' });
     expect(tokenVerifier.mock.calls[0]?.[2]).toMatchObject({
-      issuer: 'https://dev-kcddqmnusbxxo25s.us.auth0.com/',
-      audience: 'https://aws.dsg.pics',
-      algorithms: ['RS256'],
+      issuer: 'urn:dsg:spacetime:jobs-delegation',
+      audience: 'https://dsg.pics/api/dsg/app-builder/jobs/oauth',
+      algorithms: ['EdDSA'],
     });
     expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(keyImporter).toHaveBeenCalledWith(expect.objectContaining({ kty: 'OKP', crv: 'Ed25519' }), 'EdDSA');
   });
 
-  it('blocks missing OAuth even with spoofed actor and role headers', async () => {
+  it('blocks missing delegation even with spoofed actor and role headers', async () => {
     const response = await GET(request({ token: '', headers: {
       'x-dsg-actor-id': 'actor-1', 'x-dsg-actor-role': 'OWNER',
     } }));
@@ -109,13 +121,29 @@ describe('MCP App Builder signed OAuth workspace read (inactive until delegated 
     expect(jobs).not.toHaveBeenCalled();
   });
 
-  it('does not accept a token carried as a cookie or static x-dsg-api-key', async () => {
+  it('does not accept a delegation carried as a cookie or static x-dsg-api-key', async () => {
     const response = await GET(request({ token: '', headers: {
       cookie: 'sb-access-token=' + jwt + '; dsg-workspace-id=' + workspaceId,
       'x-dsg-api-key': 'server-api-key',
     } }));
     expect(response.status).toBe(401);
     expect(jobs).not.toHaveBeenCalled();
+  });
+
+  it('requires an out-of-band pinned Ed25519 delegation public key', async () => {
+    vi.stubEnv('DSG_SPACETIME_JOBS_DELEGATION_PUBLIC_KEY_B64', '');
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe('DSG_MCP_DELEGATION_KEY_NOT_CONFIGURED');
+    expect(tokenVerifier).not.toHaveBeenCalled();
+    expect(jobs).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed signer public key without falling back to a caller-provided key', async () => {
+    vi.stubEnv('DSG_SPACETIME_JOBS_DELEGATION_PUBLIC_KEY_B64', Buffer.alloc(31, 1).toString('base64'));
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+    expect(tokenVerifier).not.toHaveBeenCalled();
   });
 
   it('rejects absent and malformed workspace selectors before the database is queried', async () => {
@@ -128,7 +156,7 @@ describe('MCP App Builder signed OAuth workspace read (inactive until delegated 
     expect(jobs).not.toHaveBeenCalled();
   });
 
-  it('fails closed unless the exact signed ChatGPT OAuth client is configured', async () => {
+  it('fails closed unless the exact pinned ChatGPT OAuth client is configured', async () => {
     vi.stubEnv('DSG_SPACETIME_CHATGPT_CLIENT_ID', '');
     const response = await GET(request());
     expect(response.status).toBe(503);
@@ -138,20 +166,30 @@ describe('MCP App Builder signed OAuth workspace read (inactive until delegated 
 
   it.each([
     [{ azp: 'evil-client' }, 'wrong signed client'],
-    [{ scope: 'dsg.approve dsg.use' }, 'human approver must not be an agent'],
-    [{ scope: 'openid email' }, 'missing dsg.use'],
+    [{ scope: 'dsg.approve dsg.use' }, 'reject human approval scope'],
+    [{ scope: 'openid email' }, 'missing delegated jobs read scope'],
+    [{ aud: 'https://aws.dsg.pics' }, 'wrong resource audience'],
+    [{ route_id: 'route.dsg-one-v1.mcp.create-app-builder-job' }, 'wrong governed route'],
+    [{ verdict: 'BLOCK' }, 'denied plan decision'],
+    [{ workspace_id: otherWorkspaceId }, 'workspace not bound to receipt'],
+    [{ plan_hash: '0'.repeat(63) }, 'invalid plan hash'],
+    [{ decision_hash: '0'.repeat(63) }, 'invalid decision hash'],
+    [{ exp: Math.floor(Date.now() / 1000) + 600 }, 'overlong delegation expiry'],
+    [{ iat: Math.floor(Date.now() / 1000) - 120 }, 'stale delegation'],
+    [{ jti: 'short' }, 'unbound replay nonce'],
+    [{ auth0_iss: 'https://evil.example/' }, 'wrong upstream issuer'],
     [{ sub: 'x'.repeat(221) }, 'oversized principal'],
     [{ iat: Math.floor(Date.now() / 1000) + 600 }, 'future issue time'],
   ])('rejects %s (%s) without querying membership', async (payload, _description) => {
     tokenVerifier.mockResolvedValue(signedClaims(payload) as never);
     const response = await GET(request());
     expect(response.status).toBe(401);
-    expect((await response.json()).error.code).toBe('DSG_MCP_USER_OAUTH_INVALID');
+    expect((await response.json()).error.code).toBe('DSG_MCP_DELEGATION_INVALID');
     expect(jobs).not.toHaveBeenCalled();
     expect(db).not.toHaveBeenCalled();
   });
 
-  it('fails closed when JOSE rejects the token signature, issuer, audience or expiry', async () => {
+  it('fails closed when JOSE rejects delegation signature, issuer, audience or expiry', async () => {
     tokenVerifier.mockRejectedValue(new Error('JWT signature verification failed'));
     const response = await GET(request());
     expect(response.status).toBe(401);
@@ -159,7 +197,7 @@ describe('MCP App Builder signed OAuth workspace read (inactive until delegated 
     expect(db).not.toHaveBeenCalled();
   });
 
-  it('rejects Auth0 identities that were never explicitly linked to a website actor', async () => {
+  it('rejects signed identities that were never explicitly linked to a website actor', async () => {
     db.mockReset().mockResolvedValueOnce([] as never);
     const response = await GET(request());
     expect(response.status).toBe(403);
