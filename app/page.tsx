@@ -28,10 +28,10 @@ const systemEntries = [
     external: false,
   },
   {
-    title: 'Desktop Control UI',
-    description: 'Open the existing AWS desktop control surface. Page reachability does not prove remote execution.',
+    title: 'DSG Native Desktop',
+    description: 'Native Desktop activation and device enrollment are pending. A control page does not prove access to your device.',
     href: '/control/',
-    badge: 'Runtime control',
+    badge: 'Activation pending',
     external: false,
   },
   {
@@ -49,10 +49,10 @@ const systemEntries = [
     external: true,
   },
   {
-    title: 'Remote Desktop Commander',
-    description: 'Open the external RDC connector. Device pairing and permissions are managed separately.',
-    href: 'https://mcp.desktopcommander.app/',
-    badge: 'External connector',
+    title: 'GitBook Docs',
+    description: 'Read the source-synced canonical documentation, current queue and evidence boundaries.',
+    href: 'https://dsg-3.gitbook.io/dsg-docs/dsg-docs/dsg-one-canonical-7-docs/',
+    badge: 'Canonical docs',
     external: true,
   },
   {
@@ -115,9 +115,7 @@ export default function HomePage() {
           <nav className="hidden items-center gap-2 md:flex">
             <Link href="/architecture-3d.html" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-300 hover:bg-slate-800 hover:text-white">3D architecture</Link>
             <Link href="/closure-dashboard.html" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-cyan-200">Closure checklist</Link>
-            <a href="#system-access" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-slate-800 hover:text-white">
-              System access
-            </a>
+            <a href="#system-access" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-slate-800 hover:text-white">System access</a>
             <a href="#how-it-works" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white">
               How it works
             </a>
@@ -274,7 +272,7 @@ export default function HomePage() {
             <div className="flex shrink-0 flex-wrap gap-3">
               <Link href="/architecture-3d.html" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 hover:bg-cyan-200">Open 3D model <ArrowUpRight className="h-4 w-4" /></Link>
               <Link href="/closure-dashboard.html" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-500/25 bg-amber-950/20 px-5 py-3 text-sm font-bold text-amber-100 hover:border-amber-300/50">Closure checklist <ArrowUpRight className="h-4 w-4" /></Link>
-              <a href="https://dsg-3.gitbook.io/dsg-docs/control-plane/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-200 hover:border-cyan-400/50">Public status docs <ArrowUpRight className="h-4 w-4" /></a>
+              <a href="https://dsg-3.gitbook.io/dsg-docs/dsg-docs/dsg-one-canonical-7-docs/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-200 hover:border-cyan-400/50">Public status docs <ArrowUpRight className="h-4 w-4" /></a>
             </div>
           </div>
         </section>
