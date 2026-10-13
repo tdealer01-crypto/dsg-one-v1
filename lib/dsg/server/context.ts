@@ -60,7 +60,14 @@ export function getDsgUserAccessToken(headers: Headers): string | undefined {
   return getBearerToken(headers) ?? getCookieValue(headers, 'sb-access-token');
 }
 
-export async function resolveVerifiedDsgActor(headers: Headers): Promise<DsgServerActor | null> {
+export type DsgActorVerificationOptions = {
+  distinguishAuthBackendFailure?: boolean;
+};
+
+export async function resolveVerifiedDsgActor(
+  headers: Headers,
+  options: DsgActorVerificationOptions = {},
+): Promise<DsgServerActor | null> {
   const userAccessToken = getDsgUserAccessToken(headers);
   const workspaceId = headers.get('x-dsg-workspace-id') ?? getCookieValue(headers, 'dsg-workspace-id');
   if (!userAccessToken || !workspaceId) return null;
@@ -74,7 +81,13 @@ export async function resolveVerifiedDsgActor(headers: Headers): Promise<DsgServ
     cache: 'no-store',
   });
 
-  if (!userResponse.ok) return null;
+  if (!userResponse.ok) {
+    if (options.distinguishAuthBackendFailure) {
+      await userResponse.body?.cancel().catch(() => undefined);
+      if (userResponse.status >= 500) throw new Error('DSG_AUTH_BACKEND_UNAVAILABLE');
+    }
+    return null;
+  }
   const user = (await userResponse.json()) as SupabaseUserResponse;
   const actorId = user.id ?? user.sub;
   if (!actorId) return null;
@@ -91,8 +104,12 @@ export async function resolveVerifiedDsgActor(headers: Headers): Promise<DsgServ
   return { actorId, workspaceId, role };
 }
 
-export async function requireVerifiedDsgActor(headers: Headers, permission: DsgPermission): Promise<DsgServerActor> {
-  return assertDsgPermission(await resolveVerifiedDsgActor(headers), permission);
+export async function requireVerifiedDsgActor(
+  headers: Headers,
+  permission: DsgPermission,
+  options: DsgActorVerificationOptions = {},
+): Promise<DsgServerActor> {
+  return assertDsgPermission(await resolveVerifiedDsgActor(headers, options), permission);
 }
 
 export function devHeaderActor(headers: Headers): DsgServerActor | null {
