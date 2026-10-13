@@ -9,7 +9,7 @@ Status: **PARTIAL / SOURCE_AND_ROUTE_VERIFIED**, not whole-system production E2E
 - Live DSG ONE `/api/agent/status` reports source `00f97e4ed88c8a0cf8387542191f8734b4246b4a` / production. **A passing PR does not change this serving SHA.**
 - `https://dsg.pics/access` redirects 302 to `/dsg/access`; unauthenticated `/dsg/access` redirects 307 to `/login`; `/login` responds 200. The user session endpoint `/api/dsg/access/session` responds 401 without a session.
 - Public Spacetime MCP remains `https://aws.dsg.pics/mcp`, unauthenticated 401; protected-resource OAuth metadata 200. It must not be proxied through an unrestricted website API.
-- AWS Spacetime's explicit internal provider URLs are `http://dsg-one-v1:8080/api/mcp-server` and `http://cinema:8000` with co-located internal transport; the Cinema credential key is configured (value was **not** read). RCA/BrowserOS connection must remain approval-bound.
+- AWS Spacetime's explicit internal provider URLs are `http://dsg-one-v1:8080/api/mcp-server` and `http://cinema:8000` with co-located internal transport; the Cinema credential key is configured (value was **not** read). RCA/DSG OS connection must remain approval-bound.
 - Verified Nginx/Certbot certificates and automatic renewal are a web-edge proof only, not executor proof.
 
 ## Source inventory versus execution
