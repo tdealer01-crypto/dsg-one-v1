@@ -110,7 +110,7 @@ describe('real Ed25519 verified DSG downstream Jobs route', () => {
     [{ workspace_id: '3bbf89a3-82c7-487b-ae52-3091c593cc42' }, 'wrong workspace'],
     [{ route_id: 'route.dsg-one-v1.mcp.create-app-builder-job' }, 'different route'],
     [{ plan_hash: 'bad' }, 'wrong plan hash'],
-  ])('rejects signed but disallowed claims: %s (%s)', async (override) => {
+  ])('rejects signed but disallowed claims: %s (%s)', async (override: Record<string, unknown>, _label: string) => {
     const res = await GET(request(await receipt(override)));
     expect(res.status).toBe(401);
     expect(jobs).not.toHaveBeenCalled();
