@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { SignJWT } from 'jose';
 import { callDsgRpc, getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
 import { verifiedMcpAppBuilderReadContext, McpUserJobsDenied } from '@/lib/dsg/server/app-builder/mcp-user-context';
@@ -67,7 +68,19 @@ describe('Real Ed25519 user-bound delegation verification (no JOSE mocks)', () =
       auth0_client_id: 'mLIAcMEAhuVDaUvzXn8Qo54zj2llFp3X',
     }] as never).mockResolvedValueOnce([{ role: 'VIEWER' }] as never);
   });
-  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+  it('verifies the exact actual Python signer vector with real JOSE', async () => {
+    const vector = JSON.parse(readFileSync(new URL('../fixtures/jobs-delegation-ed25519-vector.json', import.meta.url), 'utf8'));
+    expect(vector.test_only).toBe(true);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(vector.issued_at * 1000));
+    vi.stubEnv('DSG_SPACETIME_JOBS_DELEGATION_PUBLIC_KEY_B64', vector.public_key_b64);
+    await expect(verifiedMcpAppBuilderReadContext(headers(vector.token))).resolves.toMatchObject({
+      actorId: 'actor-test', workspaceId: workspace, permission: 'job:read',
+    });
+    expect(consume).toHaveBeenCalledTimes(1);
+  });
 
   it('verifies a real Ed25519 signature and scoped membership with no bearer passthrough', async () => {
     const context = await verifiedMcpAppBuilderReadContext(headers(await assertion()));
