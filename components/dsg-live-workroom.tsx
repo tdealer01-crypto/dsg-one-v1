@@ -128,15 +128,18 @@ export function DsgLiveWorkroom() {
   async function execute(request: WorkroomExecution, label: string, approvalId?: string) {
     setStatus(`กำลัง${label} โปรดรอผลจาก provider`);
     const data = await tool('spacetime_execute', { ...request, ...(approvalId ? { approval_id: approvalId } : {}) });
-    setReceipt(publicWorkroomReceipt(data.receipt));
-    if (!workroomReceiptMatches(data.receipt, request)) throw new Error('EXACT_PROVIDER_RECEIPT_NOT_VERIFIED');
+    if (!await workroomReceiptMatches(data.receipt, request, approvalId)) throw new Error('EXACT_PROVIDER_RECEIPT_NOT_VERIFIED');
     const chain = await tool('spacetime_verify_evidence', {});
     if (!chain.evidenceVerified || chain.receipt?.valid !== true) throw new Error('EVIDENCE_CHAIN_NOT_VERIFIED');
+    setReceipt(publicWorkroomReceipt(data.receipt));
     const result = asRecord(data.receipt?.result)!;
     if (typeof request.payload.action === 'string') {
       history.current = [...history.current, {
         action: request.payload.action,
-        result: publicWorkroomReceipt(result),
+        // Never send file content or shell stdout back to the external planner.
+        outcome: 'VERIFIED',
+        plan_id: request.plan_id,
+        route_id: request.route_id,
         evidence_hash: asRecord(data.receipt?.evidence)?.evidence_hash,
       }].slice(-6);
     }
@@ -149,7 +152,11 @@ export function DsgLiveWorkroom() {
     const planId = 'web-' + crypto.randomUUID();
     const selected = steps.map((step) => ({
       ...step,
-      route: uniqueWorkroomRoute(available, step.capability, step.target),
+      route: uniqueWorkroomRoute(available, step.capability, step.capability.startsWith('device.')
+        ? (available.find(route => route.capability === step.capability && route.target_node === 'node.desktop-native')?.target_node
+           ?? available.find(route => route.capability === step.capability && route.target_node === 'node.rdc-remote')?.target_node
+           ?? step.target)
+        : step.target),
       payload: step.makePayload(planId),
     }));
     const actor = agent();
@@ -227,12 +234,14 @@ export function DsgLiveWorkroom() {
     const message = goal.trim();
     if (!message || message.length > 4000) return;
     const available = catalogLoaded ? routes : await loadCatalog();
+    const currentDesktopTarget = available.some(route => route.target_node === 'node.desktop-native')
+      ? 'node.desktop-native' : 'node.rdc-remote';
     const contracts = [
       { name: 'browser.remote.status', target: browserTarget, description: 'อ่านสถานะการเชื่อมต่อ Remote Browser', required: [], optional: [], risk: 'read' },
-      { name: 'device.remote.status', target: desktopTarget, description: 'อ่านสถานะ Remote Desktop ที่ผูกอยู่', required: [], optional: [], risk: 'read' },
-      { name: 'device.process.list', target: desktopTarget, description: 'อ่านรายการ process ของอุปกรณ์ที่ผูกอยู่', required: [], optional: [], risk: 'read' },
-      { name: 'device.fs.read', target: desktopTarget, description: 'อ่านไฟล์จากอุปกรณ์ที่ผูกอยู่', required: ['path'], optional: ['offset', 'length'], risk: 'read' },
-      { name: 'device.shell.exec', target: desktopTarget, description: 'เรียกคำสั่งบนอุปกรณ์หลังมีแผนและการอนุมัติ', required: ['command'], optional: [], risk: 'high' },
+      { name: 'device.remote.status', target: currentDesktopTarget, description: 'อ่านสถานะ Remote Desktop ที่ผูกอยู่', required: [], optional: [], risk: 'read' },
+      { name: 'device.process.list', target: currentDesktopTarget, description: 'อ่านรายการ process ของอุปกรณ์ที่ผูกอยู่', required: [], optional: [], risk: 'read' },
+      { name: 'device.fs.read', target: currentDesktopTarget, description: 'อ่านไฟล์จากอุปกรณ์ที่ผูกอยู่', required: ['path'], optional: ['offset', 'length'], risk: 'read' },
+      { name: 'device.shell.exec', target: currentDesktopTarget, description: 'เรียกคำสั่งบนอุปกรณ์หลังมีแผนและการอนุมัติ', required: ['command'], optional: [], risk: 'high' },
     ].filter(contract => available.some(route => route.capability === contract.name && route.target_node === contract.target));
     if (!contracts.length) throw new Error('NO_LIVE_TOOL_CONTRACTS_FOR_AGENT');
     setChat(items => [...items, { role: 'user', text: message }]);
