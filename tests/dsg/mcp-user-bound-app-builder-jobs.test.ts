@@ -5,6 +5,7 @@ import { listAppBuilderJobs } from '@/lib/dsg/server/app-builder/repository';
 import { GET } from '../../app/api/dsg/app-builder/jobs/oauth/route';
 
 vi.mock('jose', () => ({
+  createRemoteJWKSet: vi.fn(() => () => undefined),
   importJWK: vi.fn(async () => ({})),
   jwtVerify: vi.fn(),
 }));
