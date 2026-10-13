@@ -24,6 +24,8 @@ describe('DSG ONE MCP jobs tool only forwards signed user bearer and selected wo
     vi.stubEnv('APP_URL', 'https://dsg.pics');
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://dsg.pics');
     vi.stubEnv('INTERNAL_SERVICE_TOKEN', 'server-token-not-a-user');
+    // Exercise the enabled source-only path; production remains default-OFF.
+    vi.stubEnv('DSG_SPACETIME_JOBS_DELEGATION_ACTIVE', 'true');
   });
   afterEach(() => {
     vi.unstubAllEnvs();
