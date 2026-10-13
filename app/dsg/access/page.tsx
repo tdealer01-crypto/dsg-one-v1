@@ -74,6 +74,12 @@ const toolCards: Array<{
     badge: 'Public AWS · execution gated',
   },
   {
+    name: 'DSG Agent v0 / Governed MCP',
+    description: 'Use the existing Spacetime action.plan contract: node.agent.dsg-v0 → route.agent.dsg-v0.plan. Discovery is not a successful model invocation; a verified user OAuth principal and available Kaggle worker are still required for an executable plan. Open Workroom for your goal, with all execution controlled by Spacetime.',
+    href: '/dsg/workroom',
+    badge: 'MCP route · execution not verified',
+  },
+  {
     name: 'Agent v0 / NVIDIA Skills',
     description: 'Open the private-owner Kaggle NVIDIA T4x2 worker notebook. Agent v0 remains proposal-only behind DSG Spacetime; the notebook is ephemeral and must pass its live health/plan proof before it is treated as available. Free-only mode fails closed instead of falling back to a paid GPU provider.',
     href: 'https://www.kaggle.com/code/taraaaa1111/dsg-agent-v0-qwen3-30b-a3b-t4x2',
