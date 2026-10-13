@@ -38,6 +38,7 @@ beforeAll(async () => {
 beforeEach(() => {
   consume.mockReset().mockResolvedValue(true);
   vi.stubEnv('DSG_SPACETIME_CHATGPT_CLIENT_ID', client);
+  vi.stubEnv('DSG_SPACETIME_JOBS_DELEGATION_ACTIVE', 'true');
   vi.stubEnv('DSG_ONE_V1_SUPABASE_URL', 'https://fake-test-project.supabase.co');
   vi.stubEnv('DSG_ONE_V1_SUPABASE_SERVICE_ROLE_KEY', 'sb_secret_test_only');
   cfg.mockReturnValue({ url: 'https://fake-test-project.supabase.co', key: 'sb_secret_test_only' });
@@ -80,6 +81,27 @@ describe('real Ed25519 verified DSG downstream Jobs route', () => {
     expect(await res.json()).toEqual({ ok: true, data: [] });
     expect(db).toHaveBeenCalledTimes(2);
     expect(jobs).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks direct Jobs endpoint while owner activation is disabled', async () => {
+    vi.stubEnv('DSG_SPACETIME_JOBS_DELEGATION_ACTIVE', '');
+    const res = await GET(request(await receipt()));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({
+      ok: false, error: { code: 'DSG_MCP_JOBS_DELEGATION_NOT_ACTIVE' },
+    });
+    expect(db).not.toHaveBeenCalled();
+    expect(consume).not.toHaveBeenCalled();
+    expect(jobs).not.toHaveBeenCalled();
+  });
+
+  it('enforces a bounded deadline for the final workspace Jobs read', async () => {
+    const res = await GET(request(await receipt()));
+    expect(res.status).toBe(200);
+    expect(jobs).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: workspace, permission: 'job:read' }),
+      { timeoutMs: 5_000 },
+    );
   });
 
   it('rejects a correctly signed JWT for the upstream AWS OAuth audience', async () => {
