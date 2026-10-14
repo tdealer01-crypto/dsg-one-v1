@@ -55,6 +55,21 @@ describe('App Builder persisted jobs: scoped DB repair contract', () => {
     expect((options?.headers as Record<string, string>).authorization).toBeUndefined();
   });
 
+  it('passes an explicit deadline signal for governed Jobs reads without changing ordinary reads', async () => {
+    scopedEnv();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response('[]', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await supabaseRest({ path: 'dsg_app_builder_jobs', timeoutMs: 5_000 });
+    const [, deadlineOptions] = fetchMock.mock.calls[0]!;
+    expect(deadlineOptions?.signal).toBeInstanceOf(AbortSignal);
+    expect(deadlineOptions?.signal?.aborted).toBe(false);
+    await supabaseRest({ path: 'dsg_app_builder_jobs' });
+    const [, ordinaryOptions] = fetchMock.mock.calls[1]!;
+    expect(ordinaryOptions?.signal).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('retains JWT bearer authentication for legacy service_role configurations', async () => {
     scopedEnv('legacy-jwt-service-role');
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('[]', { status: 200 }));

@@ -3,6 +3,7 @@ type SupabaseRequest = {
   path: string;
   query?: string;
   body?: unknown;
+  timeoutMs?: number;
 };
 
 // This is a server-only client. The repo-scoped values must reference the
@@ -41,6 +42,7 @@ export async function supabaseRest<T>(input: SupabaseRequest): Promise<T> {
       headers,
       cache: 'no-store',
       body: input.body === undefined ? undefined : JSON.stringify(input.body),
+      signal: input.timeoutMs ? AbortSignal.timeout(input.timeoutMs) : undefined,
     });
   } catch {
     throw new Error('APP_BUILDER_DB_CONNECT_FAILED');
