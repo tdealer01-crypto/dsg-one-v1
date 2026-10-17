@@ -17,6 +17,8 @@ type Action = { capability: string; target: string; arguments: JsonRecord; label
 type PlannedStep = { capability: string; target: string; makePayload: (planId: string) => JsonRecord; label: string };
 const button = 'min-h-11 rounded-xl border border-slate-600 px-4 py-2 text-sm font-semibold disabled:opacity-40 hover:border-indigo-400';
 const field = 'w-full rounded-xl border border-slate-600 bg-slate-950 p-3 text-sm text-white';
+const browserTarget = 'node.cinema-remote';
+const desktopTarget = 'node.desktop-native';
 
 export function DsgLiveWorkroom() {
   const [ready, setReady] = useState(false);
@@ -150,15 +152,17 @@ export function DsgLiveWorkroom() {
   async function preparePlan(steps: PlannedStep[], label: string) {
     const available = catalogLoaded ? routes : await loadCatalog();
     const planId = 'web-' + crypto.randomUUID();
-    const selected = steps.map((step) => ({
-      ...step,
-      route: uniqueWorkroomRoute(available, step.capability, step.capability.startsWith('device.')
-        ? (available.find(route => route.capability === step.capability && route.target_node === 'node.desktop-native')?.target_node
-           ?? available.find(route => route.capability === step.capability && route.target_node === 'node.rdc-remote')?.target_node
-           ?? step.target)
-        : step.target),
-      payload: step.makePayload(planId),
-    }));
+    const selected = steps.map((step) => {
+      if (step.target === desktopTarget &&
+          !available.some(route => route.capability === step.capability && route.target_node === desktopTarget)) {
+        throw new Error('DSG_NATIVE_DESKTOP_NOT_ENROLLED');
+      }
+      return {
+        ...step,
+        route: uniqueWorkroomRoute(available, step.capability, step.target),
+        payload: step.makePayload(planId),
+      };
+    });
     const actor = agent();
     const composed = await tool('spacetime_compose', composeWorkroomRoutes(
       selected.map(({ route, payload }) => ({ route, payload })),
@@ -226,22 +230,18 @@ export function DsgLiveWorkroom() {
     }
   }
 
-  const browserTarget = 'node.cinema-remote';
-  const desktopTarget = routes.some(route => route.target_node === 'node.desktop-native') ? 'node.desktop-native' : 'node.rdc-remote';
   const isAvailable = (cap: string, target: string) => routes.some(route => route.capability === cap && route.target_node === target);
 
   async function sendGoal() {
     const message = goal.trim();
     if (!message || message.length > 4000) return;
     const available = catalogLoaded ? routes : await loadCatalog();
-    const currentDesktopTarget = available.some(route => route.target_node === 'node.desktop-native')
-      ? 'node.desktop-native' : 'node.rdc-remote';
     const contracts = [
       { name: 'browser.remote.status', target: browserTarget, description: 'อ่านสถานะการเชื่อมต่อ Remote Browser', required: [], optional: [], risk: 'read' },
-      { name: 'device.remote.status', target: currentDesktopTarget, description: 'อ่านสถานะ Remote Desktop ที่ผูกอยู่', required: [], optional: [], risk: 'read' },
-      { name: 'device.process.list', target: currentDesktopTarget, description: 'อ่านรายการ process ของอุปกรณ์ที่ผูกอยู่', required: [], optional: [], risk: 'read' },
-      { name: 'device.fs.read', target: currentDesktopTarget, description: 'อ่านไฟล์จากอุปกรณ์ที่ผูกอยู่', required: ['path'], optional: ['offset', 'length'], risk: 'read' },
-      { name: 'device.shell.exec', target: currentDesktopTarget, description: 'เรียกคำสั่งบนอุปกรณ์หลังมีแผนและการอนุมัติ', required: ['command'], optional: [], risk: 'high' },
+      { name: 'device.remote.status', target: desktopTarget, description: 'อ่านสถานะ DSG Desktop Native ที่ผูกอยู่', required: [], optional: [], risk: 'read' },
+      { name: 'device.process.list', target: desktopTarget, description: 'อ่านรายการ process ของ DSG Desktop Native', required: [], optional: [], risk: 'read' },
+      { name: 'device.fs.read', target: desktopTarget, description: 'อ่านไฟล์จาก DSG Desktop Native', required: ['path'], optional: ['offset', 'length'], risk: 'read' },
+      { name: 'device.shell.exec', target: desktopTarget, description: 'เรียกคำสั่งบน DSG Desktop Native หลังมีแผนและการอนุมัติ', required: ['command'], optional: [], risk: 'high' },
     ].filter(contract => available.some(route => route.capability === contract.name && route.target_node === contract.target));
     if (!contracts.length) throw new Error('NO_LIVE_TOOL_CONTRACTS_FOR_AGENT');
     setChat(items => [...items, { role: 'user', text: message }]);
@@ -353,7 +353,8 @@ export function DsgLiveWorkroom() {
           <button className={button} disabled={busy || !ready || Boolean(pending) || !url.trim()} onClick={() => void act(browserNavigate)}>ขอเชื่อม เปิดเว็บ และอ่านผล</button>
         </>}
         {tab === 'desktop' && <>
-          <p className="text-sm text-slate-300">ส่งคำสั่งไปยังอุปกรณ์ที่ผูกไว้กับ runtime ผลการเชื่อมต่อและผลคำสั่งจะแสดงด้านล่าง</p>
+          <p className="text-sm text-slate-300">ส่งคำสั่งผ่าน DSG Desktop Native ที่ผูกกับ runtime โดยตรง ระบบจะไม่ fallback ไป hosted RDC</p>
+          {catalogLoaded && !isAvailable('device.remote.status', desktopTarget) && <p className="text-amber-200">DSG Desktop Native ยังไม่ได้ enroll กับ runtime — จับคู่เครื่องก่อนใช้งาน</p>}
           <div className="flex flex-wrap gap-2">
             <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('device.remote.status', desktopTarget, () => ({ action: 'device.remote.status', arguments: {} }), 'ตรวจ Remote Desktop'); })}>ตรวจ Remote Desktop</button>
             <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('device.process.list', desktopTarget, () => ({ action: 'device.process.list', arguments: {} }), 'อ่านรายการ process'); })}>อ่านรายการ process</button>

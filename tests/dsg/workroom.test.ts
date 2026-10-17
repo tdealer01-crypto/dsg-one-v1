@@ -50,7 +50,7 @@ describe('AWS native Workroom governance', () => {
     expect(page).toContain("window.location.assign('/login?next=/dsg/workroom')");
     expect(page).toContain('<DsgLiveWorkroom key={selected.workspace_id} />');
     expect(page).toContain('<AgentCommandCenter />');
-    expect(page).toContain('Remote Desktop Commander');
+    expect(page).toContain('DSG Desktop Native');
     expect(page).toContain('Secret Manager');
     expect(page).toContain('dsg-agent-v0-qwen3-30b-a3b-t4x2');
     expect(page).toContain('route.agent.dsg-v0.plan');
@@ -63,5 +63,17 @@ describe('AWS native Workroom governance', () => {
     expect(commandCenter).not.toContain("'x-dsg-workspace-id': '00000000-0000-4000-8000-000000000001'");
     expect(commandCenter).not.toContain("'x-dsg-actor-id': 'customer'");
     expect(page).not.toMatch(/azurecontainerapps\.io|westus3|appdeploy\.ai/i);
+  });
+
+  it('pins desktop work to DSG Native without hosted RDC fallback', () => {
+    const page = readFileSync(join(root, 'app/dsg/workroom/page.tsx'), 'utf8');
+    const workroom = readFileSync(join(root, 'components/dsg-live-workroom.tsx'), 'utf8');
+
+    expect(workroom).toContain("const desktopTarget = 'node.desktop-native'");
+    expect(workroom).toContain('DSG_NATIVE_DESKTOP_NOT_ENROLLED');
+    expect(workroom).toContain('uniqueWorkroomRoute(available, step.capability, step.target)');
+    expect(workroom).not.toContain('node.rdc-remote');
+    expect(page).not.toContain('mcp.desktopcommander.app');
+    expect(page).toContain('never falls back to the hosted RDC compatibility provider');
   });
 });
