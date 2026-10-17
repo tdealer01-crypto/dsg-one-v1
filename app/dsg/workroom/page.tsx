@@ -30,10 +30,10 @@ const controlSurfaces = [
     href: null,
   },
   {
-    name: 'Remote Desktop Commander',
-    badge: 'External MCP connector',
-    description: 'Use the Remote Desktop Commander connection for Android/Termux filesystem, process and terminal operations. Production DSG ONE must not embed the RDC access token or device credential.',
-    href: 'https://mcp.desktopcommander.app/',
+    name: 'DSG Desktop Native',
+    badge: 'First-party relay · governed',
+    description: 'Pair this computer with the DSG desktop relay for filesystem, process and terminal operations. Workroom never falls back to the hosted RDC compatibility provider.',
+    href: '/control/',
   },
   {
     name: 'Secret Manager',
@@ -152,7 +152,7 @@ export default function DsgWorkroomPage() {
             <details className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
               <summary className="cursor-pointer text-sm font-semibold">ข้อมูลการเชื่อมต่อและเครื่องมืออื่น</summary>
               <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Operator control hub</div>
-              <h2 className="mt-2 text-2xl font-black text-white">Desktop UI · CLI · RDC · Secrets · Browser · Agent v0</h2>
+              <h2 className="mt-2 text-2xl font-black text-white">Desktop UI · CLI · DSG Native · Secrets · Browser · Agent v0</h2>
               <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {controlSurfaces.map((surface) => (
                   <article key={surface.name} className="flex min-h-48 flex-col rounded-2xl border border-slate-800 bg-slate-950 p-4">
@@ -194,7 +194,7 @@ export default function DsgWorkroomPage() {
         </details>
 
         <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 text-sm leading-6 text-slate-400">
-          <strong className="text-slate-200">Truth boundary:</strong> Workroom unifies operator surfaces, not authority. Remote Desktop Commander and Agent v0 remain external providers; Secret Manager values remain server-side; CLI/chat are request surfaces. No model response, notebook state, connector reachability or secret-name listing is execution evidence by itself. Mutating browser, desktop, deployment, purchase, secret or out-of-plan actions still require the existing governance and approval path.
+          <strong className="text-slate-200">Truth boundary:</strong> Workroom unifies operator surfaces, not authority. DSG Desktop Native remains enrollment- and approval-gated; Agent v0 remains an external proposal provider; Secret Manager values remain server-side; CLI/chat are request surfaces. No model response, notebook state, connector reachability or secret-name listing is execution evidence by itself. Mutating browser, desktop, deployment, purchase, secret or out-of-plan actions still require the existing governance and approval path.
         </section>
       </div>
     </main>
