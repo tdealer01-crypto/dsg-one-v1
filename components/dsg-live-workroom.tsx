@@ -20,6 +20,12 @@ const field = 'w-full rounded-xl border border-slate-600 bg-slate-950 p-3 text-s
 const browserTarget = 'node.cinema-remote';
 const desktopTarget = 'node.desktop-native';
 
+function approvalHref(approvalRequestId?: string): string {
+  return approvalRequestId
+    ? `/dsg/approvals?approval_request_id=${encodeURIComponent(approvalRequestId)}`
+    : '/dsg/approvals';
+}
+
 export function DsgLiveWorkroom() {
   const [ready, setReady] = useState(false);
   const [initializing, setInitializing] = useState(true);
@@ -378,7 +384,8 @@ export function DsgLiveWorkroom() {
           payload: step.request.payload,
         }))), null, 2)}</pre>
         <div className="mt-3 flex flex-wrap gap-2">
-          <a href="/dsg/approvals" target="_blank" rel="noreferrer" className={button}>เปิดหน้าอนุมัติ ↗</a>
+          <a href={approvalHref(pending.steps.find(step => step.approvalRequestId)?.approvalRequestId)}
+            target="_blank" rel="noreferrer" className={button}>เปิดคำขอนี้ในหน้าอนุมัติ ↗</a>
           <button className={button} disabled={busy || !ready} onClick={() => void act(resume)}>ดำเนินการต่อหลังอนุมัติ</button>
           <button className={button} disabled={busy} onClick={() => { setPending(null); setStatus('หยุดรอในหน้านี้ คำขอที่ยังไม่อนุมัติจะหมดอายุเอง'); }}>หยุดรอ</button>
         </div>
