@@ -3,6 +3,7 @@ export type SpacetimeToolName =
   | 'spacetime_compose'
   | 'spacetime_execute'
   | 'spacetime_request_approval'
+  | 'spacetime_claim_approval'
   | 'spacetime_resolve_approval'
   | 'spacetime_verify_evidence';
 
