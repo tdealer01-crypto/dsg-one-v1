@@ -37,6 +37,17 @@ After website login, workspace selection, and Auth0 linking on `/dsg/autonomous-
 
 Existing AWS `spacetime_resolve_approval` currently stamps `customer:<customer-id>` at runtime, not the actual Auth0 user subject. For full user-bound approval, first implement independently reviewed server-side authenticated customer decision validation, exact request and payload hash binding, anti-replay and audit. Then separately request an explicit user decision on the pending approval ID; after it is approved, execute the *same* plan hash/agent/route/payload and verify provider postcondition plus evidence. A general `APPROVE` for this build is not sufficient approval for an unknown future provider action.
 
+## Owner Approval Bridge
+
+For approval-required work, the two authorities stay separate:
+
+1. The requester creates the exact pending request with its oauth:<sub> agent binding.
+2. The owner opens the exact request in /dsg/approvals, completes Auth0 step-up/MFA, and resolves it there.
+3. The requester calls spacetime_claim_approval and receives the one-use permit.
+4. The requester executes the same plan hash, route, agent and payload with that permit.
+
+Core Spin and requester flows must never call spacetime_resolve_approval with an internal or agent credential. If a request is still pending, claim fails closed and no provider action runs. The mobile handoff link only selects the request; it never auto-approves it.
+
 ## Acceptance criteria
 
 - Identity mapping present and RLS enforced (inspected on Supabase, mapping count=1; no private subject or token exposed).
