@@ -1,7 +1,7 @@
 'use client';
 
 import { createAuth0Client, type Auth0Client } from '@auth0/auth0-spa-js';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const CALLBACK = 'https://dsg.pics/dsg/approvals';
 const AUDIENCE = 'https://aws.dsg.pics';
@@ -107,7 +107,7 @@ export default function ApprovalClient() {
     return () => { live = false; };
   }, []);
 
-  async function obtainToken() {
+  const obtainToken = useCallback(async () => {
     if (!client.current) throw new Error('AUTH0_SESSION_NOT_READY');
     // Reuse the unexpired token issued by the explicit login. Forcing a silent
     // iframe here loses a valid session when third-party cookies are blocked.
@@ -115,9 +115,11 @@ export default function ApprovalClient() {
     return client.current.getTokenSilently({
       authorizationParams: { audience: AUDIENCE, scope: SCOPE },
     });
-  }
+  }, []);
 
-  async function tool(name: string, args: Record<string, unknown>, tokenOverride?: string): Promise<ToolResponse> {
+  const tool = useCallback(async (
+    name: string, args: Record<string, unknown>, tokenOverride?: string,
+  ): Promise<ToolResponse> => {
     const accessToken = tokenOverride ?? await obtainToken();
     if (!accessToken) throw new Error('AUTH0_APPROVER_TOKEN_REQUIRED');
     const res = await fetch('/api/dsg/spacetime/user-tools', {
@@ -128,7 +130,7 @@ export default function ApprovalClient() {
     const payload = await res.json() as ToolResponse;
     if (!res.ok || !payload.ok) throw new Error(payload.error || payload.receipt?.reason || 'MCP_REJECTED');
     return payload;
-  }
+  }, [obtainToken]);
 
   async function login() {
     if (!client.current) return;
@@ -171,7 +173,7 @@ export default function ApprovalClient() {
     }
   }
 
-  async function finishStepUp(intent: StepUpIntent) {
+  const finishStepUp = useCallback(async (intent: StepUpIntent) => {
     setBusy(true);
     try {
       if (!client.current) throw new Error('AUTH0_SESSION_NOT_READY');
@@ -221,13 +223,12 @@ export default function ApprovalClient() {
     } finally {
       setBusy(false);
     }
-  }
+  }, [tool]);
 
   useEffect(() => {
     if (!pendingStepUpIntent) return;
     const intent = pendingStepUpIntent;
-    setPendingStepUpIntent(null);
-    void finishStepUp(intent);
+    void finishStepUp(intent).finally(() => setPendingStepUpIntent(null));
   }, [pendingStepUpIntent, finishStepUp]);
 
   async function checkMfaWithoutApproval() {
