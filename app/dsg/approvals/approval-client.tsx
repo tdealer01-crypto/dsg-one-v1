@@ -1,7 +1,7 @@
 'use client';
 
 import { createAuth0Client, type Auth0Client } from '@auth0/auth0-spa-js';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const CALLBACK = 'https://dsg.pics/dsg/approvals';
 const AUDIENCE = 'https://aws.dsg.pics';
@@ -31,12 +31,25 @@ type ToolResponse = {
   receipt?: { verdict?: string; reason?: string; approvals?: Approval[]; approval?: Approval };
 };
 
+type StepUpIntent =
+  | { kind: 'mfa_probe' }
+  | { kind: 'approve'; approvalRequestId: string };
+
+function isStepUpIntent(value: unknown): value is StepUpIntent {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as { kind?: unknown; approvalRequestId?: unknown };
+  return candidate.kind === 'mfa_probe' ||
+    (candidate.kind === 'approve' && typeof candidate.approvalRequestId === 'string' &&
+      candidate.approvalRequestId.length > 0);
+}
+
 export default function ApprovalClient() {
   const client = useRef<Auth0Client | null>(null);
   const [siteReady, setSiteReady] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [tokenReady, setTokenReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [pendingStepUpIntent, setPendingStepUpIntent] = useState<StepUpIntent | null>(null);
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [selected, setSelected] = useState<Approval | null>(null);
   const [status, setStatus] = useState('กำลังตรวจสอบสิทธิ์เว็บไซต์ DSG ONE');
@@ -66,13 +79,15 @@ export default function ApprovalClient() {
         if (!live) return;
         setAuthReady(true);
         const params = new URLSearchParams(window.location.search);
+        let stepUpIntent: StepUpIntent | null = null;
         if (params.has('error')) {
           setStatus('Auth0 ไม่อนุญาตให้เข้าสู่ระบบหรือ scope dsg.approve ยังไม่ได้รับสิทธิ์');
           window.history.replaceState(null, '', CALLBACK);
           return;
         }
         if (params.has('code') && params.has('state')) {
-          await c.handleRedirectCallback();
+          const callback = await c.handleRedirectCallback();
+          if (isStepUpIntent(callback.appState)) stepUpIntent = callback.appState;
           window.history.replaceState(null, '', CALLBACK);
         }
         const authenticated = await c.isAuthenticated();
@@ -80,6 +95,10 @@ export default function ApprovalClient() {
         setStatus(authenticated
           ? 'เข้าสู่ระบบ Auth0 แล้ว พร้อมตรวจรายการรออนุมัติ'
           : 'กดเข้าสู่ระบบเพื่อรับสิทธิ์ dsg.approve สำหรับเซสชันนี้');
+        if (stepUpIntent) {
+          setStatus('Auth0 ยืนยันกลับมาแล้ว กำลังตรวจ signed MFA proof กับ DSG Spacetime');
+          setPendingStepUpIntent(stepUpIntent);
+        }
       } catch {
         if (live) setStatus('ไม่สามารถยืนยันเซสชันเว็บไซต์ / Auth0 ได้');
       }
@@ -88,7 +107,7 @@ export default function ApprovalClient() {
     return () => { live = false; };
   }, []);
 
-  async function obtainToken() {
+  const obtainToken = useCallback(async () => {
     if (!client.current) throw new Error('AUTH0_SESSION_NOT_READY');
     // Reuse the unexpired token issued by the explicit login. Forcing a silent
     // iframe here loses a valid session when third-party cookies are blocked.
@@ -96,9 +115,11 @@ export default function ApprovalClient() {
     return client.current.getTokenSilently({
       authorizationParams: { audience: AUDIENCE, scope: SCOPE },
     });
-  }
+  }, []);
 
-  async function tool(name: string, args: Record<string, unknown>, tokenOverride?: string): Promise<ToolResponse> {
+  const tool = useCallback(async (
+    name: string, args: Record<string, unknown>, tokenOverride?: string,
+  ): Promise<ToolResponse> => {
     const accessToken = tokenOverride ?? await obtainToken();
     if (!accessToken) throw new Error('AUTH0_APPROVER_TOKEN_REQUIRED');
     const res = await fetch('/api/dsg/spacetime/user-tools', {
@@ -109,7 +130,7 @@ export default function ApprovalClient() {
     const payload = await res.json() as ToolResponse;
     if (!res.ok || !payload.ok) throw new Error(payload.error || payload.receipt?.reason || 'MCP_REJECTED');
     return payload;
-  }
+  }, [obtainToken]);
 
   async function login() {
     if (!client.current) return;
@@ -124,14 +145,18 @@ export default function ApprovalClient() {
     }
   }
 
-  async function checkMfaWithoutApproval() {
+  async function startStepUp(intent: StepUpIntent) {
     if (!client.current || !siteReady) return;
     setBusy(true);
-    setStatus('กำลังเปิด Auth0 ให้ยืนยัน MFA (ทดสอบอย่างเดียว ไม่อนุมัติงาน)');
+    setStatus(intent.kind === 'approve'
+      ? 'กำลังเปิด Auth0 ยืนยัน MFA ก่อนอนุมัติ (จะกลับมาหน้านี้อัตโนมัติ)'
+      : 'กำลังเปิด Auth0 ยืนยัน MFA (ทดสอบอย่างเดียว ไม่อนุมัติงาน)');
     try {
-      // A deliberate user gesture is required. Never fall back to a silent
-      // cached access token for fresh MFA proof.
-      const token = await client.current.getTokenWithPopup({
+      // Redirect is deliberate here: Android browsers commonly block or
+      // recycle popup windows. Auth0's state carries only the intent kind and
+      // exact approval id; the bearer token remains in memory and is never
+      // placed in the URL, localStorage or sessionStorage.
+      await client.current.loginWithRedirect({
         authorizationParams: {
           redirect_uri: CALLBACK,
           audience: AUDIENCE,
@@ -140,28 +165,76 @@ export default function ApprovalClient() {
           max_age: 0,
           ext_dsg_stepup: '1',
         },
-        cacheMode: 'off',
+        appState: intent,
+      });
+    } catch (error) {
+      setStatus('MFA NOT STARTED — ' + (error instanceof Error ? error.message : 'AUTH0_FAILED'));
+      setBusy(false);
+    }
+  }
+
+  const finishStepUp = useCallback(async (intent: StepUpIntent) => {
+    setBusy(true);
+    try {
+      if (!client.current) throw new Error('AUTH0_SESSION_NOT_READY');
+      // handleRedirectCallback stores the token from the exact step-up
+      // transaction in the SDK's in-memory cache. Reuse that token; a new
+      // silent transaction would lose the MFA challenge context.
+      const token = await client.current.getTokenSilently({
+        authorizationParams: { audience: AUDIENCE, scope: SCOPE },
       });
       if (!token) throw Error('AUTH0_MFA_ACCESS_TOKEN_REQUIRED');
-      const response = await fetch('/api/dsg/approvals/mfa-check', {
-        method: 'POST',
-        credentials: 'include',
-        cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: token }),
-      });
-      const receipt = await response.json() as {
-        ok?: boolean; mfaVerified?: boolean; error?: string;
-      };
-      if (!response.ok || receipt.ok !== true || receipt.mfaVerified !== true) {
-        throw Error(receipt.error || 'MFA_PROOF_NOT_VERIFIED');
+
+      if (intent.kind === 'mfa_probe') {
+        const response = await fetch('/api/dsg/approvals/mfa-check', {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken: token }),
+        });
+        const receipt = await response.json() as {
+          ok?: boolean; mfaVerified?: boolean; error?: string;
+        };
+        if (!response.ok || receipt.ok !== true || receipt.mfaVerified !== true) {
+          throw Error(receipt.error || 'MFA_PROOF_NOT_VERIFIED');
+        }
+        setStatus('MFA VERIFIED — signed proof ผ่านแล้ว (ยังไม่ได้อนุมัติหรือ Execute งาน)');
+        return;
       }
-      setStatus('MFA VERIFIED — ตรวจ JWT และหลักฐาน OTP ที่ลงลายเซ็นจริงสำเร็จ (ยังไม่ได้อนุมัติหรือ Execute งาน)');
+
+      const details = await tool('spacetime_get_approval', {
+        approval_request_id: intent.approvalRequestId,
+      }, token);
+      if (details.receipt?.approval?.approval_request_id !== intent.approvalRequestId) {
+        throw Error('APPROVAL_REQUEST_NOT_RELOADED');
+      }
+      const data = await tool('spacetime_resolve_approval', {
+        approval_request_id: intent.approvalRequestId, decision: 'APPROVE',
+      }, token);
+      if (data.receipt?.verdict !== 'APPROVED') {
+        throw Error(data.receipt?.reason || 'APPROVAL_RESULT_NOT_VERIFIED');
+      }
+      setStatus('APPROVED — ผู้ขออนุมัติต้อง claim permit และส่งหลักฐาน Execute กลับมา');
+      setSelected(null);
+      setApprovals(items => items.filter(item => item.approval_request_id !== intent.approvalRequestId));
     } catch (error) {
       setStatus('MFA NOT VERIFIED — ' + (error instanceof Error ? error.message : 'AUTH0_FAILED'));
     } finally {
       setBusy(false);
     }
+  }, [tool]);
+
+  useEffect(() => {
+    if (!pendingStepUpIntent) return;
+    const timer = window.setTimeout(() => {
+      void finishStepUp(pendingStepUpIntent);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [pendingStepUpIntent, finishStepUp]);
+
+  async function checkMfaWithoutApproval() {
+    await startStepUp({ kind: 'mfa_probe' });
   }
 
   async function load() {
@@ -198,25 +271,16 @@ export default function ApprovalClient() {
     }
     setBusy(true);
     try {
-      // For high-risk, interactive max_age=0 is a user-experience request,
-      // NOT a proof. AWS verifies Auth0-signed recent authentication method
-      // claims and fails closed if the Auth0 Action / runtime gate is absent.
-      const interactiveToken = decision === 'APPROVE' && selected.risk_tier === 'high'
-        ? await client.current?.getTokenWithPopup({
-            authorizationParams: {
-              redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE,
-              prompt: 'login', max_age: 0,
-              ext_dsg_stepup: '1', // Auth0 post-login v3 OTP challenge Action
-            },
-            cacheMode: 'off',
-          })
-        : undefined;
-      if (decision === 'APPROVE' && selected.risk_tier === 'high' && !interactiveToken) {
-        throw new Error('AUTH0_STEP_UP_TOKEN_REQUIRED');
+      // Mobile browsers can recycle a popup before the Auth0 transaction
+      // returns. Use the same redirect step-up path for every high-risk
+      // approval so all plugins share one reliable MFA flow.
+      if (decision === 'APPROVE' && selected.risk_tier === 'high') {
+        await startStepUp({ kind: 'approve', approvalRequestId: selected.approval_request_id });
+        return;
       }
       const data = await tool('spacetime_resolve_approval', {
         approval_request_id: selected.approval_request_id, decision,
-      }, interactiveToken);
+      });
       if (data.receipt?.verdict !== (decision === 'APPROVE' ? 'APPROVED' : 'REJECTED')) {
         throw new Error(data.receipt?.reason || 'APPROVAL_RESULT_NOT_VERIFIED');
       }
