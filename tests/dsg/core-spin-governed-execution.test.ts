@@ -218,6 +218,16 @@ describe('executeGovernedProposal', () => {
     });
 
     expect(result.state).toBe('COMPLETED');
+    expect(callSpacetimeTool.mock.calls.map(([name]) => name)).toEqual([
+      'spacetime_discover',
+      'spacetime_claim_approval',
+      'spacetime_execute',
+      'spacetime_verify_evidence',
+    ]);
+    expect(callSpacetimeTool).not.toHaveBeenCalledWith(
+      'spacetime_resolve_approval',
+      expect.anything(),
+    );
     const executeCall = callSpacetimeTool.mock.calls.find(
       ([name]) => name === 'spacetime_execute',
     );
