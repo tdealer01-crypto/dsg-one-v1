@@ -131,6 +131,35 @@ describe('DSG User-bound Auth0 → AWS Spacetime bridge', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('allows a requester to claim an already-approved permit without approval authority', async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const { id } = JSON.parse(init.body as string) as { id: string };
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          isError: false,
+          structuredContent: {
+            verdict: 'APPROVED',
+            approval_id: 'permit-1',
+            approval: { approval_request_id: 'request-1' },
+          },
+        },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const response = await POST(request('spacetime_claim_approval', {
+      approval_request_id: 'request-1',
+    }));
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.receipt.verdict).toBe('APPROVED');
+    expect(data.receipt.approval_id).toBe('permit-1');
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).params.name)
+      .toBe('spacetime_claim_approval');
+  });
+
   it('restricts roles: viewer cannot compose, request approval or execute', async () => {
     actor.mockResolvedValue({ actorId: 'actor-1', workspaceId: 'workspace-1', role: 'VIEWER' });
     const fetchMock = vi.fn();
