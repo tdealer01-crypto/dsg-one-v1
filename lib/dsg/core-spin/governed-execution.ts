@@ -92,6 +92,46 @@ function approvalRequestIdFrom(result: SpacetimeToolResult): string | undefined 
   return typeof id === 'string' && id ? id : undefined;
 }
 
+function approvalRecord(result: SpacetimeToolResult): Record<string, unknown> {
+  return result.approval && typeof result.approval === 'object' && !Array.isArray(result.approval)
+    ? result.approval as Record<string, unknown>
+    : {};
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']';
+  const record = value as Record<string, unknown>;
+  return '{' + Object.keys(record).sort()
+    .map((key) => JSON.stringify(key) + ':' + canonicalJson(record[key]))
+    .join(',') + '}';
+}
+
+function exactApprovalPayload(actual: unknown, expected: unknown): boolean {
+  return actual !== undefined && canonicalJson(actual) === canonicalJson(expected);
+}
+
+function approvalStatusText(result: SpacetimeToolResult): string {
+  const approval = approvalRecord(result);
+  return [
+    approval.status,
+    result.status,
+    result.verdict,
+    approval.reason,
+    result.reason,
+  ].filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toUpperCase();
+}
+
+function approvalStillPending(result: SpacetimeToolResult): boolean {
+  return /PENDING|WAITING|NOT[_ -]?READY|NOT[_ -]?APPROVED/.test(approvalStatusText(result));
+}
+
+function approvalTerminal(result: SpacetimeToolResult): boolean {
+  return /REJECT|EXPIRE|CANCEL|DENY|NOT[_ -]?FOUND|INVALID/.test(approvalStatusText(result));
+}
+
 function validateWorldContext(proposal: CoreSpinActionProposal): string | undefined {
   const context = proposal.worldContext;
   if (!context) return undefined;
@@ -275,6 +315,45 @@ export async function executeGovernedProposal(
         };
       }
 
+      // Read the exact approval metadata before consuming its one-use permit.
+      // The lookup is non-consuming; only the claim below may mint/consume it.
+      const details = await callSpacetimeTool('spacetime_get_approval', {
+        approval_request_id: proposal.approvalRequestId,
+      });
+      if (approvalStillPending(details)) {
+        return {
+          state: 'WAITING_APPROVAL',
+          routeId: route.route_id,
+          approvalRequestId: proposal.approvalRequestId,
+          reason: String(details.reason ?? 'CORE_SPIN_HUMAN_APPROVAL_NOT_READY'),
+        };
+      }
+      if (approvalTerminal(details)) {
+        return {
+          state: 'BLOCKED',
+          routeId: route.route_id,
+          approvalRequestId: proposal.approvalRequestId,
+          reason: String(details.reason ?? 'CORE_SPIN_APPROVAL_NOT_AVAILABLE'),
+        };
+      }
+
+      const detailsApproval = approvalRecord(details);
+      if (
+        detailsApproval.approval_request_id !== proposal.approvalRequestId
+        || detailsApproval.plan_id !== proposal.planId
+        || detailsApproval.route_id !== route.route_id
+        || detailsApproval.agent_id !== proposal.agentId
+        || typeof detailsApproval.plan_hash !== 'string'
+        || !exactApprovalPayload(detailsApproval.payload, executionPayload)
+      ) {
+        return {
+          state: 'BLOCKED',
+          routeId: route.route_id,
+          approvalRequestId: proposal.approvalRequestId,
+          reason: 'CORE_SPIN_APPROVAL_BINDING_MISMATCH',
+        };
+      }
+
       // Human authority is resolved only by the dedicated Auth0/MFA approval
       // surface. Core Spin must never resolve an approval with its internal
       // credential; it can only claim the resulting one-use permit.
@@ -283,17 +362,14 @@ export async function executeGovernedProposal(
       });
       if (claimed.verdict !== 'APPROVED') {
         return {
-          state: 'BLOCKED',
+          state: approvalStillPending(claimed) ? 'WAITING_APPROVAL' : 'BLOCKED',
           routeId: route.route_id,
           approvalRequestId: proposal.approvalRequestId,
           reason: String(claimed.reason ?? 'CORE_SPIN_HUMAN_APPROVAL_NOT_READY'),
         };
       }
 
-      const approval = claimed.approval && typeof claimed.approval === 'object'
-        ? claimed.approval as Record<string, unknown>
-        : {};
-
+      const approval = approvalRecord(claimed);
       const boundPlanHash = approval.plan_hash;
       const boundPlanId = approval.plan_id;
       const boundRouteId = approval.route_id;
@@ -303,6 +379,7 @@ export async function executeGovernedProposal(
         || boundPlanId !== proposal.planId
         || boundRouteId !== route.route_id
         || boundAgentId !== proposal.agentId
+        || !exactApprovalPayload(approval.payload, executionPayload)
       ) {
         return {
           state: 'BLOCKED',
