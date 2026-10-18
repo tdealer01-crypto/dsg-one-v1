@@ -228,7 +228,7 @@ export default function ApprovalClient() {
   useEffect(() => {
     if (!pendingStepUpIntent) return;
     const intent = pendingStepUpIntent;
-    void finishStepUp(intent).finally(() => setPendingStepUpIntent(null));
+    void finishStepUp(intent);
   }, [pendingStepUpIntent, finishStepUp]);
 
   async function checkMfaWithoutApproval() {
