@@ -45,11 +45,11 @@ function isStepUpIntent(value: unknown): value is StepUpIntent {
 
 export default function ApprovalClient() {
   const client = useRef<Auth0Client | null>(null);
-  const finishStepUpRef = useRef<((intent: StepUpIntent) => Promise<void>) | null>(null);
   const [siteReady, setSiteReady] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [tokenReady, setTokenReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [pendingStepUpIntent, setPendingStepUpIntent] = useState<StepUpIntent | null>(null);
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [selected, setSelected] = useState<Approval | null>(null);
   const [status, setStatus] = useState('กำลังตรวจสอบสิทธิ์เว็บไซต์ DSG ONE');
@@ -97,7 +97,7 @@ export default function ApprovalClient() {
           : 'กดเข้าสู่ระบบเพื่อรับสิทธิ์ dsg.approve สำหรับเซสชันนี้');
         if (stepUpIntent) {
           setStatus('Auth0 ยืนยันกลับมาแล้ว กำลังตรวจ signed MFA proof กับ DSG Spacetime');
-          void finishStepUpRef.current?.(stepUpIntent);
+          setPendingStepUpIntent(stepUpIntent);
         }
       } catch {
         if (live) setStatus('ไม่สามารถยืนยันเซสชันเว็บไซต์ / Auth0 ได้');
@@ -223,7 +223,12 @@ export default function ApprovalClient() {
     }
   }
 
-  finishStepUpRef.current = finishStepUp;
+  useEffect(() => {
+    if (!pendingStepUpIntent) return;
+    const intent = pendingStepUpIntent;
+    setPendingStepUpIntent(null);
+    void finishStepUp(intent);
+  }, [pendingStepUpIntent, finishStepUp]);
 
   async function checkMfaWithoutApproval() {
     await startStepUp({ kind: 'mfa_probe' });
