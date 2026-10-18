@@ -215,6 +215,8 @@ export default function ApprovalClient() {
       setStatus('APPROVED — ผู้ขออนุมัติต้อง claim permit และส่งหลักฐาน Execute กลับมา');
       setSelected(null);
       setApprovals(items => items.filter(item => item.approval_request_id !== intent.approvalRequestId));
+    } catch (error) {
+      setStatus('MFA NOT VERIFIED — ' + (error instanceof Error ? error.message : 'AUTH0_FAILED'));
     } finally {
       setBusy(false);
     }
