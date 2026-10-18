@@ -384,8 +384,10 @@ export function DsgLiveWorkroom() {
           payload: step.request.payload,
         }))), null, 2)}</pre>
         <div className="mt-3 flex flex-wrap gap-2">
-          <a href={approvalHref(pending.steps.find(step => step.approvalRequestId)?.approvalRequestId)}
-            target="_blank" rel="noreferrer" className={button}>เปิดคำขอนี้ในหน้าอนุมัติ ↗</a>
+          {pending.steps.filter(step => step.approvalRequestId).map((step, index) => (
+            <a key={step.approvalRequestId} href={approvalHref(step.approvalRequestId)}
+              target="_blank" rel="noreferrer" className={button}>เปิดคำขอ {index + 1} ในหน้าอนุมัติ ↗</a>
+          ))}
           <button className={button} disabled={busy || !ready} onClick={() => void act(resume)}>ดำเนินการต่อหลังอนุมัติ</button>
           <button className={button} disabled={busy} onClick={() => { setPending(null); setStatus('หยุดรอในหน้านี้ คำขอที่ยังไม่อนุมัติจะหมดอายุเอง'); }}>หยุดรอ</button>
         </div>
