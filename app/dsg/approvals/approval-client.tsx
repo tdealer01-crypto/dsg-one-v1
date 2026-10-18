@@ -35,21 +35,34 @@ type StepUpIntent =
   | { kind: 'mfa_probe' }
   | { kind: 'approve'; approvalRequestId: string };
 
+type ReviewIntent = { kind: 'review'; approvalRequestId: string };
+
+function isValidApprovalRequestId(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 192 && !/\s/.test(value);
+}
+
 function isStepUpIntent(value: unknown): value is StepUpIntent {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const candidate = value as { kind?: unknown; approvalRequestId?: unknown };
   return candidate.kind === 'mfa_probe' ||
-    (candidate.kind === 'approve' && typeof candidate.approvalRequestId === 'string' &&
-      candidate.approvalRequestId.length > 0);
+    (candidate.kind === 'approve' && isValidApprovalRequestId(candidate.approvalRequestId));
+}
+
+function isReviewIntent(value: unknown): value is ReviewIntent {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as { kind?: unknown; approvalRequestId?: unknown };
+  return candidate.kind === 'review' && isValidApprovalRequestId(candidate.approvalRequestId);
 }
 
 export default function ApprovalClient() {
   const client = useRef<Auth0Client | null>(null);
+  const reviewedApprovalId = useRef<string | null>(null);
   const [siteReady, setSiteReady] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [tokenReady, setTokenReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pendingStepUpIntent, setPendingStepUpIntent] = useState<StepUpIntent | null>(null);
+  const [requestedApprovalId, setRequestedApprovalId] = useState<string | null>(null);
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [selected, setSelected] = useState<Approval | null>(null);
   const [status, setStatus] = useState('กำลังตรวจสอบสิทธิ์เว็บไซต์ DSG ONE');
@@ -79,6 +92,9 @@ export default function ApprovalClient() {
         if (!live) return;
         setAuthReady(true);
         const params = new URLSearchParams(window.location.search);
+        const queryApprovalId = params.get('approval_request_id');
+        let reviewApprovalId: string | null = isValidApprovalRequestId(queryApprovalId)
+          ? queryApprovalId : null;
         let stepUpIntent: StepUpIntent | null = null;
         if (params.has('error')) {
           setStatus('Auth0 ไม่อนุญาตให้เข้าสู่ระบบหรือ scope dsg.approve ยังไม่ได้รับสิทธิ์');
@@ -88,10 +104,15 @@ export default function ApprovalClient() {
         if (params.has('code') && params.has('state')) {
           const callback = await c.handleRedirectCallback();
           if (isStepUpIntent(callback.appState)) stepUpIntent = callback.appState;
+          if (isReviewIntent(callback.appState)) reviewApprovalId = callback.appState.approvalRequestId;
           window.history.replaceState(null, '', CALLBACK);
         }
         const authenticated = await c.isAuthenticated();
         setTokenReady(authenticated);
+        if (authenticated && reviewApprovalId) {
+          setRequestedApprovalId(reviewApprovalId);
+          window.history.replaceState(null, '', CALLBACK);
+        }
         setStatus(authenticated
           ? 'เข้าสู่ระบบ Auth0 แล้ว พร้อมตรวจรายการรออนุมัติ'
           : 'กดเข้าสู่ระบบเพื่อรับสิทธิ์ dsg.approve สำหรับเซสชันนี้');
@@ -132,12 +153,44 @@ export default function ApprovalClient() {
     return payload;
   }, [obtainToken]);
 
+  // A Workroom handoff may point to one exact request. Load that request
+  // after the approver session is ready, but never approve it automatically.
+  useEffect(() => {
+    if (!tokenReady || !requestedApprovalId || reviewedApprovalId.current === requestedApprovalId) return;
+    reviewedApprovalId.current = requestedApprovalId;
+    let live = true;
+    setBusy(true);
+    void tool('spacetime_get_approval', {
+      approval_request_id: requestedApprovalId,
+    }).then((data) => {
+      const approval = data.receipt?.approval;
+      if (!approval || approval.approval_request_id !== requestedApprovalId) {
+        throw new Error('APPROVAL_REQUEST_NOT_RELOADED');
+      }
+      if (!live) return;
+      setSelected(approval);
+      setApprovals(items => items.some(item => item.approval_request_id === approval.approval_request_id)
+        ? items : [approval, ...items]);
+      setStatus('เปิดคำขอที่ระบุแล้ว โปรดตรวจ payload และกดอนุมัติด้วยตนเอง');
+    }).catch((error) => {
+      if (live) setStatus('เปิดคำขอไม่ได้: ' + (error instanceof Error ? error.message : 'APPROVAL_NOT_FOUND'));
+    }).finally(() => {
+      if (live) setBusy(false);
+    });
+    return () => { live = false; };
+  }, [requestedApprovalId, tokenReady, tool]);
+
   async function login() {
     if (!client.current) return;
     setBusy(true);
     try {
+      const queryApprovalId = new URLSearchParams(window.location.search).get('approval_request_id');
+      const appState = isValidApprovalRequestId(queryApprovalId)
+        ? { kind: 'review' as const, approvalRequestId: queryApprovalId }
+        : undefined;
       await client.current.loginWithRedirect({
         authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE },
+        ...(appState ? { appState } : {}),
       });
     } catch {
       setStatus('AUTH0_REDIRECT_FAILED — ตรวจ Allowed Callback URLs และ dsg.approve');
