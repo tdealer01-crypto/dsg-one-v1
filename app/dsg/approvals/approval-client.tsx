@@ -171,9 +171,9 @@ export default function ApprovalClient() {
   }
 
   async function finishStepUp(intent: StepUpIntent) {
-    if (!client.current) throw new Error('AUTH0_SESSION_NOT_READY');
     setBusy(true);
     try {
+      if (!client.current) throw new Error('AUTH0_SESSION_NOT_READY');
       // handleRedirectCallback stores the token from the exact step-up
       // transaction in the SDK's in-memory cache. Reuse that token; a new
       // silent transaction would lose the MFA challenge context.
