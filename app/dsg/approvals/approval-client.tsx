@@ -227,8 +227,10 @@ export default function ApprovalClient() {
 
   useEffect(() => {
     if (!pendingStepUpIntent) return;
-    const intent = pendingStepUpIntent;
-    void finishStepUp(intent);
+    const timer = window.setTimeout(() => {
+      void finishStepUp(pendingStepUpIntent);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [pendingStepUpIntent, finishStepUp]);
 
   async function checkMfaWithoutApproval() {
