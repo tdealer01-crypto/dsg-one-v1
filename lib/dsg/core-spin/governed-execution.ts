@@ -266,14 +266,6 @@ export async function executeGovernedProposal(
         };
       }
 
-      const resolved = await callSpacetimeTool('spacetime_resolve_approval', {
-        approval_request_id: proposal.approvalRequestId,
-        decision: proposal.approvalDecision,
-      });
-      const approval = resolved.approval && typeof resolved.approval === 'object'
-        ? resolved.approval as Record<string, unknown>
-        : {};
-
       if (proposal.approvalDecision === 'REJECT') {
         return {
           state: 'BLOCKED',
@@ -282,6 +274,25 @@ export async function executeGovernedProposal(
           reason: 'CORE_SPIN_APPROVAL_REJECTED',
         };
       }
+
+      // Human authority is resolved only by the dedicated Auth0/MFA approval
+      // surface. Core Spin must never resolve an approval with its internal
+      // credential; it can only claim the resulting one-use permit.
+      const claimed = await callSpacetimeTool('spacetime_claim_approval', {
+        approval_request_id: proposal.approvalRequestId,
+      });
+      if (claimed.verdict !== 'APPROVED') {
+        return {
+          state: 'BLOCKED',
+          routeId: route.route_id,
+          approvalRequestId: proposal.approvalRequestId,
+          reason: String(claimed.reason ?? 'CORE_SPIN_HUMAN_APPROVAL_NOT_READY'),
+        };
+      }
+
+      const approval = claimed.approval && typeof claimed.approval === 'object'
+        ? claimed.approval as Record<string, unknown>
+        : {};
 
       const boundPlanHash = approval.plan_hash;
       const boundPlanId = approval.plan_id;
@@ -301,14 +312,14 @@ export async function executeGovernedProposal(
         };
       }
 
-      const approvalId = approvalIdFrom(resolved);
+      const approvalId = approvalIdFrom(claimed);
       if (!approvalId) {
         return {
           state: 'BLOCKED',
           routeId: route.route_id,
           planHash: boundPlanHash,
           approvalRequestId: proposal.approvalRequestId,
-          reason: String(resolved.reason ?? 'CORE_SPIN_APPROVAL_TOKEN_MISSING'),
+          reason: String(claimed.reason ?? 'CORE_SPIN_APPROVAL_TOKEN_MISSING'),
         };
       }
       planHash = boundPlanHash;
