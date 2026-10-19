@@ -39,7 +39,7 @@ describe('DSG ONE natural-language chat-first workroom', () => {
   it('refreshes real job status, not client-side fake progress', () => {
     expect(component).toContain('window.setInterval(() => void refreshJobs(), 12000)');
     expect(component).toContain('setJobs(payload.data.jobs)');
-    expect(component).toContain('displayStatus(job.status)');
+    expect(component).toContain('displayStatus(job)');
     expect(component).not.toContain('Math.random');
   });
 
