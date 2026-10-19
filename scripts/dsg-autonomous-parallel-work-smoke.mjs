@@ -44,6 +44,16 @@ for (const stage of ['### T0 Input Lock', '### T1 Dependency Graph Build', '### 
   if (!skillText.includes(stage)) throw new Error(`autonomous skill stage missing: ${stage}`);
 }
 
+// Release contract: the AWS image must contain this file and changes must trigger its build.
+const imageDockerfile = await fs.readFile('Dockerfile', 'utf8');
+const imageWorkflow = await fs.readFile('.github/workflows/build-aws-dsg-one.yml', 'utf8');
+if (!imageDockerfile.includes('COPY --from=builder /app/skills/dsg-autonomous-execution/SKILL.md ./skills/dsg-autonomous-execution/SKILL.md')) {
+  throw new Error('autonomous skill is missing from production Docker image');
+}
+if (!imageWorkflow.includes('skills/dsg-autonomous-execution/**')) {
+  throw new Error('autonomous skill changes do not trigger AWS image build');
+}
+
 const combined = await Promise.all(files.map((file) => fs.readFile(file, 'utf8')));
 const text = combined.join('\n');
 

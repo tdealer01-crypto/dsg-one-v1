@@ -49,6 +49,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/automation_spacetime ./automation_spacetime
+# Package the autonomous execution skill into the final immutable AWS image.
+COPY --from=builder /app/skills/dsg-autonomous-execution/SKILL.md ./skills/dsg-autonomous-execution/SKILL.md
+RUN grep -Fxq "name: dsg-autonomous-execution" ./skills/dsg-autonomous-execution/SKILL.md
 COPY --from=builder /app/scripts/dsg-one-container-entrypoint.sh /usr/local/bin/dsg-one-container-entrypoint
 
 # Install only Alpine's patched zlib (CVE-2026-85091), fail closed if unavailable.
