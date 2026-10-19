@@ -198,13 +198,24 @@ export async function POST(req: Request) {
   }
 
   const history = normalizedHistory(body.history);
+  // Reuse the existing memory ingestion path and save the user's message
+  // BEFORE slow model/context calls. A refresh while the reply is pending
+  // must not silently erase the submitted turn.
+  const userPersisted = await persistAgentChatTurn(req, {
+    userMessage: body.message,
+    agentReply: '',
+    history,
+  }, verifiedIdentity).catch(() => ({
+    saved: [] as string[],
+    errors: ['MEMORY_USER_TURN_PERSIST_FAILED'],
+  }));
   const memory = await loadPersistentAgentMemory(req, body.message, verifiedIdentity);
   const externalContext = await loadExternalAgentContext(body.message);
 
   try {
     const result = await runDsgChatModel(buildMessages({ ...body, history }, memory, externalContext));
     const reply = result.outputText || 'ผมยังตอบไม่ได้จากโมเดลในรอบนี้ ลองพิมพ์รายละเอียดเพิ่มอีกครั้งครับ';
-    const persisted = await persistAgentChatTurn(req, { userMessage: body.message, agentReply: reply, history }, verifiedIdentity).catch((error) => ({
+    const persisted = await persistAgentChatTurn(req, { userMessage: '', agentReply: reply, history }, verifiedIdentity).catch((error) => ({
       saved: [],
       errors: [error instanceof Error ? error.message : 'MEMORY_PERSIST_FAILED'],
     }));
@@ -224,8 +235,8 @@ export async function POST(req: Request) {
           enabled: memory.enabled,
           memoryIds: memory.memoryIds,
           gateStatus: memory.gateStatus,
-          savedIds: persisted.saved,
-          persistErrors: persisted.errors,
+          savedIds: [...userPersisted.saved, ...persisted.saved],
+          persistErrors: [...userPersisted.errors, ...persisted.errors],
         },
         externalTools: externalContext.items.map((item) => ({
           tool: item.tool,
@@ -239,7 +250,7 @@ export async function POST(req: Request) {
   } catch (error) {
     const providerError = error instanceof Error ? error.message : 'AGENT_CHAT_MODEL_UNAVAILABLE';
     const fallback = localFallbackReply(body.message, providerError, memory, externalContext);
-    const persisted = await persistAgentChatTurn(req, { userMessage: body.message, agentReply: fallback.reply, history }, verifiedIdentity).catch((persistError) => ({
+    const persisted = await persistAgentChatTurn(req, { userMessage: '', agentReply: fallback.reply, history }, verifiedIdentity).catch((persistError) => ({
       saved: [],
       errors: [persistError instanceof Error ? persistError.message : 'MEMORY_PERSIST_FAILED'],
     }));
@@ -258,8 +269,8 @@ export async function POST(req: Request) {
           enabled: memory.enabled,
           memoryIds: memory.memoryIds,
           gateStatus: memory.gateStatus,
-          savedIds: persisted.saved,
-          persistErrors: persisted.errors,
+          savedIds: [...userPersisted.saved, ...persisted.saved],
+          persistErrors: [...userPersisted.errors, ...persisted.errors],
         },
         externalTools: externalContext.items.map((item) => ({
           tool: item.tool,
