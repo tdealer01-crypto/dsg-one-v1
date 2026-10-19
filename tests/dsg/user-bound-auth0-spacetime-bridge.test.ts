@@ -131,6 +131,64 @@ describe('DSG User-bound Auth0 → AWS Spacetime bridge', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('lets a real human approver use Auth0 alone without repeating site login', async () => {
+    // This token is from the dedicated approver SPA. The real verifier pins
+    // azp, issuer, audience, signature and dsg.approve before reaching AWS.
+    actor.mockResolvedValue(null);
+    tokenVerifier.mockResolvedValue({
+      subject, issuer, clientId: 'jI1uiKcQu7mqORsaCrogKTQVsAcZuQSt',
+      scope: 'dsg.approve',
+    });
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const { id } = JSON.parse(init.body as string) as { id: string };
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0', id,
+        result: { isError: false, structuredContent: { verdict: 'APPROVED' } },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await POST(request('spacetime_resolve_approval', {
+      approval_request_id: 'approved-request-1', decision: 'APPROVE',
+    }));
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.receipt.verdict).toBe('APPROVED');
+    expect(actor).not.toHaveBeenCalled();
+    expect(linkQuery).not.toHaveBeenCalled();
+    expect(tokenVerifier).toHaveBeenCalledWith('delegated.auth0.jwt', 'dsg.approve');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).params.name)
+      .toBe('spacetime_resolve_approval');
+  });
+
+  it('does not let an invalid approver token through when no site session exists', async () => {
+    actor.mockResolvedValue(null);
+    tokenVerifier.mockResolvedValue(null);
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const res = await POST(request('spacetime_resolve_approval', {
+      approval_request_id: 'requested-id', decision: 'APPROVE',
+    }));
+    expect(res.status).toBe(401);
+    expect((await res.json()).error).toBe('USER_AUTH0_TOKEN_NOT_VERIFIED');
+    expect(actor).not.toHaveBeenCalled();
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('still requires website workspace membership for non-approval operations', async () => {
+    actor.mockResolvedValue(null);
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const res = await POST(request('spacetime_execute', {
+      plan_id: 'p', plan_hash: 'h', route_id: 'r',
+      agent: { agent_id: 'agent', principal }, payload: {},
+    }));
+    expect(res.status).toBe(401);
+    expect((await res.json()).error).toBe('DSG_SITE_IDENTITY_NOT_VERIFIED');
+    expect(tokenVerifier).not.toHaveBeenCalled();
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
   it('allows a requester to claim an already-approved permit without approval authority', async () => {
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
       const { id } = JSON.parse(init.body as string) as { id: string };
