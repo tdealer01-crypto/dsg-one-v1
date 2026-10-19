@@ -54,18 +54,27 @@ as real production success.
 
 ## UI change and acceptance
 
-- Main sidebar: **Workroom, App Builder, Approvals**.
-- Secondary reporting: **Autonomous Level (report), Governance (reference)**.
-- A collapsed advanced group retains existing URLs for templates, planner,
-  Agent Nexus, API keys and clearly labeled **sample** history/analytics/
-  notifications.
-- Autonomous Level page explains it is not an execution entry point and
-  links to the three real workflows.
-- No extra approval or Auth0 login layer has been added.
+- Main sidebar: **one primary page, "คุยกับ DSG ONE" (/dsg/workroom)**.
+- Workroom displays a natural-language conversation and a separate list of
+  persisted jobs returned from `GET /api/dsg/jobs`. The composer remains
+  interactive while multiple independent chat responses or job submissions
+  are pending.
+- Sending a chat calls the existing `POST /api/dsg/agent-chat` backend.
+- "มอบหมายเป็นงาน" creates a durable work item with `POST /api/dsg/jobs`.
+  The job list refreshes every 10 seconds without interrupting conversation.
+- **Important technical gap:** Creating a durable job is not automatically
+  dispatching an AWS provider. Existing job creation persists a goal but
+  does not by itself prove plan/execute/evidence. Never claim automatic
+  execution until a verified dispatcher, worker and provider receipt exist.
+- The separate technical Workroom, App Builder, Approvals, Governance and
+  system reporting pages remain reachable under a collapsed operator menu.
+  Sample History/Analytics are labeled as sample, never production.
+- No extra approval, authentication credential, or Auth0 login is added.
+  Actual AWS execution and approval policy remain unchanged.
 
 Run:
 ```bash
-npx vitest run tests/dsg/sidebar-touch-navigation.test.ts
+npx vitest run tests/dsg/sidebar-touch-navigation.test.ts tests/dsg/conversational-workroom-ux.test.ts
 npm run dsg:typecheck
 npm run lint
 ```
