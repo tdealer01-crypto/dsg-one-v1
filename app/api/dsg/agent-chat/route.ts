@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { OpenAIChatMessage } from '@/lib/dsg/ai/openai-adapter';
-import { runDsgChatModel } from '@/lib/dsg/agent-runtime/chat-model';
+import { getDsgChatModelConfig, runDsgChatModel } from '@/lib/dsg/agent-runtime/chat-model';
 import { listAgentConversation } from '@/lib/dsg/agent-runtime/chat-history';
 import { routeAgentCommand } from '@/lib/dsg/agent-runtime/command-router';
 import { DSG_STUDIO_REFERENCE_PROMPT, buildPlanPaneInstruction } from '@/lib/dsg/agent-runtime/studio-reference';
@@ -168,7 +168,7 @@ export async function GET(req: Request) {
   }
   try {
     const messages = await listAgentConversation(identity);
-    return NextResponse.json({ ok: true, data: { messages, source: 'dsg_memory_events' } }, {
+    return NextResponse.json({ ok: true, data: { messages, source: 'dsg_memory_events', modelConnection: getDsgChatModelConfig() } }, {
       headers: { 'cache-control': 'no-store' },
     });
   } catch {
