@@ -135,6 +135,11 @@ export default function NotificationsPage() {
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+      <aside role="note" className="mx-auto mb-4 max-w-6xl rounded-2xl border border-amber-400/50 bg-amber-500/10 p-4 text-sm text-amber-100">
+        <strong>ตัวอย่างการแจ้งเตือน — ไม่ใช่ข้อมูลจริง</strong>
+        <p className="mt-1">รายการแจ้งเตือนด้านล่างเป็นข้อมูลตัวอย่าง หน้าเว็บนี้ยังไม่ได้เชื่อม API แจ้งเตือนจริง</p>
+        <a href="/dsg/workroom" className="mt-2 inline-block underline">กลับไปแชท DSG ONE</a>
+      </aside>
       <div className="mx-auto max-w-3xl space-y-6">
 
         {/* Header */}
