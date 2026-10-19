@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { GET } from '@/app/api/dsg/agent-chat/route';
 import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
 import { listAgentConversation } from '@/lib/dsg/agent-runtime/chat-history';
@@ -11,6 +13,19 @@ vi.mock('@/lib/dsg/agent-runtime/chat-history', () => ({
 }));
 const auth = vi.mocked(requireVerifiedDsgActor);
 const history = vi.mocked(listAgentConversation);
+
+describe('POST chat turn is durable before a slow model reply', () => {
+  it('saves each user request into the existing memory table before waiting for inference', () => {
+    const route = readFileSync(join(process.cwd(), 'app/api/dsg/agent-chat/route.ts'), 'utf8');
+    const post = route.slice(route.indexOf('export async function POST(req: Request)'));
+    const earlyWrite = post.indexOf('const userPersisted = await persistAgentChatTurn(');
+    const modelCall = post.indexOf('const result = await runDsgChatModel(');
+    expect(earlyWrite).toBeGreaterThanOrEqual(0);
+    expect(modelCall).toBeGreaterThan(earlyWrite);
+    expect(post).toContain("userMessage: '', agentReply: reply, history");
+    expect(post).toContain("userMessage: '', agentReply: fallback.reply, history");
+  });
+});
 
 describe('GET /api/dsg/agent-chat restores existing memory, not a new memory engine', () => {
   beforeEach(() => {
