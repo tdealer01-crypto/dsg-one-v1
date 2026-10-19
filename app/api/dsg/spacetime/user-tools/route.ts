@@ -144,14 +144,10 @@ export async function POST(request: NextRequest) {
   if (!request.headers.get('content-type')?.startsWith('application/json'))
     return result(415, { ok: false, error: 'JSON_REQUIRED' });
 
-  let actor;
-  try {
-    actor = await resolveVerifiedDsgActor(request.headers);
-  } catch {
-    return result(401, { ok: false, error: 'DSG_SITE_IDENTITY_NOT_VERIFIED' });
-  }
-  if (!actor) return result(401, { ok: false, error: 'DSG_SITE_IDENTITY_NOT_VERIFIED' });
-
+  // Parse the requested tool before asking for a SECOND website login.
+  // An approver-class JWT already has a pinned dedicated Auth0 client and
+  // AWS independently checks the approving person, request binding and MFA.
+  // Ordinary agent tools still require the verified DSG workspace session.
   let body: unknown;
   try {
     body = await readBoundedJson(request);
@@ -163,13 +159,23 @@ export async function POST(request: NextRequest) {
     return result(403, { ok: false, error: 'TOOL_NOT_EXPOSED_TO_USER_BRIDGE' });
   }
 
-  try {
-    assertDsgPermission(actor, ALLOWED[body.tool]);
-  } catch {
-    return result(403, { ok: false, error: 'DSG_WORKSPACE_PERMISSION_DENIED' });
+  const isHumanApproval = HUMAN_APPROVER_TOOLS.has(body.tool);
+  let actor: Awaited<ReturnType<typeof resolveVerifiedDsgActor>> = null;
+  if (!isHumanApproval) {
+    try {
+      actor = await resolveVerifiedDsgActor(request.headers);
+    } catch {
+      return result(401, { ok: false, error: 'DSG_SITE_IDENTITY_NOT_VERIFIED' });
+    }
+    if (!actor) return result(401, { ok: false, error: 'DSG_SITE_IDENTITY_NOT_VERIFIED' });
+    try {
+      assertDsgPermission(actor, ALLOWED[body.tool]);
+    } catch {
+      return result(403, { ok: false, error: 'DSG_WORKSPACE_PERMISSION_DENIED' });
+    }
   }
 
-  const requiredScope = HUMAN_APPROVER_TOOLS.has(body.tool) ? 'dsg.approve' : 'dsg.use';
+  const requiredScope = isHumanApproval ? 'dsg.approve' : 'dsg.use';
   const verified = await verifyDsgAuth0Principal(body.accessToken, requiredScope);
   if (!verified) return result(401, { ok: false, error: 'USER_AUTH0_TOKEN_NOT_VERIFIED' });
   if (verified.scope !== requiredScope) return result(403, { ok: false, error: 'APPROVER_SCOPE_REQUIRED' });
@@ -178,14 +184,19 @@ export async function POST(request: NextRequest) {
     return result(403, { ok: false, error: 'APPROVER_TOKEN_NOT_AGENT_CREDENTIAL' });
   }
 
-  let subject: string | null;
-  try {
-    subject = await linkedSubject(actor.actorId);
-  } catch {
-    return result(503, { ok: false, error: 'IDENTITY_LINK_STORE_UNAVAILABLE' });
-  }
-  if (!subject || subject !== verified.subject) {
-    return result(403, { ok: false, error: 'SITE_AUTH0_SUBJECT_BINDING_MISMATCH' });
+  if (!isHumanApproval) {
+    // Agent operations retain the site workspace-membership + linked-subject
+    // contract. Only human approval tools skip this duplicate login.
+    if (!actor) return result(401, { ok: false, error: 'DSG_SITE_IDENTITY_NOT_VERIFIED' });
+    let subject: string | null;
+    try {
+      subject = await linkedSubject(actor.actorId);
+    } catch {
+      return result(503, { ok: false, error: 'IDENTITY_LINK_STORE_UNAVAILABLE' });
+    }
+    if (!subject || subject !== verified.subject) {
+      return result(403, { ok: false, error: 'SITE_AUTH0_SUBJECT_BINDING_MISMATCH' });
+    }
   }
 
   if (!toolArgumentsBoundToUser(body.tool, body.arguments, verified.subject)) {
@@ -227,8 +238,7 @@ export async function POST(request: NextRequest) {
       ok: toolResult?.isError !== true,
       verdict: toolResult?.isError === true ? 'BLOCKED_BY_RUNTIME' : 'TOOL_RETURNED',
       tool: body.tool,
-      actorId: actor.actorId,
-      workspaceId: actor.workspaceId,
+      ...(actor ? { actorId: actor.actorId, workspaceId: actor.workspaceId } : {}),
       auth0SubjectFingerprint: createHash('sha256').update(verified.subject).digest('hex').slice(0, 16),
       receipt: structured,
       evidenceVerified: body.tool === 'spacetime_verify_evidence' && structured.valid === true,
