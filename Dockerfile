@@ -49,25 +49,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/automation_spacetime ./automation_spacetime
-# Ship the exact autonomous skill metadata with this immutable image.
+# Package the autonomous execution skill into the final immutable AWS image.
 COPY --from=builder /app/skills/dsg-autonomous-execution/SKILL.md ./skills/dsg-autonomous-execution/SKILL.md
-RUN grep -q '^name: dsg-autonomous-execution
-COPY --from=builder /app/scripts/dsg-one-container-entrypoint.sh /usr/local/bin/dsg-one-container-entrypoint
-
-# Install only Alpine's patched zlib (CVE-2026-85091), fail closed if unavailable.
-# The minimum package constraint is validated by apk during the Docker build.
-RUN apk add --no-cache 'zlib>=1.3.2-r1' ca-certificates python3 py3-pip \
-    && python3 -m venv /opt/dsg-automation \
-    && /opt/dsg-automation/bin/pip install --no-cache-dir -r /app/automation_spacetime/requirements.txt \
-    && chmod 0755 /usr/local/bin/dsg-one-container-entrypoint
-
-ENV DSG_AUTOMATION_PYTHON=/opt/dsg-automation/bin/python \
-    DSG_AUTOMATION_ENGINE=/app/automation_spacetime/engine.py \
-    DSG_AUTOMATION_ENGINE_VERSION=1.18.0
-
-EXPOSE 8080
-CMD ["/usr/local/bin/dsg-one-container-entrypoint"]
- ./skills/dsg-autonomous-execution/SKILL.md
+RUN grep -Fxq "name: dsg-autonomous-execution" ./skills/dsg-autonomous-execution/SKILL.md
 COPY --from=builder /app/scripts/dsg-one-container-entrypoint.sh /usr/local/bin/dsg-one-container-entrypoint
 
 # Install only Alpine's patched zlib (CVE-2026-85091), fail closed if unavailable.
