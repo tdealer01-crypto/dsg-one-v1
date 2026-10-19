@@ -173,17 +173,21 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 }
 
 export default function DsgLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  // Hide all administration navigation from the conversational home surface.
+  // The routes still exist and are available through its advanced section.
+  const chatFirst = pathname === '/dsg/workroom';
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="flex h-dvh min-h-0 overflow-hidden bg-slate-950 text-slate-100">
       {/* desktop sidebar */}
-      <div className="dsg-sidebar-desktop hidden h-full md:flex">
+      {!chatFirst && <div className="dsg-sidebar-desktop hidden h-full md:flex">
         <Sidebar />
-      </div>
+      </div>}
 
       {/* mobile overlay */}
-      {mobileOpen && (
+      {!chatFirst && mobileOpen && (
         <div className="dsg-sidebar-mobile-overlay fixed inset-0 z-50 flex md:hidden">
           <Sidebar onClose={() => setMobileOpen(false)} />
           <div
@@ -195,7 +199,7 @@ export default function DsgLayout({ children }: { children: React.ReactNode }) {
 
       {/* main area */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="dsg-sidebar-mobile-header flex h-14 shrink-0 items-center border-b border-slate-800 px-4 md:hidden">
+        {!chatFirst && <div className="dsg-sidebar-mobile-header flex h-14 shrink-0 items-center border-b border-slate-800 px-4 md:hidden">
           <button
             onClick={() => setMobileOpen(true)}
             className="flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
@@ -206,7 +210,7 @@ export default function DsgLayout({ children }: { children: React.ReactNode }) {
           <span className="ml-3 text-xs font-black uppercase tracking-widest text-white">
             DSG ONE
           </span>
-        </div>
+        </div>}
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>
