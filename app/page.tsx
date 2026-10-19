@@ -29,9 +29,9 @@ const systemEntries = [
   },
   {
     title: 'DSG Native Desktop',
-    description: 'Native Desktop activation and device enrollment are pending. A control page does not prove access to your device.',
+    description: 'Check current device connection, permitted capabilities and evidence in the control page. Online alone is not proof of a complete job.',
     href: '/control/',
-    badge: 'Activation pending',
+    badge: 'Check device status',
     external: false,
   },
   {
@@ -81,18 +81,18 @@ const systemEntries = [
 const steps = [
   {
     number: '01',
-    title: 'Describe one AI action',
-    desc: 'State the outcome you want in plain language.',
+    title: 'พิมพ์เป้าหมายของงาน',
+    desc: 'เข้า Workroom และอธิบายสิ่งที่ต้องการด้วยภาษาปกติ',
   },
   {
     number: '02',
-    title: 'DSG evaluates the governed path',
-    desc: 'The plan and runtime gate are evaluated without turning a blocked state into success.',
+    title: 'ระบบตรวจแผนและสิทธิ์',
+    desc: 'งานที่ต้องอนุมัติจะรอเจ้าของยืนยัน ไม่มีการข้าม Gate หรือสร้างผลลัพธ์จำลอง',
   },
   {
     number: '03',
-    title: 'Receive a proof receipt',
-    desc: 'See the proof hash, decision state, blocked reasons, and next safe action.',
+    title: 'ดูผลและหลักฐาน',
+    desc: 'ดู PASS / REVIEW / BLOCKED จากงานจริง พร้อมเหตุผลและขั้นต่อไป',
   },
 ];
 
@@ -128,10 +128,25 @@ export default function HomePage() {
             </Link>
           </nav>
 
-          <Link href="/login?next=/dsg/access" className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 md:hidden">
-            <LogIn className="h-4 w-4" />
-            Sign in
-          </Link>
+          <div className="flex items-center gap-2 md:hidden">
+            <details className="group relative">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300">
+                เมนู
+              </summary>
+              <nav aria-label="Mobile navigation" className="absolute right-0 top-12 z-50 flex w-64 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border border-slate-700 bg-slate-900 p-2 text-sm shadow-2xl">
+                <Link href="/dsg/workroom" className="rounded-lg px-3 py-3 text-cyan-200 hover:bg-slate-800">สั่งงานผ่านแชท</Link>
+                <Link href="/dsg/access" className="rounded-lg px-3 py-3 hover:bg-slate-800">Access Hub</Link>
+                <Link href="/dsg/approvals" className="rounded-lg px-3 py-3 hover:bg-slate-800">รายการอนุมัติ</Link>
+                <a href="#system-access" className="rounded-lg px-3 py-3 hover:bg-slate-800">เครื่องมือทั้งหมด</a>
+                <Link href="/architecture-3d.html" className="rounded-lg px-3 py-3 hover:bg-slate-800">สถาปัตยกรรม 3D</Link>
+                <a href="#truth-boundary" className="rounded-lg px-3 py-3 hover:bg-slate-800">หลักฐานและข้อจำกัด</a>
+              </nav>
+            </details>
+            <Link href="/dsg/workroom" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-300 px-3 py-2 text-xs font-black text-slate-950 hover:bg-cyan-200">
+              <LogIn className="h-4 w-4" />
+              เริ่มงาน
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -142,38 +157,35 @@ export default function HomePage() {
             <ShieldCheck className="h-3.5 w-3.5" />
             Public DSG ONE landing
           </div>
-          <h1 className="mt-7 text-5xl font-black tracking-tight sm:text-7xl">
-            Verify before
-            <br className="hidden sm:block" /> AI executes.
+          <h1 className="mt-7 text-4xl font-black leading-tight tracking-tight sm:text-7xl">
+            สั่ง AI ทำงาน
+            <span className="mt-2 block text-cyan-300">เห็นผลที่ตรวจสอบได้</span>
           </h1>
           <p className="mx-auto mt-7 max-w-3xl text-base leading-8 text-slate-300 sm:text-lg">
-            DSG ONE helps teams evaluate an AI action through a governed path and see the evidence behind the decision before execution is allowed.
+            เริ่มจากเป้าหมายของคุณ DSG ONE ตรวจแผน สิทธิ์ และการเชื่อมต่อก่อนให้ Agent ลงมือทำ
+            แล้วแสดงผลและหลักฐานจากระบบจริง หากทำไม่ได้จะแจ้งสาเหตุ ไม่แสดงความสำเร็จปลอม
           </p>
-          <p className="mt-4 font-mono text-sm tracking-[0.18em] text-cyan-300/80">
-            Action → Gate → Decision → Proof
+          <p className="mt-4 text-sm font-semibold leading-7 text-cyan-200">
+            บอกเป้าหมาย → ตรวจสิทธิ์ → ทำงานเมื่อได้รับอนุญาต → ดูผลและหลักฐาน
           </p>
 
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/login?next=/dsg/access" className="inline-flex items-center gap-2 rounded-2xl bg-cyan-300 px-6 py-3.5 text-sm font-black text-slate-950 hover:bg-cyan-200">
-              Enter DSG ONE
+            <Link href="/dsg/workroom" className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-cyan-300 px-6 py-3.5 text-sm font-black text-slate-950 hover:bg-cyan-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+              เริ่มสั่งงานผ่านแชท
               <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link href="/remote-browser-execution" className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-950/40 px-6 py-3.5 text-sm font-bold text-emerald-100 hover:border-emerald-300/70 hover:bg-emerald-950/60">
-              DSG Spacetime · Browser pilot (signed approval required)
+            <Link href="/dsg/access" className="inline-flex min-h-12 items-center gap-2 rounded-2xl border border-slate-700 bg-slate-900/60 px-6 py-3.5 text-sm font-bold text-slate-200 hover:border-cyan-300/50 hover:bg-slate-800">
+              ดูสถานะและเครื่องมือ
               <ArrowUpRight className="h-4 w-4" />
             </Link>
-            <Link href="/login?next=/dsg/verify" className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-900/60 px-6 py-3.5 text-sm font-bold text-slate-200 hover:border-cyan-300/50 hover:bg-slate-800">
-              Verify one AI action
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-            <Link href="/architecture-3d.html" className="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/30 bg-cyan-950/40 px-6 py-3.5 text-sm font-bold text-cyan-200 hover:border-cyan-300 hover:bg-cyan-950/70">
-              Explore 3D architecture
+            <Link href="/dsg/approvals" className="inline-flex min-h-12 items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-950/40 px-6 py-3.5 text-sm font-bold text-emerald-100 hover:border-emerald-300/70 hover:bg-emerald-950/60">
+              ตรวจรายการรออนุมัติ
               <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>
 
           <p className="mt-6 text-xs text-slate-500">
-            The public page is viewable without an account. Product actions require protected access.
+            หน้าแรกเปิดดูได้โดยไม่ต้องเข้าสู่ระบบ งานจริงต้องมีบัญชี สิทธิ์ และ Provider ที่พร้อมใช้งาน
           </p>
         </div>
       </section>
@@ -183,14 +195,14 @@ export default function HomePage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-3xl">
               <p className="font-mono text-xs uppercase tracking-[0.22em] text-cyan-300">One website · existing tools</p>
-              <h2 id="system-access-heading" className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">DSG ONE — System Access Hub</h2>
+              <h2 id="system-access-heading" className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">DSG ONE — เครื่องมือและพื้นที่ทำงาน</h2>
               <p className="mt-3 text-sm leading-7 text-slate-400">
-                Find every existing DSG surface from this landing page. Protected tools require your normal website or provider login.
+                เลือกเข้าเครื่องมือเดิมจากหน้านี้ได้โดยตรง เครื่องมือที่มีการควบคุมสิทธิ์จะให้เข้าสู่ระบบตามปกติ
                 Links do not grant execution permission or bypass Spacetime, Auth0, MFA, or the approval ledger.
               </p>
             </div>
             <Link href="/login?next=/dsg/access" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-3 text-sm font-black text-slate-950 hover:bg-cyan-200">
-              Enter authenticated Hub <ArrowRight className="h-4 w-4" />
+              เปิด Access Hub <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -221,8 +233,8 @@ export default function HomePage() {
         <PublicProductionSnapshot />
         <section id="how-it-works" className="scroll-mt-24">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="font-mono text-xs uppercase tracking-[0.22em] text-cyan-300">First value</p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">A clear decision path for every action</h2>
+            <p className="font-mono text-xs uppercase tracking-[0.22em] text-cyan-300">เริ่มใช้งาน 3 ขั้นตอน</p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">หนึ่งงาน ตั้งแต่สั่งจนเห็นผล</h2>
           </div>
           <div className="mt-9 grid gap-4 md:grid-cols-3">
             {steps.map((step) => (
