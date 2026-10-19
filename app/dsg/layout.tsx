@@ -21,33 +21,36 @@ import {
 
 const navSections = [
   {
-    label: 'Build',
+    label: 'เริ่มทำงาน',
     items: [
-      { label: 'App Builder', href: '/dsg/app-builder', iconName: 'sparkles' },
-      { label: 'Templates', href: '/dsg/templates', iconName: 'layoutTemplate' },
-      { label: 'Flow Studio', href: '/dsg/flow-studio', iconName: 'gitBranch' },
+      { label: 'Workroom · สั่งงาน', href: '/dsg/workroom', iconName: 'cpu' },
+      { label: 'App Builder · สร้างแอป', href: '/dsg/app-builder', iconName: 'sparkles' },
+      { label: 'Approvals · อนุมัติ', href: '/dsg/approvals', iconName: 'shield' },
     ],
   },
   {
-    label: 'Manage',
+    label: 'ตรวจสอบ',
     items: [
-      { label: 'My Apps', href: '/dsg/action-layer', iconName: 'layoutGrid' },
-      { label: 'History', href: '/dsg/history', iconName: 'history' },
-      { label: 'API Keys', href: '/dsg/api-keys', iconName: 'key' },
-    ],
-  },
-  {
-    label: 'Insights',
-    items: [
-      { label: 'Analytics', href: '/dsg/analytics', iconName: 'barChart2' },
-      { label: 'Governance', href: '/dsg/governance', iconName: 'shield' },
-      { label: 'Autonomous Level', href: '/dsg/autonomous-level', iconName: 'cpu' },
+      { label: 'Autonomous Level · รายงาน', href: '/dsg/autonomous-level', iconName: 'barChart2' },
+      { label: 'Governance · อ้างอิง', href: '/dsg/governance', iconName: 'shield' },
     ],
   },
 ];
 
+// Secondary pages remain directly accessible, but must not compete with
+// actual operator entry points. Never present mock history or sample analytics
+// as production records. No URLs or stored data are deleted by this change.
+const advancedItems = [
+  { label: 'Templates · คลังตัวอย่าง', href: '/dsg/templates', iconName: 'layoutTemplate' },
+  { label: 'Flow Studio · วางแผน', href: '/dsg/flow-studio', iconName: 'gitBranch' },
+  { label: 'Agent Nexus · Telemetry', href: '/dsg/action-layer', iconName: 'layoutGrid' },
+  { label: 'API Keys', href: '/dsg/api-keys', iconName: 'key' },
+  { label: 'History · ข้อมูลตัวอย่าง', href: '/dsg/history', iconName: 'history' },
+  { label: 'Analytics · ข้อมูลตัวอย่าง', href: '/dsg/analytics', iconName: 'barChart2' },
+  { label: 'Notifications · ข้อมูลตัวอย่าง', href: '/dsg/notifications', iconName: 'bell' },
+];
+
 const bottomItems = [
-  { label: 'Notifications', href: '/dsg/notifications', iconName: 'bell' },
   { label: 'Settings', href: '/dsg/settings', iconName: 'settings' },
 ];
 
@@ -122,6 +125,25 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
             })}
           </div>
         ))}
+        <details className="mx-2 mt-4 rounded-xl border border-slate-800 px-1 py-2">
+          <summary className="min-h-11 cursor-pointer touch-manipulation px-3 py-2 text-sm font-medium text-slate-300">
+            เครื่องมือเพิ่มเติม / ตัวอย่าง
+          </summary>
+          <div className="mt-2 space-y-1">
+            {advancedItems.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(item.href + '/');
+              return (
+                <a key={item.href} href={item.href} aria-current={active ? 'page' : undefined}
+                  className={`flex min-h-11 touch-manipulation items-center gap-2.5 rounded-lg px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${
+                    active ? 'bg-indigo-500/15 text-indigo-200' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}>
+                  <NavIcon name={item.iconName} />
+                  {item.label}
+                </a>
+              );
+            })}
+          </div>
+        </details>
       </nav>
 
       {/* bottom */}
