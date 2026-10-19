@@ -1,4 +1,3 @@
-import 'server-only';
 import { supabaseRest } from '@/lib/dsg/server/app-builder/supabase-rest';
 import type { AgentChatVerifiedIdentity } from './persistent-chat-memory';
 
