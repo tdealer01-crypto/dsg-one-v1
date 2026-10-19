@@ -9,7 +9,7 @@ type Turn = {
   text: string;
   pending?: boolean;
 };
-type Job = { id: string; goal: string; status: string; createdAt?: string; updatedAt?: string };
+type Job = { id: string; goal: string; status: string; completionReportId?: string | null; createdAt?: string; updatedAt?: string };
 type ChatReply = { ok?: boolean; data?: { reply?: unknown; fallback?: boolean }; error?: { code?: string; message?: string } };
 type JobReply = { ok?: boolean; data?: { id?: string; jobs?: Job[] }; error?: { code?: string; message?: string } };
 
@@ -22,15 +22,15 @@ export function isWorkDirective(text: string): boolean {
   return /^(?:สร้าง|แก้ไข|แก้|ปรับปรุง|อัปเดต|อัพเดต|ตรวจสอบ|ทดสอบ|ติดตั้ง|เชื่อมต่อ|เชื่อม|เปิด|รัน|สั่งงาน|ทำงาน|จัดการ|ดีพลอย|deploy|build|พัฒนา|ค้นหา|สรุป|วิเคราะห์|ตรวจ|ทำให้)/i.test(value);
 }
 
-function displayStatus(status: string): string {
-  const code = status.toUpperCase();
-  if (['COMPLETED', 'COMPLETE', 'SUCCESS', 'SUCCEEDED', 'PASSED'].includes(code)) return 'เสร็จแล้ว';
+function displayStatus(job: Job): string {
+  const code = job.status.toUpperCase();
+  if (['COMPLETED', 'COMPLETE', 'SUCCESS', 'SUCCEEDED', 'PASSED'].includes(code)) return job.completionReportId ? 'เสร็จแล้ว · มีรายงานผล' : 'ระบบรายงานว่าเสร็จ · ยังไม่พบรายงานยืนยัน';
   if (code === 'FAILED') return 'ไม่สำเร็จ';
   if (code === 'BLOCKED') return 'ต้องแก้ไขก่อน';
   if (code.includes('APPROV')) return 'รอคุณตัดสินใจ';
   if (['RUNNING', 'EXECUTING', 'IN_PROGRESS', 'PROCESSING'].includes(code)) return 'กำลังทำงาน';
   if (['QUEUED', 'PENDING', 'CREATED', 'DRAFT'].includes(code)) return 'รับงานแล้ว · รอเริ่ม';
-  return status || 'ยังไม่มีสถานะ';
+  return job.status || 'ยังไม่มีสถานะ';
 }
 
 function apiError(payload: { error?: { code?: string; message?: string } }, fallback: string) {
@@ -188,7 +188,7 @@ export function DsgOperatorChat() {
             <div key={job.id} className="rounded-xl border border-slate-700 p-3">
               <div className="flex items-start justify-between gap-3">
                 <p className="line-clamp-2 text-sm text-white">{job.goal}</p>
-                <span className="shrink-0 text-xs text-indigo-200">{displayStatus(job.status)}</span>
+                <span className="shrink-0 text-xs text-indigo-200">{displayStatus(job)}</span>
               </div>
               <details className="mt-2 text-xs text-slate-400">
                 <summary className="cursor-pointer text-sky-300">รายละเอียดสถานะ</summary>
