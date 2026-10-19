@@ -11,7 +11,7 @@ type Turn = {
 };
 type Job = { id: string; goal: string; status: string; completionReportId?: string | null; createdAt?: string; updatedAt?: string };
 type ChatReply = { ok?: boolean; data?: { reply?: unknown; fallback?: boolean; provider?: string; model?: string; modelStatus?: string; memory?: { persistErrors?: string[]; savedIds?: string[] } }; error?: { code?: string; message?: string } };
-type ChatHistoryReply = { ok?: boolean; data?: { messages?: { id: string; role: 'user' | 'assistant'; text: string }[] }; error?: { code?: string; message?: string } };
+type ChatHistoryReply = { ok?: boolean; data?: { messages?: { id: string; role: 'user' | 'assistant'; text: string }[]; modelConnection?: { openai?: boolean; gemini?: boolean; dsgV0ChatBound?: boolean } }; error?: { code?: string; message?: string } };
 type JobReply = { ok?: boolean; data?: { id?: string; jobs?: Job[] }; error?: { code?: string; message?: string } };
 
 // A directive starts a persistent job, while questions remain conversation.
@@ -74,6 +74,15 @@ export function DsgOperatorChat() {
         ...current,
       ]);
       setHistoryIssue(null);
+      const connection = payload.data.modelConnection;
+      if (connection) {
+        const connected = [connection.openai && 'OpenAI-compatible', connection.gemini && 'Gemini'].filter(Boolean).join(' / ');
+        setModelNotice(previous => previous === 'กำลังตรวจสอบโมเดลจากคำตอบจริง'
+          ? connected
+            ? `มีการตั้งค่า ${connected} · จะยืนยันการตอบจริงเมื่อส่งข้อความ (DSG v0 ยังเป็นเส้นทางวางแผน)`
+            : 'ยังไม่มีการตั้งค่า Chat Model บนเซิร์ฟเวอร์ · DSG v0 ใช้สำหรับวางแผน ไม่ใช่ Chat API'
+          : previous);
+      }
     } catch {
       // Do not silently say the user has no history when the database failed.
       setHistoryIssue('ยังโหลดประวัติจากเซิร์ฟเวอร์ไม่ได้ ข้อความใหม่ยังใช้งานได้');
