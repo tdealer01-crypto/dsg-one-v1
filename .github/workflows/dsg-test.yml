@@ -37,6 +37,9 @@ jobs:
       - name: DSG operator navigation regression tests
         run: npx vitest run tests/dsg/sidebar-touch-navigation.test.ts tests/dsg/operator-chat-first.test.ts
 
+      - name: Chat history and real model regression tests
+        run: npx vitest run tests/dsg/chat-history-model.test.ts tests/dsg/chat-history-recovery-route.test.ts
+
       - name: Claim gate
         run: npm run dsg:claim-gate
 
