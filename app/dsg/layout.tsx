@@ -21,26 +21,20 @@ import {
 
 const navSections = [
   {
-    label: 'เริ่มทำงาน',
+    label: 'เริ่มต้น',
     items: [
-      { label: 'Workroom · สั่งงาน', href: '/dsg/workroom', iconName: 'cpu' },
-      { label: 'App Builder · สร้างแอป', href: '/dsg/app-builder', iconName: 'sparkles' },
-      { label: 'Approvals · อนุมัติ', href: '/dsg/approvals', iconName: 'shield' },
-    ],
-  },
-  {
-    label: 'ตรวจสอบ',
-    items: [
-      { label: 'Autonomous Level · รายงาน', href: '/dsg/autonomous-level', iconName: 'barChart2' },
-      { label: 'Governance · อ้างอิง', href: '/dsg/governance', iconName: 'shield' },
+      { label: 'คุยกับ DSG ONE', href: '/dsg/workroom', iconName: 'cpu' },
     ],
   },
 ];
 
-// Secondary pages remain directly accessible, but must not compete with
-// actual operator entry points. Never present mock history or sample analytics
-// as production records. No URLs or stored data are deleted by this change.
+// Customers start in a single conversation. Technical and sample routes are
+// preserved for owners/operators, but do not compete with chat as entry points.
 const advancedItems = [
+  { label: 'สร้างแอป · App Builder', href: '/dsg/app-builder', iconName: 'sparkles' },
+  { label: 'คำขออนุมัติ · Approvals', href: '/dsg/approvals', iconName: 'shield' },
+  { label: 'รายงานความสามารถ', href: '/dsg/autonomous-level', iconName: 'barChart2' },
+  { label: 'Governance · อ้างอิง', href: '/dsg/governance', iconName: 'shield' },
   { label: 'Templates · คลังตัวอย่าง', href: '/dsg/templates', iconName: 'layoutTemplate' },
   { label: 'Flow Studio · วางแผน', href: '/dsg/flow-studio', iconName: 'gitBranch' },
   { label: 'Agent Nexus · Telemetry', href: '/dsg/action-layer', iconName: 'layoutGrid' },
@@ -127,7 +121,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
         ))}
         <details className="mx-2 mt-4 rounded-xl border border-slate-800 px-1 py-2">
           <summary className="min-h-11 cursor-pointer touch-manipulation px-3 py-2 text-sm font-medium text-slate-300">
-            เครื่องมือเพิ่มเติม / ตัวอย่าง
+            เมนูผู้ดูแลและข้อมูลเพิ่มเติม
           </summary>
           <div className="mt-2 space-y-1">
             {advancedItems.map((item) => {
