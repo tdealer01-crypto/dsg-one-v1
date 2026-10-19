@@ -60,10 +60,14 @@ export default function DsgWorkroomPage() {
     }
   }, [load]);
 
-  useEffect(() => { void load(); }, [load]);
   useEffect(() => {
-    if (!session || session.selected || session.memberships?.length !== 1 || busyWorkspace) return;
-    void selectWorkspace(session.memberships[0].workspace_id);
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+  useEffect(() => {
+    if (!session || session.selected || session.memberships?.length !== 1 || busyWorkspace) return undefined;
+    const timer = window.setTimeout(() => void selectWorkspace(session.memberships![0].workspace_id), 0);
+    return () => window.clearTimeout(timer);
   }, [session, busyWorkspace, selectWorkspace]);
 
   const selected = session?.selected ?? null;
