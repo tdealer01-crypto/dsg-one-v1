@@ -133,11 +133,13 @@ import { useChecklist, useAppLanguage, checklistStore, languageStore } from '@/s
 
 ## Production control loop
 
-### Current hosting boundary
-- Public presentation layer: Framer
-- DSG application/runtime/API: AWS migration target, source-bound immutable ECR images
-- Public AWS runtime origin: **not asserted yet**; live runtime E2E and HTTPS cutover remain NOT_RUN / NOT_DONE
-- Azure App Service: historical/manual rollback proof only
+### Current hosting boundary (updated 2026-10-19)
+- DSG ONE public website/app: `https://dsg.pics`; AWS immutable website image `f6a1e11b1b485a4d5b3d3e53f95be0bcaa0b76ad`, digest `sha256:ccc7908229d595ee60597ebb202bcfe56ebbd4f3a309ed00c44ca01e845b3d19`; [Build #39248381900](https://github.com/tdealer01-crypto/dsg-one-v1/actions/runs/39248381900) and [Ship #39248645333](https://github.com/tdealer01-crypto/dsg-one-v1/actions/runs/39248645333) verified public source serving
+- Framer, when present, is public presentation only; never privileged execution authority
+- **Separate governed execution transport:** `https://aws.dsg.pics/mcp` (OAuth-protected MCP), not a REST API origin for website endpoints; no MCP container deployment or T0-T4 provider E2E is proven by this website release
+- Skill source `skills/dsg-autonomous-execution/SKILL.md` is packaged in the website image via `Dockerfile`; it is **not** automatically a registered/executable MCP tool
+- Canonical release evidence: [docs/DSG_AUTONOMOUS_SKILL_AWS_RELEASE_20261019.md](docs/DSG_AUTONOMOUS_SKILL_AWS_RELEASE_20261019.md)
+- Azure App Service / Render / Vercel: historical or retired; no production fallback
 
 Render (`dsg-one-v1-aimo.onrender.com`) was an earlier migration target
 (see `docs/FRAMER_RENDER_MIGRATION.md`, superseded) and is not the current
@@ -147,7 +149,7 @@ repo still point at the Render origin; treat those as stale unless you
 re-verify them, not as evidence Render is live.
 
 ### Check if production is alive
-Use the currently verified HTTPS runtime origin from the AWS cutover evidence. If no verified origin exists, report BLOCKED; do not fall back to Azure.
+For the DSG ONE **website** only, check `https://dsg.pics/api/agent/status` and require `ok: true`, the exact deployment `version` and bound ECR image digest. The 19 October 2026 ship proof identifies source `f6a1e11b1b485a4d5b3d3e53f95be0bcaa0b76ad`. A new release must update this source via its own exact-SHA proof; a historical check is not proof of current health. For Spacetime MCP execution, verify authenticated route discovery, plan/approval, provider receipts and tamper-evident evidence separately. Never fall back to Azure or Render.
 
 ### Ship from chat (triggers CI → verify)
 Use GitHub MCP tool `mcp__github__create_dispatch_event` or trigger workflow_dispatch on `.github/workflows/ship.yml` with input `reason: "<what you did>"`.
