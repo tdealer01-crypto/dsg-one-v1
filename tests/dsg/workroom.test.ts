@@ -50,12 +50,15 @@ describe('AWS native Workroom governance', () => {
     expect(page).toContain("window.location.assign('/login?next=/dsg/workroom')");
     expect(page).toContain('<DsgLiveWorkroom key={selected.workspace_id} />');
     expect(page).toContain('<AgentCommandCenter />');
-    expect(page).toContain('DSG Desktop Native');
-    expect(page).toContain('Secret Manager');
-    expect(page).toContain('dsg-agent-v0-qwen3-30b-a3b-t4x2');
-    expect(page).toContain('route.agent.dsg-v0.plan');
-    expect(page).toContain('action.plan · discovery only');
-    expect(page).toContain('Spacetime remains execution authority');
+    // The user-facing screen is chat-first; the technical workroom is still
+    // accessible behind an on-demand admin section, not deleted or duplicated.
+    expect(page).toContain('<DsgOperatorChat key={selected.workspace_id} />');
+    expect(page).toContain('advancedOpen && (');
+    expect(page).toContain('<DsgLiveWorkroom key={selected.workspace_id} />');
+    const workroom = readFileSync(join(root, 'components/dsg-live-workroom.tsx'), 'utf8');
+    expect(workroom).toContain("'node.agent.dsg-v0'");
+    expect(workroom).toContain("'action.plan'");
+    expect(workroom).toContain("tool('spacetime_capability_catalog', {})");
     expect(commandRoute).toContain("requireVerifiedDsgActor(req.headers, 'job:read')");
     expect(commandCenter).toContain("credentials: 'include'");
     expect(commandCenter).toContain("deploy: 'none'");
@@ -74,6 +77,9 @@ describe('AWS native Workroom governance', () => {
     expect(workroom).toContain('uniqueWorkroomRoute(available, step.capability, step.target)');
     expect(workroom).not.toContain('node.rdc-remote');
     expect(page).not.toContain('mcp.desktopcommander.app');
-    expect(page).toContain('never falls back to the hosted RDC compatibility provider');
+    expect(page).toContain('<DsgLiveWorkroom key={selected.workspace_id} />');
+    // The canonical desktop route remains pinned to DSG Native only.
+    expect(workroom).toContain("'node.desktop-native'");
+    expect(workroom).not.toContain('mcp.desktopcommander.app');
   });
 });
