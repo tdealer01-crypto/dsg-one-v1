@@ -10,7 +10,7 @@ type Turn = {
   pending?: boolean;
 };
 type Job = { id: string; goal: string; status: string; completionReportId?: string | null; createdAt?: string; updatedAt?: string };
-type ChatReply = { ok?: boolean; data?: { reply?: unknown; fallback?: boolean; provider?: string; model?: string; modelStatus?: string }; error?: { code?: string; message?: string } };
+type ChatReply = { ok?: boolean; data?: { reply?: unknown; fallback?: boolean; provider?: string; model?: string; modelStatus?: string; memory?: { persistErrors?: string[]; savedIds?: string[] } }; error?: { code?: string; message?: string } };
 type ChatHistoryReply = { ok?: boolean; data?: { messages?: { id: string; role: 'user' | 'assistant'; text: string }[] }; error?: { code?: string; message?: string } };
 type JobReply = { ok?: boolean; data?: { id?: string; jobs?: Job[] }; error?: { code?: string; message?: string } };
 
@@ -69,7 +69,8 @@ export function DsgOperatorChat() {
         .map(item => ({ id: item.id, role: item.role, text: item.text }));
       // Preserve messages composed during hydration or currently in flight.
       updateMessages(current => [
-        ...stored.filter(item => !current.some(existing => existing.id === item.id)),
+        ...stored.filter(item => !current.some(existing =>
+          existing.id === item.id || (existing.role === item.role && existing.text === item.text))),
         ...current,
       ]);
       setHistoryIssue(null);
@@ -146,7 +147,10 @@ export function DsgOperatorChat() {
       const text = normalizeAgentChatReply(payload.data?.reply);
       setModelNotice(fallback
         ? 'โมเดล AI ยังไม่พร้อม · คำตอบนี้เป็นข้อความช่วยเหลือสำรอง ไม่ใช่ DSG v0'
-        : `ตอบด้วย ${payload.data?.model || payload.data?.provider || 'โมเดล AI'} · ไม่ใช่ Qwen DSG v0`);
+        : `โมเดลตอบจริง: ${payload.data?.model || 'ไม่ทราบรุ่น'} (${payload.data?.provider || 'ไม่ทราบ Provider'}) · ยังไม่ได้พิสูจน์ว่าคือ DSG v0`);
+      if (Array.isArray(payload.data?.memory?.persistErrors) && payload.data.memory.persistErrors.length) {
+        setHistoryIssue('เซิร์ฟเวอร์ยังบันทึกบทสนทนาไม่ได้ กรุณาตรวจระบบความจำ');
+      }
       updateMessages(previous => previous.map(item => item.id === replyId
         ? { ...item, text: fallback ? `[โมเดล AI ไม่พร้อม]\n${text}` : text, pending: false } : item));
     } catch (error) {
