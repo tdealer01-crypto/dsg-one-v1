@@ -1,85 +1,85 @@
-# DSG ONE — Operator navigation truth audit (2026-10-19)
+# DSG ONE — User-first UX and route truth audit (2026-10-19)
 
-## Decision
+## Goal
 
-Use **one primary operator route**: `/dsg/workroom` (gateway to the existing
-AWS operator surface), with `/dsg/app-builder` for app creation and
-`/dsg/approvals` for pending human decisions.
+A nontechnical customer sees a single natural-language conversation:
+**สั่งงาน → เอเจนต์ตอบ → ติดตามผล**. They can keep chatting or enqueue
+another request without waiting for any earlier reply. Backend plans, policies,
+approval receipts, route names and evidence remain internal unless their
+attention or troubleshooting is genuinely needed.
 
-`/dsg/autonomous-level` is a capability/evidence **report**, not an
-execution console. `/dsg/governance` is reference/audit information.
+The main route is `/dsg/workroom`. This branch introduces
+`DsgOperatorChat` and hides legacy operators behind an optional,
+on-demand section. The app's other routes remain available.
 
-These routes have source implementations in this repository, but this UI
-classification does **not** prove provider E2E or owner-session usability.
+## Actual user-facing routes
 
-## Source-audited user-facing routes
+Use readiness states **PASS**, **REVIEW**, **BLOCKED**. A source
+implementation is not a production E2E proof.
 
-| Route | Role | Source observation | Readiness |
+| Route / function | Verified source observation | Readiness | nextAction |
 |---|---|---|---|
-| `/dsg/workroom` | Operator workspace | Includes workroom status and links to AWS `/control/`, and Cinema | SOURCE_FOUND; LIVE_E2E_NOT_VERIFIED |
-| `/dsg/app-builder` | Build/plan workspace | Has app-builder workspace, templates and proof panels | SOURCE_FOUND; FULL_BUILD_DEPLOY_E2E_NOT_VERIFIED |
-| `/dsg/approvals` | Human approval | Auth0 approval page; PR #227 released earlier | DEPLOYED; LIVE_APPROVAL_E2E_NOT_VERIFIED |
-| `/dsg/autonomous-level` | Readiness report | Calls `evaluateDsgAutonomousLevelGate()` | STATUS_ONLY |
-| `/dsg/governance` | Reference | CCVS control catalog | REFERENCE_ONLY |
-| `/dsg/action-layer` | Agent Nexus / Telemetry | Shows orchestrator snapshot; not a genuine My Apps catalog | NOT_MY_APPS |
-| `/dsg/history` | Example timeline | Contains `MOCK_BUILDS` | SAMPLE_NOT_PRODUCTION |
-| `/dsg/analytics` | Example metrics | Contains static build/provider sample records | SAMPLE_NOT_PRODUCTION |
-| `/dsg/notifications` | Notifications UI | Repo AGENTS.md states associated API is mock | SAMPLE_NOT_PRODUCTION |
-| `/dsg/flow-studio` | Planning interface | Includes a legacy Vercel sample action | SECONDARY_REVIEW |
-| `/dsg/templates`, `/dsg/api-keys`, `/dsg/settings` | Secondary utilities | Present in repository | NOT_LIVE_VERIFIED |
+| `/dsg/workroom` conversational UI | `DsgOperatorChat` calls the existing authenticated `/api/dsg/agent-chat` and lists durable `/api/dsg/jobs` | REVIEW | Deploy current source, test real owner chat and confirm backend session |
+| Multiple conversations | Each chat reply has an independent pending state; composer does not globally lock | REVIEW | Verify 2 simultaneous live replies, out-of-order completion, and continuity on Android |
+| Work requests | Explicit natural-language directives submit a durable job through the authenticated `POST /api/dsg/jobs` API; creation does not start AWS execution | REVIEW | Integrate and E2E-test an actual AWS worker/dispatcher, plan, provider execution and signed evidence |
+| Task results | UI polls real `GET /api/dsg/jobs`; a completion report is distinguished from a bare completed state | REVIEW | Verify a real completed job with linked evidence |
+| `/dsg/approvals` | Dedicated Auth0 approval page; merged PR #227 and verified AWS Ship previously | REVIEW | Test a real human-approved request and evidence chain |
+| `/dsg/app-builder` | Builder UI, templates and proof panels exist | REVIEW | Verify real end-to-end build/deploy against AWS |
+| `/dsg/autonomous-level` | Capability report from `evaluateDsgAutonomousLevelGate` | PASS | Keep marked report-only; no user-facing execute claims |
+| `/dsg/governance` | Control catalog UI exists | PASS | Keep under advanced |
+| `/dsg/action-layer` | Agent Nexus / Telemetry snapshot, not a genuine My Apps catalog | REVIEW | Wire real app listing before using the My Apps label |
+| `/dsg/history` | `MOCK_BUILDS` fixtures and explicit sample warning | REVIEW | Replace fixtures with verified database/job history |
+| `/dsg/analytics` | Static chart and cost numbers, explicitly marked sample | REVIEW | Replace with real authenticated metrics before production claims |
+| `/dsg/notifications` | UI renders static fixture data; backend `GET/PATCH /api/dsg/notifications` already queries `dsg_notifications` | REVIEW | Connect existing live API to UI; do not rebuild it |
+| `/dsg/flow-studio` | Planner UI retains Vercel-era example | REVIEW | Use current AWS endpoints/route catalog |
+| `/dsg/settings` | No page implementation found; old sidebar target invalid | BLOCKED | Do not link to missing route; link account/workspace to existing `/dsg/access` |
+| `/dsg/access` | Existing session/workspace access route referenced by current Workroom | REVIEW | Verify owner navigation after deployment |
 
-## AppDeploy is not a second AWS authority
+## Data provenance and limits
 
-AppDeploy account lists 8 deployed/ready apps at audit time. AppDeploy
-deployed/ready means the app build is served; it does not prove its DSG
-provider execution works:
+- Chat response endpoint: `POST /api/dsg/agent-chat` (authenticated user,
+  stored memory when configured, provider fallback explicitly reported).
+- Durable job creation: `POST /api/dsg/jobs`, workspace-scoped
+  `dsg_create_runtime_job` RPC. **Not execution.**
+- Task readback: `GET /api/dsg/jobs`, workspace-scoped Supabase records.
+  A job's reported status is not fabricated client progress.
+- No additional Auth0 application, owner approval layer, secret,
+  anonymous executor, or alternate control plane is introduced.
+- On workroom route no global sidebar/mobile admin drawer. Advanced existing
+  Workroom, Cinema and technical panels mount only if explicitly opened.
+- Existing AWS Governance remains authoritative. This UI change cannot
+  claim provider execution without a worker event and signed evidence.
 
-- `dsg-one-public-recovery-g35ayy`: recovery/access workspace. Backend
-  references `https://dsg.pics/control` and has an app-scoped workroom
-  bridge secret name configured; real AWS authenticated execution is unverified.
-- `dsg-exact-mcp-runtime-wniyu0`: deterministic `dsg_exact_select` tool;
-  does not mutate AWS.
+## AppDeploy classification
+
+Eight deployed AppDeploy apps were observed at inspection time. Their READY
+status verifies deployment, not governed AWS execution.
+
+- `dsg-one-public-recovery-g35ayy`: external access/workroom bridge; its
+  app-scoped `DSG_WORKROOM_ACCESS_KEY` secret name exists but real AWS
+  owner-scoped action E2E was not verified.
+- `dsg-exact-mcp-runtime-wniyu0`: deterministic read-only
+  `dsg_exact_select` MCP.
 - `dsg-spacetime-ir4a2m`, `dsg-one-private-briefing-gip5su`,
-  `dsg-one-3d-architecture-sio3tq`: source-linked reference/briefing pages.
-- `dsg-scientific-discovery-engine-v3-1ucbdj`: its source explicitly reports
-  Plan/Approval `LOCKED`; its public check does not authenticate execution.
-- `dsg-unified-data-monitoring-nnlke4`: old monitoring snapshot retains
-  retired control-plane repository references and has no bound backend secrets
-  in the checked AppDeploy app; not the AWS execution authority.
-- `ai-project-readiness-check-f4psgp`: separate general-purpose checklist.
+  `dsg-one-3d-architecture-sio3tq`: reference/briefing surfaces.
+- `dsg-scientific-discovery-engine-v3-1ucbdj`: its source reports
+  Plan/Approval LOCKED and does not execute them.
+- `dsg-unified-data-monitoring-nnlke4`: old observer that still references
+  a retired control-plane repo; it is not AWS Spacetime execution authority.
+- `ai-project-readiness-check-f4psgp`: unrelated checklist.
 
-Do not delete apps, change domains or replace AWS endpoints as part of
-a navigation-only cleanup. Do not present sample analytics or mock history
-as real production success.
+No AppDeploy app is deleted or reconfigured by this PR. AWS remains runtime
+authority; the AppDeploy account is separate.
 
-## UI change and acceptance
+## Acceptance
 
-- Main sidebar: **one primary page, "คุยกับ DSG ONE" (/dsg/workroom)**.
-- Workroom displays a natural-language conversation and a separate list of
-  persisted jobs returned from `GET /api/dsg/jobs`. The composer remains
-  interactive while multiple independent chat responses or job submissions
-  are pending.
-- Sending a chat calls the existing `POST /api/dsg/agent-chat` backend.
-- "มอบหมายเป็นงาน" creates a durable work item with `POST /api/dsg/jobs`.
-  The job list refreshes every 10 seconds without interrupting conversation.
-- **Important technical gap:** Creating a durable job is not automatically
-  dispatching an AWS provider. Existing job creation persists a goal but
-  does not by itself prove plan/execute/evidence. Never claim automatic
-  execution until a verified dispatcher, worker and provider receipt exist.
-- The separate technical Workroom, App Builder, Approvals, Governance and
-  system reporting pages remain reachable under a collapsed operator menu.
-  Sample History/Analytics are labeled as sample, never production.
-- No extra approval, authentication credential, or Auth0 login is added.
-  Actual AWS execution and approval policy remain unchanged.
-
-Run:
 ```bash
-npx vitest run tests/dsg/sidebar-touch-navigation.test.ts tests/dsg/conversational-workroom-ux.test.ts
+npx vitest run tests/dsg/sidebar-touch-navigation.test.ts tests/dsg/operator-chat-first.test.ts
 npm run dsg:typecheck
 npm run lint
 ```
 
-**Truth labels:** SOURCE_CHANGED once PR is updated; TESTED only after the
-actual CI step succeeds; DEPLOYED only after AWS exact-source build, security
-scan, Ship and public SHA readback; LIVE_E2E only when owner operations and
-provider evidence are actually observed.
+For production, accept only exact-head CI, immutable image build + ECR scan,
+Ship success, serving SHA verification and a real owner session test.
+`SOURCE_CHANGED`, `TESTED`, `DEPLOYED`, `LIVE_E2E` are
+separate milestones and must not be conflated.
