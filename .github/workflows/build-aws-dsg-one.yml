@@ -20,6 +20,7 @@ on:
       - "public/**"
       - "automation_spacetime/**"
       - "scripts/dsg-one-container-entrypoint.sh"
+      - "skills/dsg-autonomous-execution/**"
 
 permissions:
   contents: read
