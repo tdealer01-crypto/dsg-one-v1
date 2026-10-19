@@ -31,6 +31,9 @@ jobs:
       - name: Ising MCP regression tests
         run: npx vitest run tests/dsg/mcp-ising-route.test.ts tests/dsg/nvidia-ising.test.ts
 
+      - name: Owner Auth0 approval regression tests
+        run: npx vitest run tests/dsg/approval-client-stepup.test.ts tests/dsg/user-bound-auth0-spacetime-bridge.test.ts
+
       - name: Claim gate
         run: npm run dsg:claim-gate
 
