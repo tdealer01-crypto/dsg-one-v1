@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { PublicProductionSnapshot } from '@/components/public-production-snapshot';
 import { useCallback, useEffect, useState } from 'react';
-import { ExternalLink, RefreshCw, ShieldCheck } from 'lucide-react';
+import { ExternalLink, RefreshCw } from 'lucide-react';
 import { DsgLiveWorkroom } from '@/components/dsg-live-workroom';
+import { DsgConversationalWorkspace } from '@/components/dsg-conversational-workspace';
 import { AgentCommandCenter } from '@/components/agent-command-center';
 
 type Membership = { workspace_id: string; role: 'OWNER' | 'ADMIN' | 'OPERATOR' | 'AUDITOR' | 'VIEWER' };
@@ -111,14 +112,12 @@ export default function DsgWorkroomPage() {
     <main className="min-h-screen bg-slate-950 px-5 py-8 text-slate-100 md:px-8">
       <div className="mx-auto max-w-6xl">
         <header className="rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 md:p-8">
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">
-            <ShieldCheck className="h-3.5 w-3.5" /> AWS Native Workroom
-          </div>
+          
           <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <h1 className="text-3xl font-black tracking-tight md:text-5xl">สั่งงานและควบคุมรีโมต</h1>
+              <h1 className="text-3xl font-black tracking-tight md:text-5xl">คุยและสั่งงานกับ DSG ONE</h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-                ใช้ Agent v0 ผ่านภาษาธรรมชาติ ตรวจ Remote Browser และ Remote Desktop จาก workspace ของคุณ
+                บอกเป้าหมายในแชทได้เลย ระบบแสดงผลและความคืบหน้าของแต่ละงานแยกกัน โดยไม่หยุดบทสนทนา
               </p>
             </div>
             <button onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:border-slate-500">
@@ -127,8 +126,11 @@ export default function DsgWorkroomPage() {
           </div>
         </header>
 
-        <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6">
-          <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Workspace authority</div>
+        <details open={!selected} className="mt-5 rounded-2xl border border-slate-800 bg-slate-900 p-4">
+          <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-slate-300">
+            บัญชีและพื้นที่ทำงาน
+          </summary>
+          <div className="mt-3 text-xs font-semibold text-slate-400">บัญชีที่ใช้งาน</div>
           <div className="mt-2 text-lg font-black text-white">{session?.actor?.email ?? 'Loading…'}</div>
           <p className="mt-2 text-sm text-slate-400">{message}</p>
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -144,11 +146,15 @@ export default function DsgWorkroomPage() {
             })}
           </div>
           {session?.memberships?.length === 0 && <p className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">No DSG workspace membership is assigned. Workroom fails closed.</p>}
-        </section>
+        </details>
 
         {selected ? (
           <section className="mt-6 space-y-4">
-            <DsgLiveWorkroom key={selected.workspace_id} />
+            <DsgConversationalWorkspace key={selected.workspace_id} />
+            <details className="rounded-3xl border border-slate-800 bg-slate-900 p-5">
+              <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-slate-300">เครื่องมือขั้นสูงสำหรับผู้ดูแล</summary>
+              <div className="mt-4"><DsgLiveWorkroom key={selected.workspace_id} /></div>
+            </details>
             <details className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
               <summary className="cursor-pointer text-sm font-semibold">ข้อมูลการเชื่อมต่อและเครื่องมืออื่น</summary>
               <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Operator control hub</div>
@@ -184,7 +190,7 @@ export default function DsgWorkroomPage() {
           </section>
         ) : (
           <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-400">
-            Select a verified workspace before chat or operator actions become available.
+            เลือกพื้นที่ทำงานของคุณหนึ่งครั้งเพื่อเริ่มแชท หากคุณมีพื้นที่ทำงานเดียว ระบบจะเลือกให้โดยอัตโนมัติ
           </div>
         )}
 
@@ -193,9 +199,10 @@ export default function DsgWorkroomPage() {
           <div className="mt-4"><PublicProductionSnapshot compact /></div>
         </details>
 
-        <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 text-sm leading-6 text-slate-400">
+        <details className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 text-sm leading-6 text-slate-400">
+          <summary className="min-h-11 cursor-pointer text-sm font-semibold">รายละเอียดทางเทคนิคและหลักฐาน</summary>
           <strong className="text-slate-200">Truth boundary:</strong> Workroom unifies operator surfaces, not authority. DSG Desktop Native remains enrollment- and approval-gated; Agent v0 remains an external proposal provider; Secret Manager values remain server-side; CLI/chat are request surfaces. No model response, notebook state, connector reachability or secret-name listing is execution evidence by itself. Mutating browser, desktop, deployment, purchase, secret or out-of-plan actions still require the existing governance and approval path.
-        </section>
+        </details>
       </div>
     </main>
   );
