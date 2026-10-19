@@ -46,10 +46,11 @@ export function DsgConversationalWorkspace() {
     try {
       const response = await fetch('/api/dsg/jobs', { credentials: 'include', cache: 'no-store' });
       const body = await response.json() as JobsPayload;
-      if (!response.ok || !body.ok || !Array.isArray(body.data?.jobs)) {
+      const loadedJobs = body.data?.jobs;
+      if (!response.ok || !body.ok || !Array.isArray(loadedJobs)) {
         throw new Error(body.error?.message || body.error?.code || 'ตรวจรายการงานไม่ได้');
       }
-      setJobs(body.data.jobs);
+      setJobs(loadedJobs);
       setJobsError('');
     } catch (error) {
       setJobsError(errorText(error));
@@ -188,7 +189,7 @@ export function DsgConversationalWorkspace() {
               <article key={job.id} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
                 <p className="line-clamp-2 text-sm font-medium">{job.goal}</p>
                 <p className="mt-1 text-xs text-slate-400">{publicJobState(job)}</p>
-                {(FAILED.has(job.status.toUpperCase()) || WAITING.has(job.status.toUpperCase())) && (
+                {WAITING.has(job.status.toUpperCase()) && (
                   <a href="/dsg/approvals" className="mt-2 inline-block text-xs text-indigo-300">ดูรายละเอียดหรือคำขออนุมัติ</a>
                 )}
               </article>
