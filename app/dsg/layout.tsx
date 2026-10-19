@@ -21,34 +21,31 @@ import {
 
 const navSections = [
   {
-    label: 'Build',
+    label: 'เริ่มต้น',
     items: [
-      { label: 'App Builder', href: '/dsg/app-builder', iconName: 'sparkles' },
-      { label: 'Templates', href: '/dsg/templates', iconName: 'layoutTemplate' },
-      { label: 'Flow Studio', href: '/dsg/flow-studio', iconName: 'gitBranch' },
-    ],
-  },
-  {
-    label: 'Manage',
-    items: [
-      { label: 'My Apps', href: '/dsg/action-layer', iconName: 'layoutGrid' },
-      { label: 'History', href: '/dsg/history', iconName: 'history' },
-      { label: 'API Keys', href: '/dsg/api-keys', iconName: 'key' },
-    ],
-  },
-  {
-    label: 'Insights',
-    items: [
-      { label: 'Analytics', href: '/dsg/analytics', iconName: 'barChart2' },
-      { label: 'Governance', href: '/dsg/governance', iconName: 'shield' },
-      { label: 'Autonomous Level', href: '/dsg/autonomous-level', iconName: 'cpu' },
+      { label: 'คุยกับ DSG ONE', href: '/dsg/workroom', iconName: 'cpu' },
     ],
   },
 ];
 
+// Customers start in a single conversation. Technical and sample routes are
+// preserved for owners/operators, but do not compete with chat as entry points.
+const advancedItems = [
+  { label: 'สร้างแอป · App Builder', href: '/dsg/app-builder', iconName: 'sparkles' },
+  { label: 'คำขออนุมัติ · Approvals', href: '/dsg/approvals', iconName: 'shield' },
+  { label: 'รายงานความสามารถ', href: '/dsg/autonomous-level', iconName: 'barChart2' },
+  { label: 'Governance · อ้างอิง', href: '/dsg/governance', iconName: 'shield' },
+  { label: 'Templates · คลังตัวอย่าง', href: '/dsg/templates', iconName: 'layoutTemplate' },
+  { label: 'Flow Studio · วางแผน', href: '/dsg/flow-studio', iconName: 'gitBranch' },
+  { label: 'Agent Nexus · Telemetry', href: '/dsg/action-layer', iconName: 'layoutGrid' },
+  { label: 'API Keys', href: '/dsg/api-keys', iconName: 'key' },
+  { label: 'History · ข้อมูลตัวอย่าง', href: '/dsg/history', iconName: 'history' },
+  { label: 'Analytics · ข้อมูลตัวอย่าง', href: '/dsg/analytics', iconName: 'barChart2' },
+  { label: 'Notifications · ข้อมูลตัวอย่าง', href: '/dsg/notifications', iconName: 'bell' },
+];
+
 const bottomItems = [
-  { label: 'Notifications', href: '/dsg/notifications', iconName: 'bell' },
-  { label: 'Settings', href: '/dsg/settings', iconName: 'settings' },
+  { label: 'บัญชีและพื้นที่ทำงาน', href: '/dsg/access', iconName: 'settings' },
 ];
 
 function NavIcon({ name }: { name: string }) {
@@ -122,6 +119,25 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
             })}
           </div>
         ))}
+        <details open={advancedItems.some(item => pathname === item.href || pathname.startsWith(item.href + '/'))} className="mx-2 mt-4 rounded-xl border border-slate-800 px-1 py-2">
+          <summary className="min-h-11 cursor-pointer touch-manipulation px-3 py-2 text-sm font-medium text-slate-300">
+            เมนูผู้ดูแลและข้อมูลเพิ่มเติม
+          </summary>
+          <div className="mt-2 space-y-1">
+            {advancedItems.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(item.href + '/');
+              return (
+                <a key={item.href} href={item.href} aria-current={active ? 'page' : undefined}
+                  className={`flex min-h-11 touch-manipulation items-center gap-2.5 rounded-lg px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${
+                    active ? 'bg-indigo-500/15 text-indigo-200' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}>
+                  <NavIcon name={item.iconName} />
+                  {item.label}
+                </a>
+              );
+            })}
+          </div>
+        </details>
       </nav>
 
       {/* bottom */}
@@ -157,17 +173,21 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 }
 
 export default function DsgLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  // Hide all administration navigation from the conversational home surface.
+  // The routes still exist and are available through its advanced section.
+  const chatFirst = pathname === '/dsg/workroom';
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="flex h-dvh min-h-0 overflow-hidden bg-slate-950 text-slate-100">
       {/* desktop sidebar */}
-      <div className="dsg-sidebar-desktop hidden h-full md:flex">
+      {!chatFirst && <div className="dsg-sidebar-desktop hidden h-full md:flex">
         <Sidebar />
-      </div>
+      </div>}
 
       {/* mobile overlay */}
-      {mobileOpen && (
+      {!chatFirst && mobileOpen && (
         <div className="dsg-sidebar-mobile-overlay fixed inset-0 z-50 flex md:hidden">
           <Sidebar onClose={() => setMobileOpen(false)} />
           <div
@@ -179,7 +199,7 @@ export default function DsgLayout({ children }: { children: React.ReactNode }) {
 
       {/* main area */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="dsg-sidebar-mobile-header flex h-14 shrink-0 items-center border-b border-slate-800 px-4 md:hidden">
+        {!chatFirst && <div className="dsg-sidebar-mobile-header flex h-14 shrink-0 items-center border-b border-slate-800 px-4 md:hidden">
           <button
             onClick={() => setMobileOpen(true)}
             className="flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
@@ -190,7 +210,7 @@ export default function DsgLayout({ children }: { children: React.ReactNode }) {
           <span className="ml-3 text-xs font-black uppercase tracking-widest text-white">
             DSG ONE
           </span>
-        </div>
+        </div>}
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>

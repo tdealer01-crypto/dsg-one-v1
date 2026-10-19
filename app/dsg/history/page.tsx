@@ -133,6 +133,11 @@ export default function BuildHistoryPage() {
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+      <aside role="note" className="mx-auto mb-4 max-w-6xl rounded-2xl border border-amber-400/50 bg-amber-500/10 p-4 text-sm text-amber-100">
+        <strong>ตัวอย่างประวัติ Build — ไม่ใช่ข้อมูลจริง</strong>
+        <p className="mt-1">รายการ Build ด้านล่างเป็นข้อมูลตัวอย่าง ไม่ใช่ประวัติ Deploy ของ DSG ONE จริง</p>
+        <a href="/dsg/workroom" className="mt-2 inline-block underline">กลับไปแชท DSG ONE</a>
+      </aside>
       <div className="mx-auto max-w-5xl space-y-6">
 
         {/* Header */}

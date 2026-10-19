@@ -7,15 +7,18 @@ const layout = readFileSync(join(root, 'app/dsg/layout.tsx'), 'utf8');
 const css = readFileSync(join(root, 'app/globals.css'), 'utf8');
 
 const entries = [
-  ['/dsg/app-builder', 'App Builder'],
-  ['/dsg/templates', 'Templates'],
-  ['/dsg/flow-studio', 'Flow Studio'],
-  ['/dsg/action-layer', 'My Apps'],
-  ['/dsg/history', 'History'],
+  ['/dsg/workroom', 'คุยกับ DSG ONE'],
+  ['/dsg/app-builder', 'สร้างแอป · App Builder'],
+  ['/dsg/approvals', 'คำขออนุมัติ · Approvals'],
+  ['/dsg/autonomous-level', 'รายงานความสามารถ'],
+  ['/dsg/governance', 'Governance · อ้างอิง'],
+  ['/dsg/templates', 'Templates · คลังตัวอย่าง'],
+  ['/dsg/flow-studio', 'Flow Studio · วางแผน'],
+  ['/dsg/action-layer', 'Agent Nexus · Telemetry'],
   ['/dsg/api-keys', 'API Keys'],
-  ['/dsg/analytics', 'Analytics'],
-  ['/dsg/governance', 'Governance'],
-  ['/dsg/autonomous-level', 'Autonomous Level'],
+  ['/dsg/history', 'History · ข้อมูลตัวอย่าง'],
+  ['/dsg/analytics', 'Analytics · ข้อมูลตัวอย่าง'],
+  ['/dsg/notifications', 'Notifications · ข้อมูลตัวอย่าง'],
 ];
 
 describe('DSG navigation on touch and Android embedded browsers', () => {
@@ -27,6 +30,26 @@ describe('DSG navigation on touch and Android embedded browsers', () => {
     expect(layout).toContain('href={item.href}');
     expect(layout).not.toContain("import Link from 'next/link'");
     expect(layout).not.toContain('<Link');
+  });
+
+  it('puts the real work surfaces first and hides sample views in secondary navigation', () => {
+    const primary = layout.slice(layout.indexOf('const navSections = ['),
+      layout.indexOf('const advancedItems = ['));
+    const secondary = layout.slice(layout.indexOf('const advancedItems = ['),
+      layout.indexOf('const bottomItems = ['));
+    expect(primary).toContain("href: '/dsg/workroom'");
+    expect(primary).toContain("label: 'คุยกับ DSG ONE'");
+    expect(primary).not.toContain("href: '/dsg/app-builder'");
+    expect(primary).not.toContain("href: '/dsg/approvals'");
+    expect(secondary).toContain("href: '/dsg/app-builder'");
+    expect(secondary).toContain("href: '/dsg/approvals'");
+    expect(primary).not.toContain("href: '/dsg/history'");
+    expect(primary).not.toContain("href: '/dsg/analytics'");
+    expect(primary).not.toContain("label: 'My Apps'");
+    expect(secondary).toContain('History · ข้อมูลตัวอย่าง');
+    expect(secondary).toContain('Analytics · ข้อมูลตัวอย่าง');
+    expect(secondary).toContain('Agent Nexus · Telemetry');
+    expect(layout).toContain('<details open={advancedItems.some(');
   });
 
   it('does not unmount a mobile menu link during the Next router click', () => {

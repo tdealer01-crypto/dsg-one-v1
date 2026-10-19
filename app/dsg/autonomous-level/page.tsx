@@ -27,6 +27,24 @@ export default function DsgAutonomousLevelPage() {
           </div>
         </section>
 
+        <section aria-label="ทางเข้าใช้งาน DSG ONE" className="rounded-2xl border border-indigo-400/30 bg-slate-900 p-5">
+          <h2 className="text-xl font-bold">ต้องการสั่งงานหรือสร้างแอป?</h2>
+          <p className="mt-2 text-sm text-slate-300">
+            หน้านี้เป็นรายงานความพร้อม ไม่ใช่หน้า Execute งานจริง เลือกจุดเริ่มต้นเพียงหนึ่งอย่างด้านล่าง
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <a href="/dsg/workroom" className="rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white">
+              สั่งงาน · Workroom
+            </a>
+            <a href="/dsg/app-builder" className="rounded-lg border border-indigo-500 px-4 py-3 text-sm text-indigo-100">
+              สร้างแอป · App Builder
+            </a>
+            <a href="/dsg/approvals" className="rounded-lg border border-slate-600 px-4 py-3 text-sm text-slate-100">
+              อนุมัติคำขอ · Approvals
+            </a>
+          </div>
+        </section>
+
         <section className="rounded-2xl border border-slate-700 bg-slate-900 p-4">
           <h2 className="font-semibold">User-bound Human Approval</h2>
           <p className="mt-2 text-sm text-slate-300">ตรวจและอนุมัติเฉพาะงานที่ผูกกับบัญชี Auth0 ของคุณ — ไม่ใช้ internal key</p>
