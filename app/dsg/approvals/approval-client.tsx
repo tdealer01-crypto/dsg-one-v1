@@ -57,7 +57,6 @@ function isReviewIntent(value: unknown): value is ReviewIntent {
 export default function ApprovalClient() {
   const client = useRef<Auth0Client | null>(null);
   const reviewedApprovalId = useRef<string | null>(null);
-  const [siteReady, setSiteReady] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [tokenReady, setTokenReady] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -65,22 +64,17 @@ export default function ApprovalClient() {
   const [requestedApprovalId, setRequestedApprovalId] = useState<string | null>(null);
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [selected, setSelected] = useState<Approval | null>(null);
-  const [status, setStatus] = useState('กำลังตรวจสอบสิทธิ์เว็บไซต์ DSG ONE');
+  const [status, setStatus] = useState('กำลังตรวจสอบเซสชัน Auth0 สำหรับการอนุมัติ');
 
   useEffect(() => {
     let live = true;
     async function initialize() {
       try {
-        const session = await fetch('/api/dsg/identity/link', {
-          credentials: 'include', cache: 'no-store',
-        });
-        const data = await session.json() as { ok?: boolean; linked?: boolean };
-        if (!session.ok || !data.ok || !data.linked) {
-          if (live) setStatus('ต้องเข้าสู่ระบบ DSG ONE และเชื่อมบัญชี Auth0 ที่ /dsg/autonomous-level ก่อน');
-          return;
-        }
+        // The human-approver Auth0 credential is independently verified by
+        // the website relay and AWS. A second Supabase/site login here caused
+        // a redirect loop, especially when returning from MFA on Android.
+        // Do not block the Auth0 callback on an unrelated website session.
         if (!live) return;
-        setSiteReady(true);
         const c = await createAuth0Client({
           domain: 'dev-kcddqmnusbxxo25s.us.auth0.com',
           clientId: 'jI1uiKcQu7mqORsaCrogKTQVsAcZuQSt',
@@ -199,7 +193,7 @@ export default function ApprovalClient() {
   }
 
   async function startStepUp(intent: StepUpIntent) {
-    if (!client.current || !siteReady) return;
+    if (!client.current || !authReady) return;
     setBusy(true);
     setStatus(intent.kind === 'approve'
       ? 'กำลังเปิด Auth0 ยืนยัน MFA ก่อนอนุมัติ (จะกลับมาหน้านี้อัตโนมัติ)'
@@ -351,15 +345,15 @@ export default function ApprovalClient() {
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
       <section className="mx-auto max-w-3xl space-y-5 rounded-2xl border border-slate-700 bg-slate-900 p-5">
         <h1 className="text-2xl font-bold">DSG · คำขออนุมัติจากผู้ใช้จริง</h1>
-        <p className="text-sm text-slate-300">ใช้บัญชี Auth0 ที่ผูกกับ DSG ONE ของคุณ ไม่ใช้ Owner key หรือ internal key แทน</p>
+        <p className="text-sm text-slate-300">ใช้บัญชี Auth0 ของคุณเพื่ออนุมัติผ่าน AWS Spacetime โดยตรง ไม่ต้องเข้าสู่ระบบเว็บไซต์ซ้ำและไม่ใช้ Owner key หรือ internal key</p>
         <p role="status" aria-live="polite" className="rounded-lg border border-slate-700 p-3 text-sm">{status}</p>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => void login()} disabled={!siteReady || !authReady || busy}
+          <button type="button" onClick={() => void login()} disabled={!authReady || busy}
             className="rounded-lg bg-indigo-600 px-4 py-2 disabled:opacity-40">เข้าสู่ระบบเพื่ออนุมัติ</button>
           <button type="button" onClick={() => void checkMfaWithoutApproval()}
-            disabled={!siteReady || !authReady || busy}
+            disabled={!authReady || busy}
             className="rounded-lg border border-amber-400 px-4 py-2 disabled:opacity-40">ทดสอบ MFA (ไม่อนุมัติ)</button>
-          <button type="button" onClick={() => void load()} disabled={!siteReady || !authReady || !tokenReady || busy}
+          <button type="button" onClick={() => void load()} disabled={!authReady || !tokenReady || busy}
             className="rounded-lg border border-slate-500 px-4 py-2 disabled:opacity-40">ดูรายการรออนุมัติ</button>
           <a href="/dsg/autonomous-level" className="rounded-lg border border-slate-500 px-4 py-2">กลับหน้าสถานะระบบ</a>
         </div>
