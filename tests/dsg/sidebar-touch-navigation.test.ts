@@ -49,7 +49,7 @@ describe('DSG navigation on touch and Android embedded browsers', () => {
     expect(secondary).toContain('History · ข้อมูลตัวอย่าง');
     expect(secondary).toContain('Analytics · ข้อมูลตัวอย่าง');
     expect(secondary).toContain('Agent Nexus · Telemetry');
-    expect(layout).toContain('<details className=');
+    expect(layout).toContain('<details open={advancedItems.some(');
   });
 
   it('does not unmount a mobile menu link during the Next router click', () => {
