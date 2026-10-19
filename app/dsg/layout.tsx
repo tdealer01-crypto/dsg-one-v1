@@ -45,7 +45,7 @@ const advancedItems = [
 ];
 
 const bottomItems = [
-  { label: 'Settings', href: '/dsg/settings', iconName: 'settings' },
+  { label: 'บัญชีและพื้นที่ทำงาน', href: '/dsg/access', iconName: 'settings' },
 ];
 
 function NavIcon({ name }: { name: string }) {
@@ -119,7 +119,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
             })}
           </div>
         ))}
-        <details className="mx-2 mt-4 rounded-xl border border-slate-800 px-1 py-2">
+        <details open={advancedItems.some(item => pathname === item.href || pathname.startsWith(item.href + '/'))} className="mx-2 mt-4 rounded-xl border border-slate-800 px-1 py-2">
           <summary className="min-h-11 cursor-pointer touch-manipulation px-3 py-2 text-sm font-medium text-slate-300">
             เมนูผู้ดูแลและข้อมูลเพิ่มเติม
           </summary>
