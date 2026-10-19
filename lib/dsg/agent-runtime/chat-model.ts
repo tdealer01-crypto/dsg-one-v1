@@ -63,6 +63,13 @@ async function callGemini(messages: OpenAIChatMessage[], maxOutputTokens: number
   return { provider: 'gemini', model, outputText, responseId: payload.responseId, usage: payload.usageMetadata };
 }
 
+function safeProviderError(error: unknown, fallback: string): string {
+  const code = error instanceof Error ? error.message : '';
+  // The external API may embed user content or partial credentials in a human
+  // error sentence. Only pass stable error codes through to the chat response.
+  return /^[A-Z][A-Z0-9_:-]{2,100}$/.test(code) ? code : fallback;
+}
+
 export async function runDsgChatModel(messages: OpenAIChatMessage[]): Promise<ChatModelResult> {
   const config = getDsgChatModelConfig();
   let primaryError = 'OPENAI_API_KEY_MISSING';
@@ -72,14 +79,14 @@ export async function runDsgChatModel(messages: OpenAIChatMessage[]): Promise<Ch
       if (!result.outputText.trim()) throw new Error('OPENAI_CHAT_EMPTY_RESPONSE');
       return result;
     } catch (error) {
-      primaryError = error instanceof Error ? error.message : 'OPENAI_CHAT_UNAVAILABLE';
+      primaryError = safeProviderError(error, 'OPENAI_CHAT_UNAVAILABLE');
     }
   }
   if (config.gemini) {
     try {
       return await callGemini(messages, 1800);
     } catch (error) {
-      const code = error instanceof Error ? error.message : 'GEMINI_CHAT_UNAVAILABLE';
+      const code = safeProviderError(error, 'GEMINI_CHAT_UNAVAILABLE');
       throw new Error(`MODEL_PROVIDERS_UNAVAILABLE:OPENAI=${primaryError};GEMINI=${code}`);
     }
   }
