@@ -10,7 +10,8 @@ type Turn = {
   pending?: boolean;
 };
 type Job = { id: string; goal: string; status: string; completionReportId?: string | null; createdAt?: string; updatedAt?: string };
-type ChatReply = { ok?: boolean; data?: { reply?: unknown; fallback?: boolean }; error?: { code?: string; message?: string } };
+type ChatReply = { ok?: boolean; data?: { reply?: unknown; fallback?: boolean; provider?: string; model?: string; modelStatus?: string }; error?: { code?: string; message?: string } };
+type ChatHistoryReply = { ok?: boolean; data?: { messages?: { id: string; role: 'user' | 'assistant'; text: string }[] }; error?: { code?: string; message?: string } };
 type JobReply = { ok?: boolean; data?: { id?: string; jobs?: Job[] }; error?: { code?: string; message?: string } };
 
 // A directive starts a persistent job, while questions remain conversation.
@@ -44,12 +45,38 @@ export function DsgOperatorChat() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobsIssue, setJobsIssue] = useState<string | null>(null);
   const [pendingReplies, setPendingReplies] = useState(0);
+  const [historyIssue, setHistoryIssue] = useState<string | null>(null);
+  const [modelNotice, setModelNotice] = useState('กำลังตรวจสอบโมเดลจากคำตอบจริง');
   const listEnd = useRef<HTMLDivElement>(null);
 
   function updateMessages(fn: (previous: Turn[]) => Turn[]) {
     const next = fn(historyRef.current);
     historyRef.current = next;
     setMessages(next);
+  }
+
+  async function loadHistory() {
+    try {
+      const response = await fetch('/api/dsg/agent-chat', {
+        cache: 'no-store', credentials: 'include',
+      });
+      const payload = await response.json() as ChatHistoryReply;
+      if (!response.ok || !payload.ok || !Array.isArray(payload.data?.messages)) {
+        throw new Error(payload.error?.message || payload.error?.code || 'ไม่สามารถอ่านประวัติได้');
+      }
+      const stored: Turn[] = payload.data.messages
+        .filter(item => (item.role === 'user' || item.role === 'assistant') && typeof item.text === 'string')
+        .map(item => ({ id: item.id, role: item.role, text: item.text }));
+      // Preserve messages composed during hydration or currently in flight.
+      updateMessages(current => [
+        ...stored.filter(item => !current.some(existing => existing.id === item.id)),
+        ...current,
+      ]);
+      setHistoryIssue(null);
+    } catch {
+      // Do not silently say the user has no history when the database failed.
+      setHistoryIssue('ยังโหลดประวัติจากเซิร์ฟเวอร์ไม่ได้ ข้อความใหม่ยังใช้งานได้');
+    }
   }
 
   async function refreshJobs() {
@@ -68,7 +95,10 @@ export function DsgOperatorChat() {
   }
 
   useEffect(() => {
-    const initial = window.setTimeout(() => void refreshJobs(), 0);
+    const initial = window.setTimeout(() => {
+      void refreshJobs();
+      void loadHistory();
+    }, 0);
     const id = window.setInterval(() => void refreshJobs(), 12000);
     return () => {
       window.clearTimeout(initial);
@@ -112,11 +142,16 @@ export function DsgOperatorChat() {
       });
       const payload = await response.json() as ChatReply;
       if (!response.ok || !payload.ok) throw new Error(apiError(payload, 'แชทไม่พร้อมใช้งาน'));
+      const fallback = payload.data?.fallback === true || payload.data?.modelStatus === 'unavailable';
       const text = normalizeAgentChatReply(payload.data?.reply);
+      setModelNotice(fallback
+        ? 'โมเดล AI ยังไม่พร้อม · คำตอบนี้เป็นข้อความช่วยเหลือสำรอง ไม่ใช่ DSG v0'
+        : `ตอบด้วย ${payload.data?.model || payload.data?.provider || 'โมเดล AI'} · ไม่ใช่ Qwen DSG v0`);
       updateMessages(previous => previous.map(item => item.id === replyId
-        ? { ...item, text, pending: false } : item));
+        ? { ...item, text: fallback ? `[โมเดล AI ไม่พร้อม]\n${text}` : text, pending: false } : item));
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'แชทไม่พร้อมใช้งาน';
+      setModelNotice('เชื่อมโมเดลไม่ได้ · โปรดตรวจการตั้งค่า AI บนเซิร์ฟเวอร์');
       updateMessages(previous => previous.map(item => item.id === replyId
         ? { ...item, text: `ยังตอบไม่ได้: ${reason}`, pending: false } : item));
     } finally {
@@ -153,6 +188,8 @@ export function DsgOperatorChat() {
       <header className="border-b border-slate-800 px-4 py-4 sm:px-6">
         <h1 className="text-xl font-bold text-white">DSG ONE</h1>
         <p className="mt-1 text-sm text-slate-400">บอกสิ่งที่ต้องการได้เลย คุยต่อได้แม้มีงานอื่นค้างอยู่</p>
+        <p role="status" className="mt-2 text-xs text-indigo-200">{modelNotice}</p>
+        {historyIssue && <p role="alert" className="mt-2 text-xs text-amber-200">{historyIssue} <button className="underline" onClick={() => void loadHistory()}>ลองโหลดใหม่</button></p>}
       </header>
       <div role="log" aria-label="บทสนทนา" aria-live="polite" className="min-h-[40dvh] flex-1 space-y-3 overflow-y-auto px-3 py-5 sm:px-6">
         {messages.length === 0 && <p className="max-w-lg rounded-2xl bg-slate-950 p-4 text-sm text-slate-300">
