@@ -11,6 +11,8 @@ and left the owner repeating sign-in steps.
 
 - `/dsg/approvals` initializes and completes the dedicated Auth0 approver
   login/redirect independently of the site session.
+- `middleware.ts` allows **only** `/dsg/approvals` (and trailing slash) as an OAuth callback landing route; other `/dsg` pages retain the site gate.
+- `/api/dsg/approvals/mfa-check` validates the signed approver JWT and fresh MFA claim without an additional site session, returns a boolean only, and has no AWS write side effects.
 - `/api/dsg/spacetime/user-tools` accepts the three human-approval tools with
   a verified, **approve-only** Auth0 JWT instead of requiring a second Supabase
   website session and identity-link lookup.
@@ -37,7 +39,7 @@ tool or provider health.
 
 Run:
 ```bash
-npm test -- tests/dsg/approval-client-stepup.test.ts tests/dsg/user-bound-auth0-spacetime-bridge.test.ts
+npm test -- tests/dsg/approval-client-stepup.test.ts tests/dsg/approval-middleware-callback.test.ts tests/dsg/auth0-approver-mfa-readonly-route.test.ts tests/dsg/user-bound-auth0-spacetime-bridge.test.ts
 npm run dsg:typecheck
 ```
 
