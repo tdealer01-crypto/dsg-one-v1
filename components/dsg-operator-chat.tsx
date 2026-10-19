@@ -68,9 +68,12 @@ export function DsgOperatorChat() {
   }
 
   useEffect(() => {
-    void refreshJobs();
+    const initial = window.setTimeout(() => void refreshJobs(), 0);
     const id = window.setInterval(() => void refreshJobs(), 12000);
-    return () => window.clearInterval(id);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(id);
+    };
   }, []);
 
   useEffect(() => {
