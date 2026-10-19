@@ -7,10 +7,10 @@ const layout = readFileSync(join(root, 'app/dsg/layout.tsx'), 'utf8');
 const css = readFileSync(join(root, 'app/globals.css'), 'utf8');
 
 const entries = [
-  ['/dsg/workroom', 'Workroom · สั่งงาน'],
-  ['/dsg/app-builder', 'App Builder · สร้างแอป'],
-  ['/dsg/approvals', 'Approvals · อนุมัติ'],
-  ['/dsg/autonomous-level', 'Autonomous Level · รายงาน'],
+  ['/dsg/workroom', 'คุยกับ DSG ONE'],
+  ['/dsg/app-builder', 'สร้างแอป · App Builder'],
+  ['/dsg/approvals', 'คำขออนุมัติ · Approvals'],
+  ['/dsg/autonomous-level', 'รายงานความสามารถ'],
   ['/dsg/governance', 'Governance · อ้างอิง'],
   ['/dsg/templates', 'Templates · คลังตัวอย่าง'],
   ['/dsg/flow-studio', 'Flow Studio · วางแผน'],
@@ -38,8 +38,11 @@ describe('DSG navigation on touch and Android embedded browsers', () => {
     const secondary = layout.slice(layout.indexOf('const advancedItems = ['),
       layout.indexOf('const bottomItems = ['));
     expect(primary).toContain("href: '/dsg/workroom'");
-    expect(primary).toContain("href: '/dsg/app-builder'");
-    expect(primary).toContain("href: '/dsg/approvals'");
+    expect(primary).toContain("label: 'คุยกับ DSG ONE'");
+    expect(primary).not.toContain("href: '/dsg/app-builder'");
+    expect(primary).not.toContain("href: '/dsg/approvals'");
+    expect(secondary).toContain("href: '/dsg/app-builder'");
+    expect(secondary).toContain("href: '/dsg/approvals'");
     expect(primary).not.toContain("href: '/dsg/history'");
     expect(primary).not.toContain("href: '/dsg/analytics'");
     expect(primary).not.toContain("label: 'My Apps'");
