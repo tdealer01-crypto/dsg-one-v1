@@ -14,6 +14,12 @@ describe('human approval step-up transport', () => {
     expect(SOURCE).not.toContain('getTokenWithPopup');
   });
 
+  it('does not require a second Supabase site session before the Auth0 callback', () => {
+    expect(SOURCE).toContain('handleRedirectCallback');
+    expect(SOURCE).not.toContain("fetch('/api/dsg/identity/link'");
+    expect(SOURCE).not.toContain('siteReady');
+  });
+
   it('keeps the step-up bearer token out of browser storage and URLs', () => {
     expect(SOURCE).toContain('getTokenSilently');
     expect(SOURCE).toContain('the bearer token remains in memory');
