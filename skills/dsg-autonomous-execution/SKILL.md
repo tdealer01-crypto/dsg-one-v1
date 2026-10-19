@@ -1,3 +1,8 @@
+---
+name: dsg-autonomous-execution
+description: Governed deterministic T0-T4 execution with input locking, DAG dependencies, parallel work, reproducible merge and evidence verification using configured AWS Spacetime capabilities.
+---
+
 # DSG Autonomous Execution Skill
 
 ## Purpose
@@ -12,7 +17,16 @@ Use this skill for DSG autonomous work where speed is useful but correctness is 
 - User benefit comes first: the output must be usable, testable, and visibly tied to evidence.
 - Empty diagnostic output is not proof of success.
 - A failed evaluator, missing exit code, broken linter, broken test runner, or unknown tool state blocks repair and release.
-- Framer is the public presentation layer; privileged DSG runtime/API/proof execution stays server-side on Render or other governed backend services.
+- DSG ONE's website is the user-facing surface, not the privileged execution authority. The intended execution backend is AWS Spacetime; do not use retired hosting or control-plane fallbacks.
+- Keep the existing plan, owner-approval, authentication and evidence boundaries. This skill must not invent an additional approval gate or silently bypass a current one.
+
+## Runtime routing and proof boundary
+
+- AWS Spacetime MCP: `https://aws.dsg.pics/mcp`. It is an OAuth-protected MCP protocol endpoint, **not** a REST base URL. Discover the live tool list and its input contracts before attempting execution.
+- DSG ONE web/UI routes, including `/dsg/autonomous-level` and `/api/dsg/autonomous-level/status`, belong to the website's HTTP application. They must **not** be appended to `/mcp`.
+- For web route smoke tests, explicitly set `DSG_ONE_WEB_BASE_URL` to a currently verified HTTPS website origin. No provider hostname is assumed to be healthy merely because it is in documentation.
+- For governed execution, use only capabilities actually available on the connected AWS Spacetime MCP session with the existing plan/approval rules. If a required tool is missing, report `BLOCKED` with the exact missing capability and required next step; do not substitute mock output.
+- Keep T0-T4 data, dependencies, execution receipts and merge proofs tied to a single immutable run identity. HTTP status alone is not execution or production evidence.
 
 ## Core deterministic pipeline
 
@@ -100,7 +114,7 @@ For repair or release promotion, at least one verifier must differ from the sour
 Examples:
 
 - source tool: local lint, independent verifier: CI lint
-- source tool: local build, independent verifier: Render deployment/build evidence for the exact commit
+- source tool: local build, independent verifier: independent CI build for the exact commit; separately correlate the AWS release manifest and runtime smoke evidence before claiming deployment
 - source tool: agent repair result, independent verifier: human review or secondary toolchain
 
 The independent verifier must include:
@@ -250,10 +264,24 @@ npm run build:termux
 ## Default production smoke commands
 
 ```bash
-BASE="https://dsg-one-v1-aimo.onrender.com"
+# Set only after verifying the HTTPS origin and exact deployed revision.
+: "${DSG_ONE_WEB_BASE_URL:?BLOCK: set a verified DSG ONE website HTTPS origin (not the MCP URL)}"
+BASE="${DSG_ONE_WEB_BASE_URL%/}"
+case "$BASE" in
+  https://*) ;;
+  *) echo "BLOCK: website smoke requires HTTPS"; exit 1 ;;
+esac
+case "$BASE" in
+  */mcp|*/mcp/*) echo "BLOCK: MCP is not a web REST base"; exit 1 ;;
+esac
 
 for p in /dsg/autonomous-level /api/dsg/autonomous-level/status /dsg/flow-studio /api/dsg/flow-studio/config; do
-  code=$(curl -L -s -o /tmp/dsg-skill-check.html -w "%{http_code}" "$BASE$p")
-  echo "$code $p"
+  code=$(curl --location --silent --show-error --output /tmp/dsg-skill-check.html --write-out "%{http_code}" "$BASE$p") || {
+    echo "BLOCK: request failed for $p"
+    exit 1
+  }
+  printf '%s %s\n' "$code" "$p"
 done
+# HTTP codes are observations only. Verify auth, exact deployed revision
+# and runtime/provider evidence separately before claiming a PASS.
 ```
