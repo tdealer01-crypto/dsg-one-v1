@@ -22,7 +22,6 @@ export function isWorkDirective(text: string): boolean {
   return /^(?:สร้าง|แก้ไข|แก้|ปรับปรุง|อัปเดต|อัพเดต|ตรวจสอบ|ทดสอบ|ติดตั้ง|เชื่อมต่อ|เชื่อม|เปิด|รัน|สั่งงาน|ทำงาน|จัดการ|ดีพลอย|deploy|build|พัฒนา|ค้นหา|สรุป|วิเคราะห์|ตรวจ|ทำให้)/i.test(value);
 }
 
-const finishedStatuses = new Set(['COMPLETED', 'COMPLETE', 'SUCCESS', 'SUCCEEDED', 'PASSED', 'FAILED', 'CANCELLED', 'CANCELED', 'BLOCKED']);
 function displayStatus(status: string): string {
   const code = status.toUpperCase();
   if (['COMPLETED', 'COMPLETE', 'SUCCESS', 'SUCCEEDED', 'PASSED'].includes(code)) return 'เสร็จแล้ว';
@@ -191,9 +190,11 @@ export function DsgOperatorChat() {
                 <p className="line-clamp-2 text-sm text-white">{job.goal}</p>
                 <span className="shrink-0 text-xs text-indigo-200">{displayStatus(job.status)}</span>
               </div>
-              <a href={`/dsg/jobs/${encodeURIComponent(job.id)}`} className="mt-2 inline-block text-xs text-sky-300">
-                ดูรายละเอียดงาน
-              </a>
+              <details className="mt-2 text-xs text-slate-400">
+                <summary className="cursor-pointer text-sky-300">รายละเอียดสถานะ</summary>
+                <p className="mt-2 break-all">สถานะจากระบบ: {job.status}</p>
+                <p className="mt-1 break-all">รหัสงาน: {job.id}</p>
+              </details>
             </div>
           ))}
         </div>
