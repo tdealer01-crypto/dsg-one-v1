@@ -17,6 +17,14 @@ const PROTECTED_PREFIXES = ['/dsg', '/enterprise', '/generated-apps'];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // The human approver page is a public OAuth callback landing page.
+  // No data/decision authority is granted here: all approval APIs verify a
+  // dedicated signed Auth0 JWT and AWS enforces ownership + signed MFA.
+  // Requiring a Supabase site cookie here destroys the OAuth code/state.
+  if (pathname === '/dsg/approvals' || pathname === '/dsg/approvals/') {
+    return NextResponse.next();
+  }
+
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
   if (!isProtected) return NextResponse.next();
 
