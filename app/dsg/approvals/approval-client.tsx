@@ -295,10 +295,6 @@ export default function ApprovalClient() {
     return () => window.clearTimeout(timer);
   }, [pendingStepUpIntent, finishStepUp]);
 
-  async function checkMfaWithoutApproval() {
-    await startStepUp({ kind: 'mfa_probe' });
-  }
-
   async function load() {
     setBusy(true);
     setSelected(null);
