@@ -75,8 +75,8 @@ const toolCards: Array<{
   },
   {
     name: 'DSG Agent v0 / Governed MCP',
-    description: 'Use the existing Spacetime action.plan contract: node.agent.dsg-v0 → route.agent.dsg-v0.plan. Discovery is not a successful model invocation; a verified user OAuth principal and available Kaggle worker are still required for an executable plan. Open Workroom for your goal, with all execution controlled by Spacetime.',
-    href: '/dsg/workroom',
+    description: 'Open the existing Qwen Agent v0 proposal-only action.plan panel in Workroom. The AWS Spacetime Route is configured, but the latest live test reported DSG_BRAIN_BASE_URL_INVALID: Kaggle Brain inference is NOT verified on the serving runtime. Keep provider execution and approval under Spacetime.',
+    href: '/dsg/workroom?tool=agent-v0',
     badge: 'MCP route · execution not verified',
   },
   {
