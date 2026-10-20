@@ -75,7 +75,7 @@ const toolCards: Array<{
   },
   {
     name: 'DSG Agent v0 / Governed MCP',
-    description: 'Open the existing Qwen Agent v0 proposal-only action.plan panel in Workroom. The AWS Spacetime Route is configured, but the latest live test reported DSG_BRAIN_BASE_URL_INVALID: Kaggle Brain inference is NOT verified on the serving runtime. Keep provider execution and approval under Spacetime.',
+    description: 'Open the existing Qwen Agent v0 proposal-only action.plan panel in Workroom through route.agent.dsg-v0.plan. The AWS Spacetime Route is configured, but the latest live test reported DSG_BRAIN_BASE_URL_INVALID: Kaggle Brain inference is NOT verified on the serving runtime. Keep provider execution and approval under Spacetime.',
     href: '/dsg/workroom?tool=agent-v0',
     badge: 'MCP route · execution not verified',
   },
