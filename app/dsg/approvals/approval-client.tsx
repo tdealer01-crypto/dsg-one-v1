@@ -470,7 +470,7 @@ export default function ApprovalClient() {
               โหลดหน้าอนุมัติใหม่
             </button>
           </div>
-        )
+        )}
         {!tokenReady && (
           <button type="button" onClick={() => void login()} disabled={!authReady || busy}
             className="min-h-12 w-full rounded-xl bg-indigo-600 px-4 py-3 text-base font-bold text-white disabled:opacity-40">
