@@ -108,7 +108,8 @@ describe('DSG access console session bridge', () => {
     expect(page).toContain('https://aws.dsg.pics/mcp');
     expect(page).toContain("href: '/dsg/workroom'");
     expect(page).toContain('Authenticated AWS workroom');
-    expect(page).toContain("href: 'https://aws.dsg.pics/app'");
+    expect(page).toContain("href: '/dsg/workroom?tool=browser'");
+    expect(page).toContain('The AWS /app page is Evidence & Conformance, not the Cinema viewer.');
     expect(page).toContain("href: null");
     expect(page).toContain('No verified AWS operator UI route');
     expect(page).toContain('APP HEALTHY');
