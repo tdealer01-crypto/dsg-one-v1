@@ -15,7 +15,7 @@ describe('Cinema landing -> authenticated Workroom Browser Controls', () => {
   it('routes public landing and Access Hub to existing governed controls, not Evidence Console', () => {
     expect(landing).toContain("href: '/dsg/workroom?tool=browser'");
     expect(access).toContain("href: '/dsg/workroom?tool=browser'");
-    expect(landing).toContain("title: 'Cinema Remote Browser'");
+    expect(landing).toContain("title: 'ควบคุมเว็บด้วย Cinema'");
     expect(access).toContain("name: 'Cinema / Browser'");
     expect(landing).toContain('external: false');
     expect(access).toContain('Evidence & Conformance, not the Cinema viewer');
@@ -32,7 +32,7 @@ describe('Cinema landing -> authenticated Workroom Browser Controls', () => {
   });
 
   it('opens advanced Browser Controls automatically and retains Auth0/Spacetime execution gates', () => {
-    expect(workroom).toContain("get('tool') === 'browser'");
+    expect(workroom).toContain("['browser', 'desktop'].includes");
     expect(workroom).toContain('const [advancedOpen, setAdvancedOpen] = useState(() =>');
     expect(workroom).toContain('<details open={advancedOpen}');
     expect(workroom).toContain("document.getElementById('live-controls')?.scrollIntoView");
