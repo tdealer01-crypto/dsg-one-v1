@@ -1,6 +1,6 @@
 'use client';
 
-import { createAuth0Client, type Auth0Client } from '@auth0/auth0-spa-js';
+import { Auth0Client } from '@auth0/auth0-spa-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const CALLBACK = 'https://dsg.pics/dsg/approvals';
@@ -57,6 +57,7 @@ function isReviewIntent(value: unknown): value is ReviewIntent {
 export default function ApprovalClient() {
   const client = useRef<Auth0Client | null>(null);
   const reviewedApprovalId = useRef<string | null>(null);
+  const completingStepUpId = useRef<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [tokenReady, setTokenReady] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -75,7 +76,10 @@ export default function ApprovalClient() {
         // a redirect loop, especially when returning from MFA on Android.
         // Do not block the Auth0 callback on an unrelated website session.
         if (!live) return;
-        const c = await createAuth0Client({
+        // Handle redirects exactly once here, including Android app switching.
+        // createAuth0Client can automatically consume the callback before the
+        // explicit handler below sees the exact-request appState.
+        const c = new Auth0Client({
           domain: 'dev-kcddqmnusbxxo25s.us.auth0.com',
           clientId: 'jI1uiKcQu7mqORsaCrogKTQVsAcZuQSt',
           authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE },
@@ -91,21 +95,29 @@ export default function ApprovalClient() {
           ? queryApprovalId : null;
         let stepUpIntent: StepUpIntent | null = null;
         if (params.has('error')) {
-          setStatus('Auth0 ไม่อนุญาตให้เข้าสู่ระบบหรือ scope dsg.approve ยังไม่ได้รับสิทธิ์');
-          window.history.replaceState(null, '', CALLBACK);
+          setStatus('Auth0 ไม่อนุญาต: ' + (params.get('error') || 'AUTH0_CALLBACK_ERROR') +
+            ' — ยังไม่อนุมัติงานนี้ โปรดลองจากเบราว์เซอร์เดิม');
+          window.history.replaceState(null, '', reviewApprovalId
+            ? CALLBACK + '?approval_request_id=' + encodeURIComponent(reviewApprovalId) : CALLBACK);
           return;
         }
         if (params.has('code') && params.has('state')) {
           const callback = await c.handleRedirectCallback();
-          if (isStepUpIntent(callback.appState)) stepUpIntent = callback.appState;
+          if (isStepUpIntent(callback.appState)) {
+            stepUpIntent = callback.appState;
+            if (callback.appState.kind === 'approve') reviewApprovalId = callback.appState.approvalRequestId;
+          }
           if (isReviewIntent(callback.appState)) reviewApprovalId = callback.appState.approvalRequestId;
-          window.history.replaceState(null, '', CALLBACK);
+          // An exact request ID is not a credential. Retain it in the URL so
+          // an Android tab/app reload does not lose the pending work.
+          window.history.replaceState(null, '', reviewApprovalId
+            ? CALLBACK + '?approval_request_id=' + encodeURIComponent(reviewApprovalId) : CALLBACK);
         }
         const authenticated = await c.isAuthenticated();
         setTokenReady(authenticated);
         if (authenticated && reviewApprovalId) {
           setRequestedApprovalId(reviewApprovalId);
-          window.history.replaceState(null, '', CALLBACK);
+          window.history.replaceState(null, '', CALLBACK + '?approval_request_id=' + encodeURIComponent(reviewApprovalId));
         }
         setStatus(authenticated
           ? 'เข้าสู่ระบบ Auth0 แล้ว พร้อมตรวจรายการรออนุมัติ'
@@ -199,17 +211,15 @@ export default function ApprovalClient() {
       ? 'กำลังเปิด Auth0 ยืนยัน MFA ก่อนอนุมัติ (จะกลับมาหน้านี้อัตโนมัติ)'
       : 'กำลังเปิด Auth0 ยืนยัน MFA (ทดสอบอย่างเดียว ไม่อนุมัติงาน)');
     try {
-      // Redirect is deliberate here: Android browsers commonly block or
-      // recycle popup windows. Auth0's state carries only the intent kind and
-      // exact approval id; the bearer token remains in memory and is never
-      // placed in the URL, localStorage or sessionStorage.
+      // A normal interactive redirect is sufficient: the dedicated Auth0
+      // Post-Login Action challenges for a fresh OTP when ext_dsg_stepup=1.
+      // Do not force a second primary sign-in with prompt=login/max_age=0.
+      // Auth0 state contains only the intent and exact request ID.
       await client.current.loginWithRedirect({
         authorizationParams: {
           redirect_uri: CALLBACK,
           audience: AUDIENCE,
           scope: SCOPE,
-          prompt: 'login',
-          max_age: 0,
           ext_dsg_stepup: '1',
         },
         appState: intent,
@@ -221,6 +231,10 @@ export default function ApprovalClient() {
   }
 
   const finishStepUp = useCallback(async (intent: StepUpIntent) => {
+    const key = intent.kind === 'approve' ? intent.approvalRequestId : 'mfa_probe';
+    if (completingStepUpId.current === key) return;
+    completingStepUpId.current = key;
+    setPendingStepUpIntent(null);
     setBusy(true);
     try {
       if (!client.current) throw new Error('AUTH0_SESSION_NOT_READY');
@@ -269,6 +283,7 @@ export default function ApprovalClient() {
       setStatus('MFA NOT VERIFIED — ' + (error instanceof Error ? error.message : 'AUTH0_FAILED'));
     } finally {
       setBusy(false);
+      completingStepUpId.current = null;
     }
   }, [tool]);
 
@@ -318,11 +333,38 @@ export default function ApprovalClient() {
     }
     setBusy(true);
     try {
-      // Mobile browsers can recycle a popup before the Auth0 transaction
-      // returns. Use the same redirect step-up path for every high-risk
-      // approval so all plugins share one reliable MFA flow.
+      // Reuse a genuine, *fresh*, independently verified signed MFA event
+      // during the server's 120-second validity window. This avoids forcing
+      // another login/OTP for each exact request; it never skips MFA when stale.
       if (decision === 'APPROVE' && selected.risk_tier === 'high') {
-        await startStepUp({ kind: 'approve', approvalRequestId: selected.approval_request_id });
+        const token = await obtainToken();
+        const proofResponse = await fetch('/api/dsg/approvals/mfa-check', {
+          method: 'POST', credentials: 'include', cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken: token }),
+        });
+        const proof = await proofResponse.json() as {
+          ok?: boolean; mfaVerified?: boolean; error?: string;
+        };
+        if (!proofResponse.ok && proofResponse.status === 403 &&
+            proof.error === 'FRESH_SIGNED_MFA_REQUIRED') {
+          await startStepUp({ kind: 'approve', approvalRequestId: selected.approval_request_id });
+          return;
+        }
+        if (!proofResponse.ok || proof.ok !== true || proof.mfaVerified !== true) {
+          throw new Error(proof.error || 'MFA_PROOF_CHECK_FAILED');
+        }
+        // Still resolve ONE exact request; the prior MFA event does not
+        // authorize any other action and is reverified by AWS.
+        const data = await tool('spacetime_resolve_approval', {
+          approval_request_id: selected.approval_request_id, decision,
+        }, token);
+        if (data.receipt?.verdict !== 'APPROVED') {
+          throw new Error(data.receipt?.reason || 'APPROVAL_RESULT_NOT_VERIFIED');
+        }
+        setStatus('APPROVED — Signed MFA ยังมีผล ไม่ต้องยืนยันซ้ำ; ผู้ขออนุมัติ Claim แล้ว Execute ได้');
+        setSelected(null);
+        setApprovals(items => items.filter(item => item.approval_request_id !== selected.approval_request_id));
         return;
       }
       const data = await tool('spacetime_resolve_approval', {
@@ -348,11 +390,10 @@ export default function ApprovalClient() {
         <p className="text-sm text-slate-300">ใช้บัญชี Auth0 ของคุณเพื่ออนุมัติผ่าน AWS Spacetime โดยตรง ไม่ต้องเข้าสู่ระบบเว็บไซต์ซ้ำและไม่ใช้ Owner key หรือ internal key</p>
         <p role="status" aria-live="polite" className="rounded-lg border border-slate-700 p-3 text-sm">{status}</p>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => void login()} disabled={!authReady || busy}
-            className="rounded-lg bg-indigo-600 px-4 py-2 disabled:opacity-40">เข้าสู่ระบบเพื่ออนุมัติ</button>
-          <button type="button" onClick={() => void checkMfaWithoutApproval()}
-            disabled={!authReady || busy}
-            className="rounded-lg border border-amber-400 px-4 py-2 disabled:opacity-40">ทดสอบ MFA (ไม่อนุมัติ)</button>
+          {!tokenReady && <button type="button" onClick={() => void login()} disabled={!authReady || busy}
+            className="rounded-lg bg-indigo-600 px-4 py-2 disabled:opacity-40">เข้าสู่ระบบเพื่ออนุมัติ</button>}
+          {/* MFA diagnostics are not part of ordinary approval UX. The signed
+              proof is checked automatically on the actual approval tap. */}
           <button type="button" onClick={() => void load()} disabled={!authReady || !tokenReady || busy}
             className="rounded-lg border border-slate-500 px-4 py-2 disabled:opacity-40">ดูรายการรออนุมัติ</button>
           <a href="/dsg/autonomous-level" className="rounded-lg border border-slate-500 px-4 py-2">กลับหน้าสถานะระบบ</a>
