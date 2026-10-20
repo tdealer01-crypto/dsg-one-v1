@@ -44,7 +44,9 @@ export function middleware(request: NextRequest) {
 
   const url = request.nextUrl.clone();
   url.pathname = '/login';
-  url.searchParams.set('next', pathname);
+  // Preserve the user's protected destination (including ?tool=browser) through sign-in.
+  // The pathname is already same-origin and in the protected prefix allowlist.
+  url.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
   return NextResponse.redirect(url);
 }
 

@@ -32,12 +32,12 @@ const gates: MarketplaceReadinessGate[] = [
     userBenefit: 'ผู้ใช้มั่นใจได้ว่าแอปเปิดได้จริงใน production ไม่ใช่แค่โค้ดใน repo',
     verifiedEvidence: [
       'Existing package script: dsg:production-flow-check',
-      'Existing Vercel deployment proof must be attached from deployment logs before marketplace submission',
+      'Existing AWS immutable ECR Build and governed existing-EC2 Ship workflows; attach exact-source release evidence before marketplace submission',
     ],
     requiredEvidence: [
-      'Latest production deployment READY proof',
+      'Latest AWS exact-main CI, ECR digest/scan and Ship proof bound to the release source SHA',
       'Production URL returns 2xx without unexpected auth wall for intended audience',
-      'Body/proof hash from scripts/dsg-production-flow-check.mjs',
+      'Independent https://dsg.pics/api/agent/status sourceBound/digestBound readback and body/proof hash from scripts/dsg-production-flow-check.mjs',
     ],
     nextAction: 'Run dsg:production-flow-check with the exact production URL and attach proofHash to the release note.',
   },

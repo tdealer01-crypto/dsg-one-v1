@@ -19,7 +19,9 @@ export default function DsgWorkroomPage() {
   const [loading, setLoading] = useState(true);
   const [busyWorkspace, setBusyWorkspace] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'browser'
+  );
 
   const load = useCallback(async () => {
     try {
@@ -72,6 +74,18 @@ export default function DsgWorkroomPage() {
 
   const selected = session?.selected ?? null;
 
+  // The entry link can arrive before a workspace has been selected.
+  // After the protected session becomes ready, reveal the real Cinema controls
+  // instead of leaving the user at the top of a long Agent Chat screen.
+  useEffect(() => {
+    if (!selected || !advancedOpen) return undefined;
+    if (new URLSearchParams(window.location.search).get('tool') !== 'browser') return undefined;
+    const timer = window.setTimeout(() => {
+      document.getElementById('live-controls')?.scrollIntoView({ block: 'start' });
+    }, 100);
+    return () => window.clearTimeout(timer);
+  }, [selected, advancedOpen]);
+
   return (
     <main className="min-h-full bg-slate-950 px-2 py-3 text-slate-100 sm:px-6 sm:py-6">
       <div className="mx-auto max-w-4xl">
@@ -103,7 +117,7 @@ export default function DsgWorkroomPage() {
           </section>
         )}
         {selected && (
-          <details className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
+          <details open={advancedOpen} className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
             onToggle={event => setAdvancedOpen(event.currentTarget.open)}>
             <summary className="cursor-pointer text-sm text-slate-400">เครื่องมือเพิ่มเติมสำหรับผู้ดูแลระบบ</summary>
             {advancedOpen && (
@@ -118,7 +132,8 @@ export default function DsgWorkroomPage() {
                   <a href="/dsg/app-builder">App Builder</a>
                   <a href="/dsg/approvals">Approvals</a>
                   <a href="/control/">AWS Workroom</a>
-                  <a href="https://aws.dsg.pics/app" target="_blank" rel="noreferrer">Cinema</a>
+                  <a href="/dsg/workroom?tool=browser#live-controls">Cinema Browser Controls</a>
+                  <a href="https://aws.dsg.pics/app" target="_blank" rel="noopener noreferrer">Evidence &amp; Conformance</a>
                 </nav>
               </div>
             )}
