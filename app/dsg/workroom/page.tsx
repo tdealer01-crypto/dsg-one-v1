@@ -78,6 +78,18 @@ export default function DsgWorkroomPage() {
 
   const selected = session?.selected ?? null;
 
+  // The entry link can arrive before a workspace has been selected.
+  // After the protected session becomes ready, reveal the real Cinema controls
+  // instead of leaving the user at the top of a long Agent Chat screen.
+  useEffect(() => {
+    if (!selected || !advancedOpen) return undefined;
+    if (new URLSearchParams(window.location.search).get('tool') !== 'browser') return undefined;
+    const timer = window.setTimeout(() => {
+      document.getElementById('live-controls')?.scrollIntoView({ block: 'start' });
+    }, 100);
+    return () => window.clearTimeout(timer);
+  }, [selected, advancedOpen]);
+
   return (
     <main className="min-h-full bg-slate-950 px-2 py-3 text-slate-100 sm:px-6 sm:py-6">
       <div className="mx-auto max-w-4xl">
