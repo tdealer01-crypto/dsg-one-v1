@@ -6,6 +6,11 @@ import { DsgLiveWorkroom } from '@/components/dsg-live-workroom';
 import { AgentCommandCenter } from '@/components/agent-command-center';
 import { PublicProductionSnapshot } from '@/components/public-production-snapshot';
 
+// Only UI deep-links. No credentials, model payloads or permits are stored in URLs.
+function isToolDeepLink(tool: string | null): boolean {
+  return ['browser', 'desktop'].includes(tool || '') || tool === 'agent-v0';
+}
+
 type Membership = { workspace_id: string; role: 'OWNER' | 'ADMIN' | 'OPERATOR' | 'AUDITOR' | 'VIEWER' };
 type SessionPayload = {
   ok: boolean;
@@ -20,7 +25,7 @@ export default function DsgWorkroomPage() {
   const [busyWorkspace, setBusyWorkspace] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(() =>
-    typeof window !== 'undefined' && ['browser', 'desktop'].includes(new URLSearchParams(window.location.search).get('tool') || '')
+    typeof window !== 'undefined' && isToolDeepLink(new URLSearchParams(window.location.search).get('tool'))
   );
 
   const load = useCallback(async () => {
@@ -76,13 +81,21 @@ export default function DsgWorkroomPage() {
   }, [session, busyWorkspace, selectWorkspace]);
 
   const selected = session?.selected ?? null;
+  const openAgentV0 = useCallback(() => {
+    setAdvancedOpen(true);
+    const next = new URL(window.location.href);
+    next.searchParams.set('tool', 'agent-v0');
+    next.hash = 'live-controls';
+    window.history.replaceState(window.history.state, '', next.pathname + next.search + next.hash);
+    window.setTimeout(() => document.getElementById('live-controls')?.scrollIntoView({ block: 'start' }), 100);
+  }, []);
 
   // The entry link can arrive before a workspace has been selected.
   // After the protected session becomes ready, reveal the real Cinema controls
   // instead of leaving the user at the top of a long Agent Chat screen.
   useEffect(() => {
     if (!selected || !advancedOpen) return undefined;
-    if (!['browser', 'desktop'].includes(new URLSearchParams(window.location.search).get('tool') || '')) return undefined;
+    if (!isToolDeepLink(new URLSearchParams(window.location.search).get('tool'))) return undefined;
     const timer = window.setTimeout(() => {
       document.getElementById('live-controls')?.scrollIntoView({ block: 'start' });
     }, 100);
@@ -97,6 +110,8 @@ export default function DsgWorkroomPage() {
             <p className="text-sm font-semibold text-white">บอกงานที่ต้องการได้เลย — ระบบจะแสดงความคืบหน้าและผลตามจริง</p>
             <nav aria-label="ทางลัดการทำงาน" className="mt-3 flex flex-wrap gap-2 text-sm">
               <a href="#dsg-chat-message" className="min-h-11 rounded-xl bg-indigo-700 px-3 py-3 font-semibold text-white">1. สั่งงาน</a>
+              <button type="button" onClick={openAgentV0} aria-controls="dsg-advanced-tools"
+                className="min-h-11 rounded-xl border border-indigo-500 px-3 py-3 font-semibold text-indigo-100">วางแผนด้วย DSG Agent v0 (Qwen)</button>
               <a href="#dsg-jobs" onClick={() => document.getElementById('dsg-jobs')?.setAttribute('open', '')}
                 className="min-h-11 rounded-xl border border-slate-700 px-3 py-3 text-slate-200">2. ติดตามงาน</a>
               <a href="/dsg/approvals" className="min-h-11 rounded-xl border border-slate-700 px-3 py-3 text-slate-200">3. อนุมัติเมื่อจำเป็น</a>
@@ -134,16 +149,17 @@ export default function DsgWorkroomPage() {
         {selected && (
           <details id="dsg-advanced-tools" open={advancedOpen} className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
             onToggle={event => setAdvancedOpen(event.currentTarget.open)}>
-            <summary className="cursor-pointer text-sm text-slate-400">ควบคุมเว็บและคอมพิวเตอร์ · เครื่องมือขั้นสูง</summary>
+            <summary className="cursor-pointer text-sm text-slate-400">Agent v0 · ควบคุมเว็บและอุปกรณ์ · เครื่องมือเพิ่มเติม</summary>
             {advancedOpen && (
               <div className="mt-4 space-y-5">
                 <p className="text-sm text-slate-400">
-                  เลือกควบคุมเว็บหรืออุปกรณ์ได้จากแท็บด้านล่าง ถ้างานต้องอนุมัติ ระบบจะแสดงขั้นตอนต่อไป แชทหลักยังใช้งานได้
+                  วางแผนด้วย DSG Agent v0 หรือควบคุมเว็บ/อุปกรณ์จริงจากแท็บด้านล่าง หากโมเดลหรืออุปกรณ์ยังไม่พร้อม ระบบจะแจ้งเหตุผล ไม่แสดงผลสำเร็จจำลอง
                 </p>
                 <DsgLiveWorkroom key={selected.workspace_id} />
                 <AgentCommandCenter />
                 <PublicProductionSnapshot compact />
                 <nav aria-label="เครื่องมือขั้นสูง" className="flex flex-wrap gap-3 text-sm text-indigo-200">
+                  <a href="/dsg/workroom?tool=agent-v0#live-controls">Agent v0 · Qwen Planner</a>
                   <a href="/dsg/app-builder">สร้างแอป</a>
                   <a href="/dsg/approvals">คำขออนุมัติ</a>
                   <a href="/control/">เครื่องที่เชื่อมต่อ</a>

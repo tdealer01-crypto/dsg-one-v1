@@ -28,6 +28,13 @@ const systemEntries = [
     external: false,
   },
   {
+    title: 'DSG Agent v0 · Qwen Planner',
+    description: 'ส่งเป้าหมายให้ Qwen เสนอแผนผ่าน AWS Spacetime (proposal-only) ตรวจผลจากโมเดลจริงเท่านั้น; Kaggle Worker อาจยังไม่พร้อม',
+    href: '/dsg/workroom?tool=agent-v0',
+    badge: 'วางแผน · ตรวจ Inference ก่อนลงมือทำ',
+    external: false,
+  },
+  {
     title: 'สั่งงานอุปกรณ์ DSG Native',
     description: 'สั่งคำสั่งบนอุปกรณ์ Native ที่เชื่อมไว้ ตรวจผลเมื่อโปรเซสทำงานเสร็จ และอนุมัติเฉพาะงานที่จำเป็น',
     href: '/dsg/workroom?tool=desktop',
@@ -114,6 +121,7 @@ export default function HomePage() {
 
           <nav className="hidden items-center gap-2 md:flex">
             <Link href="/dsg/workroom" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-300 hover:bg-slate-800 hover:text-white">สั่งงาน</Link>
+            <Link href="/dsg/workroom?tool=agent-v0" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-slate-800 hover:text-white">Agent v0 · Qwen</Link>
             <Link href="/dsg/workroom?tool=desktop" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-cyan-200">อุปกรณ์ Native</Link>
             <Link href="/dsg/workroom?tool=browser" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-slate-800 hover:text-white">ควบคุมเว็บ</Link>
             <a href="#how-it-works" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white">
@@ -135,6 +143,7 @@ export default function HomePage() {
               </summary>
               <nav aria-label="Mobile navigation" className="absolute right-0 top-12 z-50 flex w-64 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border border-slate-700 bg-slate-900 p-2 text-sm shadow-2xl">
                 <Link href="/dsg/workroom" className="rounded-lg px-3 py-3 text-cyan-200 hover:bg-slate-800">สั่งงานผ่านแชท</Link>
+                <Link href="/dsg/workroom?tool=agent-v0" className="rounded-lg px-3 py-3 hover:bg-slate-800">Agent v0 · วางแผนงาน</Link>
                 <Link href="/dsg/workroom?tool=desktop" className="rounded-lg px-3 py-3 hover:bg-slate-800">สั่งงานอุปกรณ์ Native</Link>
                 <Link href="/dsg/workroom?tool=browser" className="rounded-lg px-3 py-3 hover:bg-slate-800">ควบคุมเว็บ</Link>
                 <Link href="/dsg/approvals" className="rounded-lg px-3 py-3 hover:bg-slate-800">รายการอนุมัติ</Link>
