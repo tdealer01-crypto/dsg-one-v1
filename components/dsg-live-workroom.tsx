@@ -50,6 +50,8 @@ export function DsgLiveWorkroom() {
   const [command, setCommand] = useState('');
   const transcript = useRef<HTMLDivElement | null>(null);
   const [verifiedAction, setVerifiedAction] = useState<string | null>(null);
+  const [shellProcessId, setShellProcessId] = useState<string | null>(null);
+  const [shellOutcome, setShellOutcome] = useState<'running' | 'succeeded' | 'failed' | 'unknown' | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -158,7 +160,33 @@ export function DsgLiveWorkroom() {
         evidence_hash: asRecord(data.receipt?.evidence)?.evidence_hash,
       }].slice(-6);
     }
-    setStatus(`${label}: ได้รับผลจาก provider และตรวจสายหลักฐานแล้ว ดูผลด้านล่าง`);
+    if (request.route_id === 'route.desktop-native.shell-exec') {
+      // process_start acknowledges a process, NOT necessarily its completion.
+      const operation = asRecord(asRecord(result.execution)?.result);
+      if (!operation || operation.ok !== true || typeof operation.process_id !== 'string') {
+        setShellOutcome('unknown');
+        setStatus('ตรวจหลักฐานของการส่งคำสั่งแล้ว แต่ยังยืนยัน Process ID ไม่ได้');
+      } else {
+        setShellProcessId(operation.process_id);
+        if (operation.running === true) {
+          setShellOutcome('running');
+          setStatus('เริ่มคำสั่งบน DSG Native แล้ว · โปรเซสกำลังทำงาน รอตรวจผลลัพธ์ก่อนสรุปว่าสำเร็จ');
+        } else if (operation.running === false && operation.returncode === 0) {
+          setShellOutcome('succeeded');
+          setShellProcessId(null);
+          setStatus('คำสั่งทำงานเสร็จ (exit code 0) และตรวจสายหลักฐานแล้ว');
+        } else if (operation.running === false && typeof operation.returncode === 'number') {
+          setShellOutcome('failed');
+          setShellProcessId(null);
+          setStatus('คำสั่งสิ้นสุดด้วย exit code ' + operation.returncode + ' · ดูผลด้านล่าง');
+        } else {
+          setShellOutcome('unknown');
+          setStatus('ส่งคำสั่งถึงอุปกรณ์แล้ว แต่ยังตรวจสถานะสุดท้ายไม่ได้');
+        }
+      }
+    } else {
+      setStatus(`${label}: ได้รับผลจาก provider และตรวจสายหลักฐานแล้ว ดูผลด้านล่าง`);
+    }
     return result;
   }
 
@@ -244,6 +272,50 @@ export function DsgLiveWorkroom() {
       await execute(step.request, step.label, step.approvalRequestId ? permits.get(step.approvalRequestId) : undefined);
     }
   }
+
+  async function checkShellProcess() {
+    if (!shellProcessId) return;
+    const expectedProcessId = shellProcessId;
+    const planned = await preparePlan([{
+      capability: 'device.process.list', target: desktopTarget,
+      makePayload: () => ({ action: 'device.process.list', arguments: {} }),
+      label: 'ตรวจผลคำสั่งที่กำลังทำงาน',
+    }], 'ติดตาม Native Shell ผ่าน Route อ่านรายการโปรเซสเดิม');
+    const result = await execute(planned[0].request, 'ตรวจผลคำสั่ง');
+    const operation = asRecord(asRecord(result.execution)?.result);
+    const processes = operation?.processes;
+    const entry = Array.isArray(processes)
+      ? processes.map(asRecord).find(item => item?.process_id === expectedProcessId)
+      : undefined;
+    if (!entry) {
+      setShellOutcome('unknown');
+      setStatus('ยังไม่พบโปรเซสนี้ในการตอบกลับจากอุปกรณ์ ไม่สั่ง Shell ซ้ำ');
+    } else if (entry.running === true) {
+      setShellOutcome('running');
+      setStatus('โปรเซสยังทำงานอยู่ · สามารถตรวจผลอีกครั้งได้');
+    } else if (entry.running === false && entry.returncode === 0) {
+      setShellOutcome('succeeded');
+      setShellProcessId(null);
+      setStatus('คำสั่งเสร็จสำเร็จ (exit code 0) · ตรวจผลผ่าน Native Provider และ Evidence แล้ว');
+    } else if (entry.running === false && typeof entry.returncode === 'number') {
+      setShellOutcome('failed');
+      setShellProcessId(null);
+      setStatus('คำสั่งจบด้วย exit code ' + entry.returncode + ' · ดูข้อความจากโปรเซสในผลลัพธ์');
+    } else {
+      setShellOutcome('unknown');
+      setStatus('ข้อมูลโปรเซสยังไม่ครบสำหรับสรุปผลสำเร็จ');
+    }
+  }
+
+  useEffect(() => {
+    if (!ready || !shellProcessId || shellOutcome !== 'running') return;
+    // One automatic read-only readback. Do not re-dispatch the shell command.
+    const timer = window.setTimeout(() => {
+      if (!busyRef.current) void act(checkShellProcess);
+    }, 4000);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, shellProcessId, shellOutcome]);
 
   function selectTool(item: 'agent' | 'browser' | 'desktop') {
     setTab(item);
@@ -410,7 +482,7 @@ export function DsgLiveWorkroom() {
           <button className={button} disabled={busy || !ready || Boolean(pending) || !path.trim()} onClick={() => void act(async () => { await run('device.fs.read', desktopTarget, () => ({ action: 'device.fs.read', arguments: { path: path.trim(), length: 100 } }), 'อ่านไฟล์จาก Desktop'); })}>อ่านไฟล์</button>
           <label htmlFor="workroom-shell-command" className="block text-sm font-semibold">สั่งให้ DSG Native ทำอะไร (Shell Command)</label>
           <textarea id="workroom-shell-command" rows={2} value={command} onChange={event => setCommand(event.target.value)} className={field} placeholder="เช่น pwd หรือ ls -la" />
-          <button className={button} disabled={busy || !ready || Boolean(pending) || !command.trim()} onClick={() => void act(async () => { await run('device.shell.exec', desktopTarget, () => ({ action: 'device.shell.exec', arguments: { command: command.trim() } }), 'ทำคำสั่งบน DSG Native'); })}>เริ่มงาน · อนุมัติเมื่อจำเป็น</button>
+          <button className={button} disabled={busy || !ready || Boolean(pending) || !command.trim()} onClick={() => void act(async () => { await run('device.shell.exec', desktopTarget, () => ({ action: 'device.shell.exec', arguments: { command: command.trim() }  wait_seconds: 3 }), 'ทำคำสั่งบน DSG Native'); })}>เริ่มงาน · อนุมัติเมื่อจำเป็น</button>
         </>}
       </div>
       {pending && <section className="mt-5 rounded-xl border border-amber-400/50 p-4" aria-label="งานรออนุมัติ">
