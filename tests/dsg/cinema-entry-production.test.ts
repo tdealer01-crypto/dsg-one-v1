@@ -35,6 +35,7 @@ describe('Cinema landing -> authenticated Workroom Browser Controls', () => {
     expect(workroom).toContain("get('tool') === 'browser'");
     expect(workroom).toContain('setAdvancedOpen(true)');
     expect(workroom).toContain('<details open={advancedOpen}');
+    expect(workroom).toContain("document.getElementById('live-controls')?.scrollIntoView");
     expect(remote).toContain("get('tool') === 'browser'");
     expect(remote).toContain("setTab('browser')");
     expect(remote).toContain("const browserTarget = 'node.cinema-remote'");
