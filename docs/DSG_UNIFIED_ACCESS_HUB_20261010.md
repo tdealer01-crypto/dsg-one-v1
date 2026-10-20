@@ -12,11 +12,13 @@ The homepage `app/page.tsx` includes a mobile-responsive **DSG ONE — System Ac
 | Workroom / operator hub | `https://dsg.pics/dsg/workroom` | DSG website sign-in and workspace membership |
 | DSG Native Desktop | `https://dsg.pics/control/` | Activation/device enrollment/E2E pending; no claim of device access |
 | DSG OS | `https://dsg.pics/dsg-os` | Local adapter/evidence tools, never execution authority |
-| Cinema Remote Browser | `https://aws.dsg.pics/app` | Separate Cinema app; high-risk connect/execute needs signed approval |
+| Cinema Remote Browser controls | `https://dsg.pics/dsg/workroom?tool=browser` | Existing DSG Workroom opens Browser tab; Spacetime Auth0 and signed approval remain mandatory for high-risk Connect/Execute |
 | GitBook Docs | `https://dsg-3.gitbook.io/dsg-docs/dsg-docs/dsg-one-canonical-7-docs/` | Canonical Git-synced documents; dated snapshots are not live telemetry |
 | Human Approvals | `https://dsg.pics/dsg/approvals` | Linked Auth0 human approver with `dsg.approve`; MFA/production gates apply |
 | App Builder | `https://dsg.pics/dsg/app-builder` | DSG authenticated workspace |
 | Browser Pilot | `https://dsg.pics/remote-browser-execution` | Public early-access information only |
+
+**20 October 2026 correction:** `https://aws.dsg.pics/app` is the Evidence & Conformance console, NOT the interactive Cinema browser viewer. Do not label it "Cinema" or "Open Shared Browser". The existing Workroom Browser Controls use the governed `node.cinema-remote` route; `?tool=browser` survives site login and opens the advanced Browser tab once a workspace is selected. The evidence console remains available under its accurate label. Cinema status `connected` alone does not prove a signed Navigate/Click/Execute E2E.
 
 **Transport boundary:** `https://aws.dsg.pics/mcp` remains the OAuth-protected production Spacetime execution/governance MCP; `https://aws.dsg.pics/api/v1/mcp` is a separate verification JSON-RPC surface. Do not redirect the browser landing entry or human approvals to either MCP transport.
 
