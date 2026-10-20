@@ -110,7 +110,9 @@ export function DsgLiveWorkroom() {
     try { await work(); }
     catch (error) {
       const reason = error instanceof Error ? error.message : 'REQUEST_FAILED';
-      setStatus(reason === 'HUMAN_APPROVAL_NOT_READY' || reason === 'APPROVAL_PENDING'
+      setStatus(reason.includes('DSG_BRAIN_BASE_URL_INVALID')
+        ? 'DSG Agent v0 ยังเรียกโมเดลไม่ได้: Brain Endpoint ของ AWS ไม่พร้อม · ต้องเชื่อม Kaggle Worker รุ่นที่ตรวจสอบแล้วก่อน ไม่มีการเรียกโมเดลจำลองหรือ GPU เสียเงิน'
+        : reason === 'HUMAN_APPROVAL_NOT_READY' || reason === 'APPROVAL_PENDING'
         ? 'ยังรอการอนุมัติในหน้าเจ้าของ เมื่ออนุมัติแล้วกลับมาแท็บนี้หรือกดตรวจการอนุมัติ'
         : `ยังทำงานไม่สำเร็จ: ${reason} — ตรวจเซสชันหรือสถานะ provider ก่อนลองใหม่`);
     } finally { busyRef.current = false; setBusy(false); }
@@ -297,7 +299,7 @@ export function DsgLiveWorkroom() {
     setTab(item);
     // Persist only the chosen UI route, never auth tokens, shell commands or permits.
     const next = new URL(window.location.href);
-    if (item === 'agent') next.searchParams.delete('tool');
+    if (item === 'agent') next.searchParams.set('tool', 'agent-v0');
     else next.searchParams.set('tool', item);
     window.history.replaceState(window.history.state, '', next.pathname + next.search + next.hash);
   }
@@ -396,7 +398,7 @@ export function DsgLiveWorkroom() {
 
   return (
     <section id="live-controls" className="scroll-mt-20 rounded-3xl border border-indigo-400/30 bg-slate-900 p-5 md:p-6" aria-label="เครื่องมือ Workroom">
-      <h2 className="text-2xl font-bold">ควบคุมเว็บและคอมพิวเตอร์</h2>
+      <h2 className="text-2xl font-bold">DSG Agent v0 · ควบคุมเว็บและอุปกรณ์</h2>
       <p className="mt-2 text-sm text-slate-300">เลือกงาน → ตรวจสิทธิ์ → อนุมัติเฉพาะเมื่อจำเป็น → ดูผลและหลักฐานจริง</p>
       <p role="status" aria-live="polite" className="mt-4 break-words rounded-xl bg-slate-950 p-4 text-sm text-indigo-100">{status}</p>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -408,21 +410,22 @@ export function DsgLiveWorkroom() {
         {(['agent', 'browser', 'desktop'] as const).map((item, index) => (
           <button key={item} role="tab" id={`workroom-tab-${item}`} aria-controls={`workroom-panel-${item}`} aria-selected={tab === item}
             onClick={() => selectTool(item)} className={`${button} ${tab === item ? 'bg-indigo-700 border-indigo-400' : ''}`}>
-            {['วางแผนด้วย AI', 'ควบคุมเว็บ', 'สั่งงานอุปกรณ์'][index]}
+            {['Agent v0 · วางแผนด้วย Qwen', 'ควบคุมเว็บ', 'สั่งงานอุปกรณ์'][index]}
           </button>
         ))}
       </div>
       <div role="tabpanel" id={`workroom-panel-${tab}`} aria-labelledby={`workroom-tab-${tab}`} className="mt-5 space-y-4">
         {tab === 'agent' && <>
-          <p className="text-sm text-slate-300">บอกสิ่งที่ต้องการ เช่น “ตรวจว่ารีโมตเดสก์ท็อปเชื่อมอยู่ไหม” Agent v0 จะเสนอขั้นตอนจากเครื่องมือที่ระบบมี</p>
+          <p className="text-sm text-slate-300">DSG Agent v0 ใช้ Qwen เพื่อเสนอแผนผ่าน AWS Spacetime ไม่ได้อนุมัติหรือลงมือทำเอง หาก Kaggle Worker ไม่ออนไลน์จะแสดงข้อผิดพลาดตามจริง</p>
+          <p className="text-xs text-amber-200">สถานะ Route ไม่เท่ากับโมเดลพร้อมใช้ · Qwen3-30B-A3B เป็น Worker ชั่วคราวบน Kaggle (proposal-only)</p>
           <div role="log" aria-label="บทสนทนา Agent v0" aria-live="polite" className="max-h-80 space-y-3 overflow-y-auto">
             {chat.map((turn, index) => <p key={index} className={`whitespace-pre-wrap rounded-xl p-3 text-sm ${turn.role === 'user' ? 'bg-indigo-900/60' : 'bg-slate-950'}`}><strong>{turn.role === 'user' ? 'คุณ' : 'Agent v0'}: </strong>{turn.text}</p>)}
             <div ref={transcript} />
           </div>
           <form onSubmit={event => { event.preventDefault(); void act(sendGoal); }} className="space-y-3">
-            <label htmlFor="workroom-goal" className="block text-sm font-semibold">เป้าหมายของคุณ</label>
-            <textarea id="workroom-goal" value={goal} onChange={event => setGoal(event.target.value)} maxLength={4000} rows={3} className={field} placeholder="พิมพ์คำสั่งเป็นภาษาธรรมชาติ…" />
-            <button type="submit" className={`${button} bg-indigo-700`} disabled={!ready || busy || !goal.trim() || Boolean(pending)}>{busy ? 'กำลังทำงาน…' : 'ส่งให้ Agent v0'}</button>
+            <label htmlFor="workroom-goal" className="block text-sm font-semibold">ให้ DSG Agent v0 วางแผนงานอะไร</label>
+            <textarea id="workroom-goal" value={goal} onChange={event => setGoal(event.target.value)} maxLength={4000} rows={3} className={field} placeholder="เช่น ตรวจสถานะ Cinema หรือช่วยวางแผนอ่านไฟล์บน DSG Native" />
+            <button type="submit" className={`${button} bg-indigo-700`} disabled={!ready || busy || !goal.trim() || Boolean(pending)}>{busy ? 'กำลังตรวจ Brain จริง…' : 'วางแผนด้วย Agent v0'}</button>
           </form>
           {proposal && <div className="rounded-xl border border-indigo-400 p-4">
             <p className="font-semibold">ขั้นตอนที่เสนอ: {proposal.label}</p>
