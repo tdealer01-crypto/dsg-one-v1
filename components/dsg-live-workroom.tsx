@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getDsgBrowserSession, DSG_AUTH0_CALLBACK } from '@/lib/dsg/user-bound/browser-session';
 import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
+import { nativeShellOutcome } from '@/lib/dsg/user-bound/native-shell-outcome';
 import {
   asRecord, catalogRoutes, composeWorkroomRoutes, publicWorkroomReceipt,
   uniqueWorkroomRoute, workroomReceiptMatches,
@@ -161,29 +162,14 @@ export function DsgLiveWorkroom() {
       }].slice(-6);
     }
     if (request.route_id === 'route.desktop-native.shell-exec') {
-      // process_start acknowledges a process, NOT necessarily its completion.
-      const operation = asRecord(asRecord(result.execution)?.result);
-      if (!operation || operation.ok !== true || typeof operation.process_id !== 'string') {
-        setShellOutcome('unknown');
-        setStatus('ตรวจหลักฐานของการส่งคำสั่งแล้ว แต่ยังยืนยัน Process ID ไม่ได้');
-      } else {
-        setShellProcessId(operation.process_id);
-        if (operation.running === true) {
-          setShellOutcome('running');
-          setStatus('เริ่มคำสั่งบน DSG Native แล้ว · โปรเซสกำลังทำงาน รอตรวจผลลัพธ์ก่อนสรุปว่าสำเร็จ');
-        } else if (operation.running === false && operation.returncode === 0) {
-          setShellOutcome('succeeded');
-          setShellProcessId(null);
-          setStatus('คำสั่งทำงานเสร็จ (exit code 0) และตรวจสายหลักฐานแล้ว');
-        } else if (operation.running === false && typeof operation.returncode === 'number') {
-          setShellOutcome('failed');
-          setShellProcessId(null);
-          setStatus('คำสั่งสิ้นสุดด้วย exit code ' + operation.returncode + ' · ดูผลด้านล่าง');
-        } else {
-          setShellOutcome('unknown');
-          setStatus('ส่งคำสั่งถึงอุปกรณ์แล้ว แต่ยังตรวจสถานะสุดท้ายไม่ได้');
-        }
-      }
+      // Provider evidence proves dispatch, not command exit success.
+      const outcome = nativeShellOutcome(result);
+      setShellOutcome(outcome.state);
+      setShellProcessId(outcome.state === 'running' ? outcome.processId : null);
+      if (outcome.state === 'succeeded') setStatus('คำสั่งทำงานเสร็จ (exit code 0) และตรวจหลักฐานแล้ว');
+      else if (outcome.state === 'failed') setStatus('คำสั่งสิ้นสุดด้วย exit code ' + outcome.exitCode + ' · ดูผลด้านล่าง');
+      else if (outcome.state === 'running') setStatus('ส่งคำสั่งแล้ว · อุปกรณ์กำลังทำงาน รอตรวจ Exit Code');
+      else setStatus('ส่งคำสั่งแล้ว แต่ยังยืนยันผลลัพธ์ของโปรเซสไม่ได้ (ไม่สั่งซ้ำ)');
     } else {
       setStatus(`${label}: ได้รับผลจาก provider และตรวจสายหลักฐานแล้ว ดูผลด้านล่าง`);
     }
@@ -282,28 +268,18 @@ export function DsgLiveWorkroom() {
       label: 'ตรวจผลคำสั่งที่กำลังทำงาน',
     }], 'ติดตาม Native Shell ผ่าน Route อ่านรายการโปรเซสเดิม');
     const result = await execute(planned[0].request, 'ตรวจผลคำสั่ง');
-    const operation = asRecord(asRecord(result.execution)?.result);
-    const processes = operation?.processes;
-    const entry = Array.isArray(processes)
-      ? processes.map(asRecord).find(item => item?.process_id === expectedProcessId)
-      : undefined;
-    if (!entry) {
-      setShellOutcome('unknown');
-      setStatus('ยังไม่พบโปรเซสนี้ในการตอบกลับจากอุปกรณ์ ไม่สั่ง Shell ซ้ำ');
-    } else if (entry.running === true) {
-      setShellOutcome('running');
-      setStatus('โปรเซสยังทำงานอยู่ · สามารถตรวจผลอีกครั้งได้');
-    } else if (entry.running === false && entry.returncode === 0) {
-      setShellOutcome('succeeded');
+    const outcome = nativeShellOutcome(result, expectedProcessId);
+    setShellOutcome(outcome.state);
+    if (outcome.state === 'succeeded') {
       setShellProcessId(null);
       setStatus('คำสั่งเสร็จสำเร็จ (exit code 0) · ตรวจผลผ่าน Native Provider และ Evidence แล้ว');
-    } else if (entry.running === false && typeof entry.returncode === 'number') {
-      setShellOutcome('failed');
+    } else if (outcome.state === 'failed') {
       setShellProcessId(null);
-      setStatus('คำสั่งจบด้วย exit code ' + entry.returncode + ' · ดูข้อความจากโปรเซสในผลลัพธ์');
+      setStatus('คำสั่งจบด้วย exit code ' + outcome.exitCode + ' · ดูข้อความจากโปรเซสในผลลัพธ์');
+    } else if (outcome.state === 'running') {
+      setStatus('โปรเซสยังทำงานอยู่ · สามารถตรวจผลอีกครั้งได้');
     } else {
-      setShellOutcome('unknown');
-      setStatus('ข้อมูลโปรเซสยังไม่ครบสำหรับสรุปผลสำเร็จ');
+      setStatus('ยังยืนยันผลคำสั่งนี้ไม่ได้ ไม่สั่ง Shell ซ้ำ');
     }
   }
 
