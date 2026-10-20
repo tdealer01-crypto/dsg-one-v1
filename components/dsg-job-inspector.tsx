@@ -11,13 +11,15 @@ export function DsgJobInspector({ jobId }: { jobId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshSerial, setRefreshSerial] = useState(0);
-  const refresh = useCallback(() => setRefreshSerial(n => n + 1), []);
-
-  useEffect(() => {
-    const abort = new AbortController();
+  const refresh = useCallback(() => {
     setLoading(true);
     setData(null);
     setError(null);
+    setRefreshSerial(n => n + 1);
+  }, []);
+
+  useEffect(() => {
+    const abort = new AbortController();
     void (async () => {
       try {
         const response = await fetch(`/api/dsg/jobs/${encodeURIComponent(jobId)}`, {
