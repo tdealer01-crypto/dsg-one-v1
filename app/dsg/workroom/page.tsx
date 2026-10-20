@@ -20,7 +20,7 @@ export default function DsgWorkroomPage() {
   const [busyWorkspace, setBusyWorkspace] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(() =>
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'browser'
+    typeof window !== 'undefined' && ['browser', 'desktop'].includes(new URLSearchParams(window.location.search).get('tool') || '')
   );
 
   const load = useCallback(async () => {
@@ -29,7 +29,10 @@ export default function DsgWorkroomPage() {
         credentials: 'include', cache: 'no-store',
       });
       if (response.status === 401) {
-        window.location.assign('/login?next=/dsg/workroom');
+        // Keep the exact destination (including ?tool=browser or ?tool=desktop)
+        // through site sign-in; the login page only accepts local next paths.
+        const returnTo = window.location.pathname + window.location.search;
+        window.location.assign('/login?next=' + encodeURIComponent(returnTo));
         return;
       }
       const payload = await response.json() as SessionPayload;
@@ -79,7 +82,7 @@ export default function DsgWorkroomPage() {
   // instead of leaving the user at the top of a long Agent Chat screen.
   useEffect(() => {
     if (!selected || !advancedOpen) return undefined;
-    if (new URLSearchParams(window.location.search).get('tool') !== 'browser') return undefined;
+    if (!['browser', 'desktop'].includes(new URLSearchParams(window.location.search).get('tool') || '')) return undefined;
     const timer = window.setTimeout(() => {
       document.getElementById('live-controls')?.scrollIntoView({ block: 'start' });
     }, 100);
@@ -89,6 +92,18 @@ export default function DsgWorkroomPage() {
   return (
     <main className="min-h-full bg-slate-950 px-2 py-3 text-slate-100 sm:px-6 sm:py-6">
       <div className="mx-auto max-w-4xl">
+        {selected && (
+          <section aria-label="เริ่มใช้งาน DSG ONE" className="mb-3 rounded-2xl border border-indigo-500/30 bg-slate-900 p-3 sm:p-4">
+            <p className="text-sm font-semibold text-white">บอกงานที่ต้องการได้เลย — ระบบจะแสดงความคืบหน้าและผลตามจริง</p>
+            <nav aria-label="ทางลัดการทำงาน" className="mt-3 flex flex-wrap gap-2 text-sm">
+              <a href="#dsg-chat-message" className="min-h-11 rounded-xl bg-indigo-700 px-3 py-3 font-semibold text-white">1. สั่งงาน</a>
+              <a href="#dsg-jobs" onClick={() => document.getElementById('dsg-jobs')?.setAttribute('open', '')}
+                className="min-h-11 rounded-xl border border-slate-700 px-3 py-3 text-slate-200">2. ติดตามงาน</a>
+              <a href="/dsg/approvals" className="min-h-11 rounded-xl border border-slate-700 px-3 py-3 text-slate-200">3. อนุมัติเมื่อจำเป็น</a>
+              <a href="/control/" className="min-h-11 rounded-xl border border-slate-700 px-3 py-3 text-slate-200">เครื่องที่เชื่อมต่อ</a>
+            </nav>
+          </section>
+        )}
         {selected ? (
           <DsgOperatorChat key={selected.workspace_id} />
         ) : (
@@ -117,23 +132,23 @@ export default function DsgWorkroomPage() {
           </section>
         )}
         {selected && (
-          <details open={advancedOpen} className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
+          <details id="dsg-advanced-tools" open={advancedOpen} className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
             onToggle={event => setAdvancedOpen(event.currentTarget.open)}>
-            <summary className="cursor-pointer text-sm text-slate-400">เครื่องมือเพิ่มเติมสำหรับผู้ดูแลระบบ</summary>
+            <summary className="cursor-pointer text-sm text-slate-400">ควบคุมเว็บและคอมพิวเตอร์ · เครื่องมือขั้นสูง</summary>
             {advancedOpen && (
               <div className="mt-4 space-y-5">
                 <p className="text-sm text-slate-400">
-                  คำสั่งขั้นสูงและหลักฐานทางเทคนิคอยู่ในส่วนนี้ แชทด้านบนยังใช้งานแยกกันได้
+                  เลือกควบคุมเว็บหรืออุปกรณ์ได้จากแท็บด้านล่าง ถ้างานต้องอนุมัติ ระบบจะแสดงขั้นตอนต่อไป แชทหลักยังใช้งานได้
                 </p>
                 <DsgLiveWorkroom key={selected.workspace_id} />
                 <AgentCommandCenter />
                 <PublicProductionSnapshot compact />
                 <nav aria-label="เครื่องมือขั้นสูง" className="flex flex-wrap gap-3 text-sm text-indigo-200">
-                  <a href="/dsg/app-builder">App Builder</a>
-                  <a href="/dsg/approvals">Approvals</a>
-                  <a href="/control/">AWS Workroom</a>
-                  <a href="/dsg/workroom?tool=browser#live-controls">Cinema Browser Controls</a>
-                  <a href="https://aws.dsg.pics/app" target="_blank" rel="noopener noreferrer">Evidence &amp; Conformance</a>
+                  <a href="/dsg/app-builder">สร้างแอป</a>
+                  <a href="/dsg/approvals">คำขออนุมัติ</a>
+                  <a href="/control/">เครื่องที่เชื่อมต่อ</a>
+                  <a href="/dsg/workroom?tool=browser#live-controls">ควบคุมเว็บ</a>
+                  <a href="https://aws.dsg.pics/app" target="_blank" rel="noopener noreferrer">ตรวจหลักฐาน (ขั้นสูง) ↗</a>
                 </nav>
               </div>
             )}
