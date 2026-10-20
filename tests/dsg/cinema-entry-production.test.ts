@@ -33,11 +33,11 @@ describe('Cinema landing -> authenticated Workroom Browser Controls', () => {
 
   it('opens advanced Browser Controls automatically and retains Auth0/Spacetime execution gates', () => {
     expect(workroom).toContain("get('tool') === 'browser'");
-    expect(workroom).toContain('setAdvancedOpen(true)');
+    expect(workroom).toContain('const [advancedOpen, setAdvancedOpen] = useState(() =>');
     expect(workroom).toContain('<details open={advancedOpen}');
     expect(workroom).toContain("document.getElementById('live-controls')?.scrollIntoView");
     expect(remote).toContain("get('tool') === 'browser'");
-    expect(remote).toContain("setTab('browser')");
+    expect(remote).toContain("const [tab, setTab] = useState<'agent' | 'browser' | 'desktop'>(() =>");
     expect(remote).toContain("const browserTarget = 'node.cinema-remote'");
     expect(remote).toContain("'browser.remote.connect'");
     expect(remote).toContain("'browser.remote.execute'");
