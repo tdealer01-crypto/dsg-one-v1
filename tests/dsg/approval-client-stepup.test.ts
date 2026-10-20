@@ -22,8 +22,27 @@ describe('human approval step-up transport', () => {
 
   it('keeps the step-up bearer token out of browser storage and URLs', () => {
     expect(SOURCE).toContain('getTokenSilently');
-    expect(SOURCE).toContain('the bearer token remains in memory');
+    expect(SOURCE).toContain("cacheLocation: 'memory'");
     expect(SOURCE).not.toContain('localStorage.setItem');
     expect(SOURCE).not.toContain('sessionStorage.setItem');
+  });
+
+  it('does not force primary login or an MFA test before each exact approval', () => {
+    expect(SOURCE).toContain("ext_dsg_stepup: '1'");
+    expect(SOURCE).not.toContain("prompt: 'login'");
+    expect(SOURCE).not.toContain('max_age: 0,');
+    expect(SOURCE).toContain("proof.error === 'FRESH_SIGNED_MFA_REQUIRED'");
+    expect(SOURCE).toContain("tool('spacetime_resolve_approval'");
+    expect(SOURCE).not.toContain('ทดสอบ MFA (ไม่อนุมัติ)</button>');
+    expect(SOURCE).toContain('signed MFA');
+  });
+
+  it('keeps the exact request across redirect, without persisting any bearer token', () => {
+    expect(SOURCE).toContain('const c = new Auth0Client({');
+    expect(SOURCE).toContain('const callback = await c.handleRedirectCallback()');
+    expect(SOURCE).toContain('reviewApprovalId = callback.appState.approvalRequestId');
+    expect(SOURCE).toContain("CALLBACK + '?approval_request_id=' + encodeURIComponent(reviewApprovalId)");
+    expect(SOURCE).toContain('completingStepUpId.current === key');
+    expect(SOURCE).not.toContain('localStorage.setItem');
   });
 });
