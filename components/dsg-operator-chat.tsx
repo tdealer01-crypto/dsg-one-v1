@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { normalizeAgentChatReply } from '@/lib/dsg/client/agent-chat-normalize';
+import { DsgJobInspector } from '@/components/dsg-job-inspector';
 
 type Turn = {
   id: string;
@@ -44,6 +45,8 @@ export function DsgOperatorChat() {
   const [draft, setDraft] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobsIssue, setJobsIssue] = useState<string | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const jobsDetailsRef = useRef<HTMLDetailsElement>(null);
   const [pendingReplies, setPendingReplies] = useState(0);
   const [historyIssue, setHistoryIssue] = useState<string | null>(null);
   const [modelNotice, setModelNotice] = useState('กำลังตรวจสอบโมเดลจากคำตอบจริง');
@@ -132,6 +135,8 @@ export function DsgOperatorChat() {
         throw new Error(apiError(payload, 'รับงานไม่ได้'));
       }
       await refreshJobs();
+      setSelectedJobId(payload.data.id);
+      jobsDetailsRef.current?.setAttribute('open', '');
       updateMessages(previous => previous.map(item => item.id === replyId
         ? { ...item, text: 'รับงานเข้าระบบแล้ว คุณคุยหรือสั่งงานอื่นต่อได้ ขณะนี้ยังไม่มีหลักฐานว่าเริ่ม Execute งานนี้แล้ว', pending: false }
         : item));
@@ -232,7 +237,7 @@ export function DsgOperatorChat() {
         </form>
         {pendingReplies > 0 && <p role="status" className="mt-2 text-xs text-slate-400">กำลังตอบ {pendingReplies} ข้อความ · พิมพ์ข้อความถัดไปได้เลย</p>}
       </div>
-      <details id="dsg-jobs" className="scroll-mt-20 border-t border-slate-800 px-4 py-3 sm:px-6">
+      <details id="dsg-jobs" ref={jobsDetailsRef} className="scroll-mt-20 border-t border-slate-800 px-4 py-3 sm:px-6">
         <summary className="cursor-pointer text-sm font-semibold text-slate-300">ติดตามงานและผลลัพธ์ ({jobs.length})</summary>
         {jobsIssue && <p role="status" className="mt-2 text-sm text-amber-200">ยังตรวจสถานะงานไม่ได้: {jobsIssue}</p>}
         {jobs.length === 0 && !jobsIssue && <p className="mt-3 text-sm text-slate-400">ยังไม่มีรายการงานใน Workspace นี้</p>}
@@ -243,11 +248,14 @@ export function DsgOperatorChat() {
                 <p className="line-clamp-2 text-sm text-white">{job.goal}</p>
                 <span className="shrink-0 text-xs text-indigo-200">{displayStatus(job)}</span>
               </div>
-              <details className="mt-2 text-xs text-slate-400">
-                <summary className="cursor-pointer text-sky-300">รายละเอียดสถานะ</summary>
-                <p className="mt-2 break-all">สถานะจากระบบ: {job.status}</p>
-                <p className="mt-1 break-all">รหัสงาน: {job.id}</p>
-              </details>
+              <button type="button" onClick={() => setSelectedJobId(current => current === job.id ? null : job.id)}
+                aria-expanded={selectedJobId === job.id} aria-controls={selectedJobId === job.id ? 'dsg-job-inspector-panel' : undefined}
+                className="mt-2 min-h-11 rounded-xl border border-sky-800 px-3 py-2 text-sm font-semibold text-sky-200">
+                {selectedJobId === job.id ? 'ซ่อนผลและหลักฐาน' : 'ดูผลและหลักฐาน'}
+              </button>
+              {selectedJobId === job.id && <div id="dsg-job-inspector-panel">
+                <DsgJobInspector key={job.id} jobId={job.id} />
+              </div>}
             </div>
           ))}
         </div>
