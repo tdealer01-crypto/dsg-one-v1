@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getDsgBrowserSession, DSG_AUTH0_CALLBACK } from '@/lib/dsg/user-bound/browser-session';
 import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
+import { nativeShellOutcome } from '@/lib/dsg/user-bound/native-shell-outcome';
 import {
   asRecord, catalogRoutes, composeWorkroomRoutes, publicWorkroomReceipt,
   uniqueWorkroomRoute, workroomReceiptMatches,
@@ -36,7 +37,8 @@ export function DsgLiveWorkroom() {
   const [routes, setRoutes] = useState<WorkroomRoute[]>([]);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [tab, setTab] = useState<'agent' | 'browser' | 'desktop'>(() =>
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'browser' ? 'browser' : 'agent'
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'browser' ? 'browser' :
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'desktop' ? 'desktop' : 'agent'
   );
   const [goal, setGoal] = useState('');
   const [chat, setChat] = useState<ChatTurn[]>([]);
@@ -48,6 +50,9 @@ export function DsgLiveWorkroom() {
   const [path, setPath] = useState('');
   const [command, setCommand] = useState('');
   const transcript = useRef<HTMLDivElement | null>(null);
+  const [verifiedAction, setVerifiedAction] = useState<string | null>(null);
+  const [shellProcessId, setShellProcessId] = useState<string | null>(null);
+  const [shellOutcome, setShellOutcome] = useState<'running' | 'succeeded' | 'failed' | 'unknown' | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -105,7 +110,9 @@ export function DsgLiveWorkroom() {
     try { await work(); }
     catch (error) {
       const reason = error instanceof Error ? error.message : 'REQUEST_FAILED';
-      setStatus(`ยังทำงานไม่สำเร็จ: ${reason} — ตรวจเซสชันหรือสถานะ provider ก่อนลองใหม่`);
+      setStatus(reason === 'HUMAN_APPROVAL_NOT_READY' || reason === 'APPROVAL_PENDING'
+        ? 'ยังรอการอนุมัติในหน้าเจ้าของ เมื่ออนุมัติแล้วกลับมาแท็บนี้หรือกดตรวจการอนุมัติ'
+        : `ยังทำงานไม่สำเร็จ: ${reason} — ตรวจเซสชันหรือสถานะ provider ก่อนลองใหม่`);
     } finally { busyRef.current = false; setBusy(false); }
   }
 
@@ -114,7 +121,7 @@ export function DsgLiveWorkroom() {
       setStatus('กำลังเปิด Auth0 แล้วจะกลับมาหน้า Workroom');
       await getDsgBrowserSession().loginWithRedirect({
         authorizationParams: { redirect_uri: DSG_AUTH0_CALLBACK },
-        appState: { returnTo: '/dsg/workroom' },
+        appState: { returnTo: window.location.pathname + window.location.search },
       });
     });
   }
@@ -142,6 +149,7 @@ export function DsgLiveWorkroom() {
     const chain = await tool('spacetime_verify_evidence', {});
     if (!chain.evidenceVerified || chain.receipt?.valid !== true) throw new Error('EVIDENCE_CHAIN_NOT_VERIFIED');
     setReceipt(publicWorkroomReceipt(data.receipt));
+    setVerifiedAction(label);
     const result = asRecord(data.receipt?.result)!;
     if (typeof request.payload.action === 'string') {
       history.current = [...history.current, {
@@ -153,7 +161,18 @@ export function DsgLiveWorkroom() {
         evidence_hash: asRecord(data.receipt?.evidence)?.evidence_hash,
       }].slice(-6);
     }
-    setStatus(`${label}: ได้รับผลจาก provider และตรวจสายหลักฐานแล้ว ดูผลด้านล่าง`);
+    if (request.route_id === 'route.desktop-native.shell-exec') {
+      // Provider evidence proves dispatch, not command exit success.
+      const outcome = nativeShellOutcome(result);
+      setShellOutcome(outcome.state);
+      setShellProcessId(outcome.state === 'running' ? outcome.processId : null);
+      if (outcome.state === 'succeeded') setStatus('คำสั่งทำงานเสร็จ (exit code 0) และตรวจหลักฐานแล้ว');
+      else if (outcome.state === 'failed') setStatus('คำสั่งสิ้นสุดด้วย exit code ' + outcome.exitCode + ' · ดูผลด้านล่าง');
+      else if (outcome.state === 'running') setStatus('ส่งคำสั่งแล้ว · อุปกรณ์กำลังทำงาน รอตรวจ Exit Code');
+      else setStatus('ส่งคำสั่งแล้ว แต่ยังยืนยันผลลัพธ์ของโปรเซสไม่ได้ (ไม่สั่งซ้ำ)');
+    } else {
+      setStatus(`${label}: ได้รับผลจาก provider และตรวจสายหลักฐานแล้ว ดูผลด้านล่าง`);
+    }
     return result;
   }
 
@@ -193,6 +212,8 @@ export function DsgLiveWorkroom() {
 
   async function runSteps(steps: PlannedStep[], label: string) {
     if (pending) throw new Error('FINISH_OR_CANCEL_PENDING_REQUEST_FIRST');
+    setVerifiedAction(null);
+    setReceipt(null);
     const planned = await preparePlan(steps, label);
     const withApprovals: PendingStep[] = [];
     for (const step of planned) {
@@ -208,8 +229,8 @@ export function DsgLiveWorkroom() {
     if (withApprovals.some(step => step.approvalRequestId)) {
       setPending({ label, steps: withApprovals });
       setStatus(withApprovals.length > 1
-        ? 'คำขอชุดเดียวกันพร้อมให้มนุษย์ตรวจ payload เปิดหน้าอนุมัติทุกใบ แล้วกลับมากดดำเนินการต่อ'
-        : 'คำขอพร้อมให้มนุษย์ตรวจ payload เปิดหน้าอนุมัติ แล้วกลับมากดดำเนินการต่อ');
+        ? 'รออนุมัติตามรายการด้านล่าง เมื่อครบแล้วกลับมาเพื่อทำงานต่อ'
+        : 'รออนุมัติ 1 คำขอ เปิดหน้าตรวจคำสั่งแล้วกลับมา ระบบจะพยายามทำงานต่ออัตโนมัติ');
       return null;
     }
     let result: JsonRecord | null = null;
@@ -238,7 +259,71 @@ export function DsgLiveWorkroom() {
     }
   }
 
+  async function checkShellProcess() {
+    if (!shellProcessId) return;
+    const expectedProcessId = shellProcessId;
+    const planned = await preparePlan([{
+      capability: 'device.process.list', target: desktopTarget,
+      makePayload: () => ({ action: 'device.process.list', arguments: {} }),
+      label: 'ตรวจผลคำสั่งที่กำลังทำงาน',
+    }], 'ติดตาม Native Shell ผ่าน Route อ่านรายการโปรเซสเดิม');
+    const result = await execute(planned[0].request, 'ตรวจผลคำสั่ง');
+    const outcome = nativeShellOutcome(result, expectedProcessId);
+    setShellOutcome(outcome.state);
+    if (outcome.state === 'succeeded') {
+      setShellProcessId(null);
+      setStatus('คำสั่งเสร็จสำเร็จ (exit code 0) · ตรวจผลผ่าน Native Provider และ Evidence แล้ว');
+    } else if (outcome.state === 'failed') {
+      setShellProcessId(null);
+      setStatus('คำสั่งจบด้วย exit code ' + outcome.exitCode + ' · ดูข้อความจากโปรเซสในผลลัพธ์');
+    } else if (outcome.state === 'running') {
+      setStatus('โปรเซสยังทำงานอยู่ · สามารถตรวจผลอีกครั้งได้');
+    } else {
+      setStatus('ยังยืนยันผลคำสั่งนี้ไม่ได้ ไม่สั่ง Shell ซ้ำ');
+    }
+  }
+
+  useEffect(() => {
+    if (!ready || !shellProcessId || shellOutcome !== 'running') return;
+    // One automatic read-only readback. Do not re-dispatch the shell command.
+    const timer = window.setTimeout(() => {
+      if (!busyRef.current) void act(checkShellProcess);
+    }, 4000);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, shellProcessId, shellOutcome]);
+
+  function selectTool(item: 'agent' | 'browser' | 'desktop') {
+    setTab(item);
+    // Persist only the chosen UI route, never auth tokens, shell commands or permits.
+    const next = new URL(window.location.href);
+    if (item === 'agent') next.searchParams.delete('tool');
+    else next.searchParams.set('tool', item);
+    window.history.replaceState(window.history.state, '', next.pathname + next.search + next.hash);
+  }
+
   const isAvailable = (cap: string, target: string) => routes.some(route => route.capability === cap && route.target_node === target);
+
+  useEffect(() => {
+    if (!pending || !ready || pending.steps.length !== 1 ||
+        !pending.steps[0].approvalRequestId ||
+        pending.steps[0].request.route_id !== 'route.desktop-native.shell-exec') return;
+    const onReturn = () => {
+      if (!document.hidden && !busyRef.current) {
+        // A single claim attempt on return; the backend must prove APPROVED.
+        // Execute is one-shot after claim. No polling/new approvals on failures.
+        void act(resume);
+      }
+    };
+    window.addEventListener('focus', onReturn);
+    document.addEventListener('visibilitychange', onReturn);
+    return () => {
+      window.removeEventListener('focus', onReturn);
+      document.removeEventListener('visibilitychange', onReturn);
+    };
+    // Listener is scoped to the pending exact request and authenticated session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending, ready]);
 
   async function sendGoal() {
     const message = goal.trim();
@@ -311,19 +396,19 @@ export function DsgLiveWorkroom() {
 
   return (
     <section id="live-controls" className="scroll-mt-20 rounded-3xl border border-indigo-400/30 bg-slate-900 p-5 md:p-6" aria-label="เครื่องมือ Workroom">
-      <h2 className="text-2xl font-bold">Agent v0 · Remote Browser · Remote Desktop</h2>
-      <p className="mt-2 text-sm text-slate-400">พิมพ์เป้าหมาย ตรวจแผน และดูผลจากเครื่องมือที่เชื่อมอยู่</p>
+      <h2 className="text-2xl font-bold">ควบคุมเว็บและคอมพิวเตอร์</h2>
+      <p className="mt-2 text-sm text-slate-300">เลือกงาน → ตรวจสิทธิ์ → อนุมัติเฉพาะเมื่อจำเป็น → ดูผลและหลักฐานจริง</p>
       <p role="status" aria-live="polite" className="mt-4 break-words rounded-xl bg-slate-950 p-4 text-sm text-indigo-100">{status}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {!ready && <button className={button} disabled={busy || initializing} onClick={() => void login()}>เข้าสู่ระบบเครื่องมือ</button>}
-        <button className={button} disabled={busy || !ready} onClick={() => void act(async () => { await loadCatalog(); })}>อ่านเครื่องมือที่เชื่อมอยู่</button>
-        <a href="/dsg/access" className={button}>สิทธิ์ workspace</a>
+        <details className="rounded-xl border border-slate-700 p-2 text-sm"><summary className="cursor-pointer px-2 py-1">การเชื่อมต่อ (ขั้นสูง)</summary><button className={`${button} mt-2`} disabled={busy || !ready} onClick={() => void act(async () => { await loadCatalog(); })}>ตรวจรายการเครื่องมือ</button></details>
+        <a href="/dsg/access" className={button}>บัญชีและพื้นที่ทำงาน</a>
       </div>
       <div role="tablist" aria-label="เลือกเครื่องมือ" className="mt-6 flex flex-wrap gap-2">
         {(['agent', 'browser', 'desktop'] as const).map((item, index) => (
           <button key={item} role="tab" id={`workroom-tab-${item}`} aria-controls={`workroom-panel-${item}`} aria-selected={tab === item}
-            onClick={() => setTab(item)} className={`${button} ${tab === item ? 'bg-indigo-700 border-indigo-400' : ''}`}>
-            {['แชท Agent v0', 'Remote Browser', 'Remote Desktop'][index]}
+            onClick={() => selectTool(item)} className={`${button} ${tab === item ? 'bg-indigo-700 border-indigo-400' : ''}`}>
+            {['วางแผนด้วย AI', 'ควบคุมเว็บ', 'สั่งงานอุปกรณ์'][index]}
           </button>
         ))}
       </div>
@@ -361,43 +446,50 @@ export function DsgLiveWorkroom() {
           <button className={button} disabled={busy || !ready || Boolean(pending) || !url.trim()} onClick={() => void act(browserNavigate)}>ขอเชื่อม เปิดเว็บ และอ่านผล</button>
         </>}
         {tab === 'desktop' && <>
-          <p className="text-sm text-slate-300">ส่งคำสั่งผ่าน DSG Desktop Native ที่ผูกกับ runtime โดยตรง ระบบจะไม่ fallback ไป hosted RDC</p>
+          <p className="text-sm text-slate-300">สั่งงานบนอุปกรณ์ DSG Native ที่เชื่อมอยู่ (ปัจจุบันคือ Android/Termux) ไม่ใช่ Linux EC2 ที่เปิดผ่าน Chrome Remote Desktop</p>
           {catalogLoaded && !isAvailable('device.remote.status', desktopTarget) && <p className="text-amber-200">DSG Desktop Native ยังไม่ได้ enroll กับ runtime — จับคู่เครื่องก่อนใช้งาน</p>}
           <div className="flex flex-wrap gap-2">
-            <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('device.remote.status', desktopTarget, () => ({ action: 'device.remote.status', arguments: {} }), 'ตรวจ Remote Desktop'); })}>ตรวจ Remote Desktop</button>
-            <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('device.process.list', desktopTarget, () => ({ action: 'device.process.list', arguments: {} }), 'อ่านรายการ process'); })}>อ่านรายการ process</button>
-            <a href="/control/" target="_blank" rel="noreferrer" className={button}>จับคู่ Desktop ↗</a>
+            <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('device.remote.status', desktopTarget, () => ({ action: 'device.remote.status', arguments: {} }), 'ตรวจ Remote Desktop'); })}>ตรวจอุปกรณ์ที่เชื่อมต่อ</button>
+            <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('device.process.list', desktopTarget, () => ({ action: 'device.process.list', arguments: {} }), 'อ่านรายการ process'); })}>ดูโปรแกรมที่กำลังทำงาน</button>
+            <a href="/control/" target="_blank" rel="noreferrer" className={button}>จัดการอุปกรณ์ ↗</a>
           </div>
           <label htmlFor="workroom-file-path" className="block text-sm font-semibold">ไฟล์ที่จะอ่าน</label>
           <input id="workroom-file-path" value={path} onChange={event => setPath(event.target.value)} className={field} placeholder="พาธในอุปกรณ์ที่ผูกไว้" />
           <button className={button} disabled={busy || !ready || Boolean(pending) || !path.trim()} onClick={() => void act(async () => { await run('device.fs.read', desktopTarget, () => ({ action: 'device.fs.read', arguments: { path: path.trim(), length: 100 } }), 'อ่านไฟล์จาก Desktop'); })}>อ่านไฟล์</button>
-          <label htmlFor="workroom-shell-command" className="block text-sm font-semibold">คำสั่งที่จะให้ Desktop ทำ</label>
-          <textarea id="workroom-shell-command" rows={2} value={command} onChange={event => setCommand(event.target.value)} className={field} />
-          <button className={button} disabled={busy || !ready || Boolean(pending) || !command.trim()} onClick={() => void act(async () => { await run('device.shell.exec', desktopTarget, () => ({ action: 'device.shell.exec', arguments: { command: command.trim() } }), 'เรียกคำสั่งบน Desktop'); })}>ขออนุมัติคำสั่ง</button>
+          <label htmlFor="workroom-shell-command" className="block text-sm font-semibold">สั่งให้ DSG Native ทำอะไร (Shell Command)</label>
+          <textarea id="workroom-shell-command" rows={2} value={command} onChange={event => setCommand(event.target.value)} className={field} placeholder="เช่น pwd หรือ ls -la" />
+          <button className={button} disabled={busy || !ready || Boolean(pending) || !command.trim()} onClick={() => void act(async () => { await run('device.shell.exec', desktopTarget, () => ({ action: 'device.shell.exec', arguments: { command: command.trim(), wait_seconds: 3 } }), 'ทำคำสั่งบน DSG Native'); })}>เริ่มงาน · อนุมัติเมื่อจำเป็น</button>
+          {shellProcessId && (
+            <div className="rounded-xl border border-indigo-400/30 p-3 text-sm">
+              <p>สถานะคำสั่ง: {shellOutcome === 'running' ? 'กำลังทำงาน' : 'รอตรวจผล'}</p>
+              <button className={`${button} mt-2`} disabled={busy || !ready || Boolean(pending)}
+                onClick={() => void act(checkShellProcess)}>ตรวจผลคำสั่งเดิม (ไม่รันซ้ำ)</button>
+            </div>
+          )}
         </>}
       </div>
       {pending && <section className="mt-5 rounded-xl border border-amber-400/50 p-4" aria-label="งานรออนุมัติ">
-        <h3 className="font-bold text-amber-100">รอมนุษย์อนุมัติ: {pending.label}</h3>
-        <p className="mt-2 text-sm text-slate-300">ตรวจรายละเอียดในหน้าอนุมัติที่เปิดแยก แล้วกลับมาทำงานต่อภายใน 10 นาที</p>
-        <pre className="mt-3 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(publicWorkroomReceipt(pending.steps.map(step => ({
+        <h3 className="font-bold text-amber-100">ขั้นตอนที่ 2/3 · รอเจ้าของอนุมัติงาน</h3>
+        <p className="mt-2 text-sm text-slate-300">เปิดคำขอ 1 ครั้ง ตรวจแล้วกดอนุมัติ จากนั้นกลับมาแท็บนี้ ระบบจะตรวจและทำต่อสำหรับ Native Shell อัตโนมัติเมื่อเซสชันยังอยู่ (ภายใน 10 นาที)</p>
+        <details className="mt-3 rounded-lg border border-slate-700 p-3"><summary className="cursor-pointer text-sm">รายละเอียดเทคนิคของคำขอ</summary><pre className="mt-2 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(publicWorkroomReceipt(pending.steps.map(step => ({
           label: step.label,
           approval_request_id: step.approvalRequestId,
           route_id: step.request.route_id,
           payload: step.request.payload,
-        }))), null, 2)}</pre>
+        }))), null, 2)}</pre></details>
         <div className="mt-3 flex flex-wrap gap-2">
           {pending.steps.filter(step => step.approvalRequestId).map((step, index) => (
             <a key={step.approvalRequestId} href={approvalHref(step.approvalRequestId)}
-              target="_blank" rel="noreferrer" className={button}>เปิดคำขอ {index + 1} ในหน้าอนุมัติ ↗</a>
+              target="_blank" rel="noreferrer" className={`${button} bg-indigo-700`}>อนุมัติงาน {index + 1} ↗</a>
           ))}
-          <button className={button} disabled={busy || !ready} onClick={() => void act(resume)}>ดำเนินการต่อหลังอนุมัติ</button>
+          <button className={button} disabled={busy || !ready} onClick={() => void act(resume)}>ตรวจการอนุมัติและทำงานต่อ</button>
           <button className={button} disabled={busy} onClick={() => { setPending(null); setStatus('หยุดรอในหน้านี้ คำขอที่ยังไม่อนุมัติจะหมดอายุเอง'); }}>หยุดรอ</button>
         </div>
       </section>}
-      {receipt != null && <details open className="mt-5 rounded-xl border border-slate-700 p-4">
-        <summary className="cursor-pointer font-semibold">ผลล่าสุดจาก provider</summary>
+      {receipt != null && <section className="mt-5 rounded-xl border border-emerald-600/50 p-4" aria-label="ผลการทำงานที่ตรวจหลักฐานแล้ว"><h3 className="font-bold text-emerald-200">ขั้นตอนที่ 3/3 · {verifiedAction || 'งานล่าสุด'} — ตรวจหลักฐานแล้ว</h3><details className="mt-3">
+        <summary className="cursor-pointer font-semibold">ดูผล Provider และ Evidence (ขั้นสูง)</summary>
         <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-300">{JSON.stringify(receipt, null, 2)}</pre>
-      </details>}
+      </details></section>}
     </section>
   );
 }

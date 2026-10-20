@@ -24,7 +24,8 @@ describe('DSG ONE production landing first-value flow', () => {
 
   it('retains production proof truth and does not claim provider E2E from device reachability', () => {
     expect(landing).toContain('<PublicProductionSnapshot />');
-    expect(landing).toContain('Online alone is not proof of a complete job.');
+    expect(landing).toContain('ตรวจผลเมื่อโปรเซสทำงานเสร็จ');
+    expect(landing).toContain('Production truth boundary: OAuth-bound signed read-only provider E2E');
     expect(landing).not.toContain('Native Desktop activation and device enrollment are pending.');
     expect(landing).toContain('Cinema browser Connect/Execute, Quest/Unity and whole-system E2E remain NOT VERIFIED');
     expect(landing).toContain('not live telemetry.');

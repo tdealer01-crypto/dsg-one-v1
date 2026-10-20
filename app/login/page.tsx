@@ -22,12 +22,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
-  const [message, setMessage] = useState('Sign in once to establish a protected DSG session.');
+  const [message, setMessage] = useState('เข้าสู่ระบบด้วยบัญชี DSG ONE เพื่อกลับไปทำงานต่อ');
 
   async function signIn(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatus('loading');
-    setMessage('Checking credentials and creating DSG session…');
+    setMessage('กำลังตรวจบัญชีและเปิดพื้นที่ทำงาน…');
 
     try {
       const response = await fetch('/api/auth/session', {
@@ -37,10 +37,10 @@ export default function LoginPage() {
         credentials: 'include',
       });
       const payload = await response.json() as { ok?: boolean; error?: string };
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Sign in failed.');
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'เข้าสู่ระบบไม่สำเร็จ');
 
       setStatus('success');
-      setMessage('Signed in. Redirecting to DSG Access Console…');
+      setMessage('เข้าสู่ระบบสำเร็จ กำลังกลับไปยังหน้าที่เลือก…');
       window.location.assign(nextPath);
     } catch (error) {
       setStatus('error');
@@ -56,12 +56,12 @@ export default function LoginPage() {
             <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-400/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-indigo-200">
               <ShieldCheck className="h-3.5 w-3.5" /> DSG Protected Access
             </div>
-            <h1 className="mt-6 text-4xl font-black tracking-tight md:text-5xl">Sign in once. Enter the governed workspace.</h1>
+            <h1 className="mt-6 text-3xl font-black tracking-tight md:text-5xl">เข้าสู่ระบบเพื่อทำงานต่อ</h1>
             <p className="mt-4 max-w-lg text-sm leading-6 text-slate-400">
-              Email sign-in creates a secure HttpOnly DSG session. Runtime credentials remain server-side and are never exposed to the browser.
+              ใช้บัญชี DSG ONE ของคุณ ระบบจะกลับไปยังเครื่องมือที่เลือกไว้โดยอัตโนมัติ ไม่ต้องเริ่มงานใหม่
             </p>
             <div className="mt-8 rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Next route</p>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">หลังเข้าสู่ระบบจะกลับไปหน้านี้</p>
               <p className="mt-2 break-all font-mono text-sm text-indigo-200">{nextPath}</p>
             </div>
           </div>
@@ -72,21 +72,21 @@ export default function LoginPage() {
             </div>
             <form onSubmit={signIn} className="space-y-4">
               <label className="block text-sm font-bold text-slate-300">
-                Email
+                อีเมล
                 <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition-colors focus:border-indigo-500" placeholder="you@example.com" />
               </label>
               <label className="block text-sm font-bold text-slate-300">
-                Password
+                รหัสผ่าน
                 <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" required className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition-colors focus:border-indigo-500" placeholder="••••••••" />
               </label>
               <button type="submit" disabled={status === 'loading'} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400">
-                {status === 'loading' ? 'Signing in…' : 'Continue'} <ArrowRight className="h-4 w-4" />
+                {status === 'loading' ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบและทำงานต่อ'} <ArrowRight className="h-4 w-4" />
               </button>
             </form>
             <p className={`mt-5 rounded-2xl border px-4 py-3 text-sm ${status === 'error' ? 'border-red-500/30 bg-red-500/10 text-red-200' : status === 'success' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' : 'border-slate-800 bg-slate-950 text-slate-400'}`}>
               {message}
             </p>
-            <Link href="/" className="mt-5 inline-flex text-sm font-bold text-indigo-300 hover:text-indigo-200">Back to home</Link>
+            <Link href="/" className="mt-5 inline-flex text-sm font-bold text-indigo-300 hover:text-indigo-200">กลับหน้าแรก</Link>
           </div>
         </section>
       </div>

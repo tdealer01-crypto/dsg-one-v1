@@ -227,13 +227,13 @@ export function DsgOperatorChat() {
             placeholder="พิมพ์สั่งงานหรือคุยกับเอเจนต์…"/>
           <button type="submit" disabled={!draft.trim()}
             className="min-h-12 rounded-2xl bg-indigo-600 px-5 text-sm font-bold text-white disabled:opacity-40">
-            ส่ง
+            ส่งข้อความ
           </button>
         </form>
         {pendingReplies > 0 && <p role="status" className="mt-2 text-xs text-slate-400">กำลังตอบ {pendingReplies} ข้อความ · พิมพ์ข้อความถัดไปได้เลย</p>}
       </div>
-      <details className="border-t border-slate-800 px-4 py-3 sm:px-6">
-        <summary className="cursor-pointer text-sm font-semibold text-slate-300">งานที่รับไว้ ({jobs.length})</summary>
+      <details id="dsg-jobs" className="scroll-mt-20 border-t border-slate-800 px-4 py-3 sm:px-6">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-300">ติดตามงานและผลลัพธ์ ({jobs.length})</summary>
         {jobsIssue && <p role="status" className="mt-2 text-sm text-amber-200">ยังตรวจสถานะงานไม่ได้: {jobsIssue}</p>}
         {jobs.length === 0 && !jobsIssue && <p className="mt-3 text-sm text-slate-400">ยังไม่มีรายการงานใน Workspace นี้</p>}
         <div className="mt-3 space-y-2">

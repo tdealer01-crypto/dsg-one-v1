@@ -14,24 +14,24 @@ import {
 
 const systemEntries = [
   {
-    title: 'Access Hub',
-    description: 'Sign in, select your DSG workspace, and access governed product tools.',
+    title: 'บัญชีและพื้นที่ทำงาน',
+    description: 'เข้าสู่ระบบ ดูบัญชี และเลือกพื้นที่ทำงานของคุณ',
     href: '/dsg/access',
     badge: 'Sign-in required',
     external: false,
   },
   {
-    title: 'Workroom',
-    description: 'Your operator workspace for goals, Agent Chat and Command Center.',
+    title: 'สั่งงานผ่านแชท',
+    description: 'พิมพ์สิ่งที่ต้องการ แล้วติดตามงานและผลลัพธ์ได้ในที่เดียว',
     href: '/dsg/workroom',
     badge: 'Sign-in required',
     external: false,
   },
   {
-    title: 'DSG Native Desktop',
-    description: 'Check current device connection, permitted capabilities and evidence in the control page. Online alone is not proof of a complete job.',
-    href: '/control/',
-    badge: 'Check device status',
+    title: 'สั่งงานอุปกรณ์ DSG Native',
+    description: 'สั่งคำสั่งบนอุปกรณ์ Native ที่เชื่อมไว้ ตรวจผลเมื่อโปรเซสทำงานเสร็จ และอนุมัติเฉพาะงานที่จำเป็น',
+    href: '/dsg/workroom?tool=desktop',
+    badge: 'เชื่อมอุปกรณ์ · อนุมัติตามความจำเป็น',
     external: false,
   },
   {
@@ -42,8 +42,8 @@ const systemEntries = [
     external: false,
   },
   {
-    title: 'Cinema Remote Browser',
-    description: 'Open existing Workroom Browser Controls to check Cinema status, request signed approval, and navigate after authorization. Evidence Console is a different page.',
+    title: 'ควบคุมเว็บด้วย Cinema',
+    description: 'เชื่อมเบราว์เซอร์ เปิดเว็บไซต์ และดูผลหลังได้รับอนุญาต',
     href: '/dsg/workroom?tool=browser',
     badge: 'Workroom · approval-gated',
     external: false,
@@ -56,8 +56,8 @@ const systemEntries = [
     external: true,
   },
   {
-    title: 'Human Approvals',
-    description: 'Review exact Spacetime requests with your linked Auth0 approver account. MFA may be required.',
+    title: 'รายการรออนุมัติ',
+    description: 'ตรวจคำขอและยืนยันเฉพาะเมื่อระบบต้องการ MFA',
     href: '/dsg/approvals',
     badge: 'Approver sign-in',
     external: false,
@@ -113,18 +113,18 @@ export default function HomePage() {
           </Link>
 
           <nav className="hidden items-center gap-2 md:flex">
-            <Link href="/architecture-3d.html" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-300 hover:bg-slate-800 hover:text-white">3D architecture</Link>
-            <Link href="/closure-dashboard.html" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-cyan-200">Closure checklist</Link>
-            <a href="#system-access" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-slate-800 hover:text-white">System access</a>
+            <Link href="/dsg/workroom" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-300 hover:bg-slate-800 hover:text-white">สั่งงาน</Link>
+            <Link href="/dsg/workroom?tool=desktop" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-cyan-200">อุปกรณ์ Native</Link>
+            <Link href="/dsg/workroom?tool=browser" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-slate-800 hover:text-white">ควบคุมเว็บ</Link>
             <a href="#how-it-works" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white">
-              How it works
+              วิธีใช้งาน
             </a>
             <a href="#truth-boundary" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white">
-              Truth boundary
+              ตรวจหลักฐาน
             </a>
             <Link href="/login?next=/dsg/access" className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:border-cyan-300/50 hover:text-white">
               <LogIn className="h-4 w-4" />
-              Sign in
+              เข้าสู่ระบบ
             </Link>
           </nav>
 
@@ -135,7 +135,8 @@ export default function HomePage() {
               </summary>
               <nav aria-label="Mobile navigation" className="absolute right-0 top-12 z-50 flex w-64 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border border-slate-700 bg-slate-900 p-2 text-sm shadow-2xl">
                 <Link href="/dsg/workroom" className="rounded-lg px-3 py-3 text-cyan-200 hover:bg-slate-800">สั่งงานผ่านแชท</Link>
-                <Link href="/dsg/access" className="rounded-lg px-3 py-3 hover:bg-slate-800">Access Hub</Link>
+                <Link href="/dsg/workroom?tool=desktop" className="rounded-lg px-3 py-3 hover:bg-slate-800">สั่งงานอุปกรณ์ Native</Link>
+                <Link href="/dsg/workroom?tool=browser" className="rounded-lg px-3 py-3 hover:bg-slate-800">ควบคุมเว็บ</Link>
                 <Link href="/dsg/approvals" className="rounded-lg px-3 py-3 hover:bg-slate-800">รายการอนุมัติ</Link>
                 <a href="#system-access" className="rounded-lg px-3 py-3 hover:bg-slate-800">เครื่องมือทั้งหมด</a>
                 <Link href="/architecture-3d.html" className="rounded-lg px-3 py-3 hover:bg-slate-800">สถาปัตยกรรม 3D</Link>
@@ -202,7 +203,7 @@ export default function HomePage() {
               </p>
             </div>
             <Link href="/login?next=/dsg/access" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-3 text-sm font-black text-slate-950 hover:bg-cyan-200">
-              เปิด Access Hub <ArrowRight className="h-4 w-4" />
+              บัญชีและพื้นที่ทำงาน <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
