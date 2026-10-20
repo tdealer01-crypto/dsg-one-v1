@@ -126,6 +126,20 @@ export default function ApprovalClient() {
         const authenticated = await c.isAuthenticated();
         setTokenReady(authenticated);
         setAuthFailure(null);
+        // A user who clicked an exact pending-request link already asked to
+        // review that request. Start the existing PKCE Auth0 login immediately
+        // rather than requiring another tiny tap in an Android webview.
+        // Never auto-approve, run MFA, or redirect for the generic approvals
+        // page. Do not loop if an OAuth callback was just handled.
+        if (!authenticated && reviewApprovalId && !(params.has('code') && params.has('state'))) {
+          authPhase = 'login';
+          setStatus('กำลังพาไปยืนยันว่าเป็นเจ้าของผ่าน Auth0 สำหรับคำขอนี้');
+          await c.loginWithRedirect({
+            authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE },
+            appState: { kind: 'review' as const, approvalRequestId: reviewApprovalId },
+          });
+          return;
+        }
         if (authenticated && reviewApprovalId) {
           setRequestedApprovalId(reviewApprovalId);
           window.history.replaceState(null, '', CALLBACK + '?approval_request_id=' + encodeURIComponent(reviewApprovalId));
