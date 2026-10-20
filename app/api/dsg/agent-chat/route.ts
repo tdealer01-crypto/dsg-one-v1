@@ -97,58 +97,26 @@ function buildMessages(body: ChatBody, memory: AgentPersistentMemoryResult, exte
 }
 
 function localFallbackReply(message: string, providerError: string, memory: AgentPersistentMemoryResult, externalContext: ExternalContextResult) {
-  const graphify = shouldUseGraphifyContext(message);
-  const phase1 = shouldUsePhase1Governance(message);
-  const governanceDb = shouldUseGovernanceDb(message);
+  // Deterministic routing remains available for diagnostics but is NOT a chat model.
   const route = routeAgentCommand({
     command: message,
-    context: graphify || phase1 || governanceDb
-      ? `Fallback from DSG Agent Chat because the AI provider is unavailable. Use DSG references and persistent memory when available. Memory status: ${memory.status}. External tools: ${externalContext.items.map((item) => `${item.tool}:${item.status}`).join(', ')}. Do not invent repo, connector, database, or external API evidence.`
-      : `Fallback from DSG Agent Chat because the AI provider is unavailable. Use DSG planning rules and persistent memory when available. Memory status: ${memory.status}. External tools: ${externalContext.items.map((item) => `${item.tool}:${item.status}`).join(', ')}.`,
-    userBenefit: 'ผู้ใช้ยังได้คำตอบและขั้นตอนต่อไป แม้ AI provider จะใช้งานไม่ได้ชั่วคราว',
+    context: `AI_MODEL_UNAVAILABLE; memory=${memory.status}; external=${externalContext.items.map(item => item.tool + ':' + item.status).join(',')}`,
+    userBenefit: 'ผู้ใช้เห็นสถานะจริงและสามารถเริ่มงานใหม่ได้เมื่อเชื่อมโมเดลสำเร็จ',
   });
 
-  const evidence = route.evidence.length ? route.evidence.join(', ') : 'route decision';
-  const memoryNote = memory.status === 'active'
-    ? `Persistent memory loaded: ${memory.memoryIds.length} memory item(s), gate=${memory.gateStatus || 'unknown'}`
-    : `Persistent memory status: ${memory.status}${memory.error ? ` (${memory.error})` : ''}`;
-  const externalNote = externalContext.items.filter((item) => item.status !== 'skipped').map((item) => `External tool ${item.tool}: ${item.status}${item.reason ? ` (${item.reason})` : ''}`).join('\n');
-  const graphifyNote = graphify
-    ? 'Graphify boundary: ถ้ายังไม่ได้ inspect repo จริง ต้องถือว่าเป็น BLOCKED/REVIEW ไม่ใช่ verified context graph.'
-    : undefined;
-  const phase1Note = phase1
-    ? 'Phase 1 governance boundary: connector/tool execution ต้องผ่าน risk classification, policy decision, approval/evidence/replay hash; ยังไม่ claim production ถ้าไม่มี RBAC, vault, migration, CI, และ live connector proof.'
-    : undefined;
-  const dbNote = governanceDb
-    ? 'Governance DB boundary: agent_jobs / approval_requests / execution_steps / governance_audit_logs เป็น durable state source แต่ต้อง query DB จริงก่อน claim ว่า row มีอยู่.'
-    : undefined;
-
+  // Never inject lengthy plans, raw provider diagnostics, search configuration or
+  // developer-only policy text into a user-facing chat response as fake AI output.
+  const missingCredential = providerError === 'DSG_CHAT_NO_MODEL_CREDENTIALS';
   const reply = [
-    `ตอนนี้ AI model ใช้งานไม่ได้ชั่วคราว: ${providerError}`,
-    '',
-    'ผมใช้ DSG local fallback วิเคราะห์คำสั่งแทน โดยยึดกฎ planning / permission / evidence ที่ตั้งไว้',
-    memoryNote,
-    externalNote || undefined,
-    graphifyNote,
-    phase1Note,
-    dbNote,
-    `สถานะ: ${route.status}`,
-    `ประเภทงาน: ${route.intent}`,
-    `action ที่แนะนำ: ${route.actionLabel}`,
-    route.endpoint ? `endpoint: ${route.method || 'GET'} ${route.endpoint}` : undefined,
-    `หลักฐานที่ควรได้: ${evidence}`,
-    '',
-    route.status === 'blocked'
-      ? 'คำสั่งนี้ถูกบล็อกตาม policy ต้องปรับคำขอให้ปลอดภัยก่อน'
-      : 'ถ้าต้องการสร้างจริง ให้ใช้ Agent Command Center ด้านล่าง แล้วกด Build Now / Run Builder Request เพื่อเข้า governed builder flow',
-    '',
-    'ลำดับมาตรฐานที่ระบบจะใช้: goal lock → current-state inspection → architecture summary → risk and permission checkpoints → approved execution → verification → final review',
-    graphify ? 'ถ้าเป็นงาน repo/codebase ต้องเพิ่ม: repository inspection → privacy/secret gate → context graph → graph report → plan gate' : undefined,
-    phase1 ? 'ถ้าเป็นงาน connector/tool ต้องเพิ่ม: connector registry → tool mapping → risk classification → policy evaluation → approval queue/evidence manifest → audit/replay proof' : undefined,
-    governanceDb ? 'ถ้าเป็นงาน durable memory/governance state ต้องเช็ก: agent_jobs → approval_requests → execution_steps → governance_audit_logs' : undefined,
-    `Truth boundary: ${route.truthBoundary}`,
-  ].filter(Boolean).join('\n');
-
+    missingCredential
+      ? 'ยังไม่ได้เชื่อมโมเดล AI สำหรับแชท DSG ONE บนเซิร์ฟเวอร์'
+      : 'โมเดล AI ยังไม่ตอบกลับในขณะนี้',
+    'ข้อความนี้เป็นสถานะระบบ ไม่ใช่คำตอบจากโมเดล และยังไม่ได้สั่งให้ Agent ลงมือทำ',
+    missingCredential
+      ? 'ผู้ดูแลต้องตั้งค่า OpenAI หรือ Gemini ฝั่งเซิร์ฟเวอร์เพื่อเปิดแชทจริง'
+      : 'ตรวจการเชื่อมต่อโมเดลแล้วลองอีกครั้ง โดยไม่ต้องส่งคำสั่ง Execute ซ้ำ',
+    'ถ้าต้องการใช้ DSG Agent v0 (Qwen) ให้เลือกแท็บ Agent v0 เมื่อ Brain Worker พร้อมใช้งาน',
+  ].join('\n');
   return { reply, route };
 }
 
