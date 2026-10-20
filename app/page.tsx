@@ -43,7 +43,7 @@ const systemEntries = [
   },
   {
     title: 'Cinema Remote Browser',
-    description: 'Open existing Workroom Browser Controls to check Cinema status, request signed approval, and navigate after authorization. Evidence Console is a different page.'
+    description: 'Open existing Workroom Browser Controls to check Cinema status, request signed approval, and navigate after authorization. Evidence Console is a different page.',
     href: '/dsg/workroom?tool=browser',
     badge: 'Workroom · approval-gated',
     external: false,
