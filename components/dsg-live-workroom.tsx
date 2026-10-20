@@ -35,7 +35,9 @@ export function DsgLiveWorkroom() {
   const subject = useRef<string | null>(null);
   const [routes, setRoutes] = useState<WorkroomRoute[]>([]);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
-  const [tab, setTab] = useState<'agent' | 'browser' | 'desktop'>('agent');
+  const [tab, setTab] = useState<'agent' | 'browser' | 'desktop'>(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'browser' ? 'browser' : 'agent'
+  );
   const [goal, setGoal] = useState('');
   const [chat, setChat] = useState<ChatTurn[]>([]);
   const [proposal, setProposal] = useState<Action | null>(null);
@@ -66,12 +68,6 @@ export function DsgLiveWorkroom() {
       } finally { if (live) setInitializing(false); }
     })();
     return () => { live = false; };
-  }, []);
-
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('tool') === 'browser') {
-      setTab('browser');
-    }
   }, []);
 
   useEffect(() => { transcript.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [chat]);
