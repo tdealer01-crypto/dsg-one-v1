@@ -68,6 +68,12 @@ export function DsgLiveWorkroom() {
     return () => { live = false; };
   }, []);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('tool') === 'browser') {
+      setTab('browser');
+    }
+  }, []);
+
   useEffect(() => { transcript.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [chat]);
 
   async function tool(name: string, args: JsonRecord): Promise<ToolReply> {
@@ -352,7 +358,7 @@ export function DsgLiveWorkroom() {
           <div className="flex flex-wrap gap-2">
             <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('browser.remote.status', browserTarget, () => ({ action: 'browser.remote.status', arguments: {} }), 'อ่านสถานะ Browser'); })}>ตรวจสถานะ Browser</button>
             <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(browserConnect)}>ขอเชื่อม Browser</button>
-            <a href="https://aws.dsg.pics/app" target="_blank" rel="noreferrer" className={button}>เปิด Shared Browser ↗</a>
+            <a href="https://aws.dsg.pics/app" target="_blank" rel="noopener noreferrer" className={button}>Evidence &amp; Conformance ↗ (ไม่ใช่ Cinema Viewer)</a>
           </div>
           <label htmlFor="workroom-browser-url" className="block text-sm font-semibold">เว็บที่จะเปิด</label>
           <input id="workroom-browser-url" type="url" value={url} onChange={event => setUrl(event.target.value)} className={field} />
