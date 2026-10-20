@@ -47,7 +47,9 @@ describe('AWS native Workroom governance', () => {
 
     expect(page).toContain("fetch('/api/dsg/access/session'");
     expect(page).toContain("fetch('/api/dsg/access/workspace'");
-    expect(page).toContain("window.location.assign('/login?next=/dsg/workroom')");
+    expect(page).toContain('window.location.pathname + window.location.search');
+    expect(page).toContain("'/login?next=' + encodeURIComponent(returnTo)");
+    expect(page).toContain("['browser', 'desktop'].includes");
     expect(page).toContain('<DsgLiveWorkroom key={selected.workspace_id} />');
     expect(page).toContain('<AgentCommandCenter />');
     // The user-facing screen is chat-first; the technical workroom is still
