@@ -42,10 +42,12 @@ describe('Customer-first UX and Native Shell handoff', () => {
   });
 
   it('reports process start as running, not successful completion', () => {
-    expect(live).toContain('operation.running === true');
-    expect(live).toContain('operation.returncode === 0');
+    const classifier = read('lib/dsg/user-bound/native-shell-outcome.ts');
+    expect(live).toContain('nativeShellOutcome(result)');
+    expect(classifier).toContain('row.running === true');
+    expect(classifier).toContain('row.returncode === 0');
     expect(live).toContain("capability: 'device.process.list'");
-    expect(live).toContain("entry?.process_id === expectedProcessId");
+    expect(classifier).toContain('row.process_id !== expectedProcessId');
     expect(live).toContain('ตรวจผลคำสั่งเดิม (ไม่รันซ้ำ)');
     expect(live).toContain('คำสั่งเสร็จสำเร็จ (exit code 0)');
   });
