@@ -61,6 +61,12 @@ export default function DsgWorkroomPage() {
   }, [load]);
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('tool') === 'browser') {
+      setAdvancedOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
@@ -103,7 +109,7 @@ export default function DsgWorkroomPage() {
           </section>
         )}
         {selected && (
-          <details className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
+          <details open={advancedOpen} className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
             onToggle={event => setAdvancedOpen(event.currentTarget.open)}>
             <summary className="cursor-pointer text-sm text-slate-400">เครื่องมือเพิ่มเติมสำหรับผู้ดูแลระบบ</summary>
             {advancedOpen && (
@@ -118,7 +124,8 @@ export default function DsgWorkroomPage() {
                   <a href="/dsg/app-builder">App Builder</a>
                   <a href="/dsg/approvals">Approvals</a>
                   <a href="/control/">AWS Workroom</a>
-                  <a href="https://aws.dsg.pics/app" target="_blank" rel="noreferrer">Cinema</a>
+                  <a href="/dsg/workroom?tool=browser#live-controls">Cinema Browser Controls</a>
+                  <a href="https://aws.dsg.pics/app" target="_blank" rel="noopener noreferrer">Evidence &amp; Conformance</a>
                 </nav>
               </div>
             )}
