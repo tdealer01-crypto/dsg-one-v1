@@ -2,6 +2,7 @@
 
 import { Auth0Client } from '@auth0/auth0-spa-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { describeApprovalAuthProblem, type ApprovalAuthPhase, type ApprovalAuthProblem } from '@/lib/dsg/client/approval-auth-diagnostics';
 
 const CALLBACK = 'https://dsg.pics/dsg/approvals';
 const AUDIENCE = 'https://aws.dsg.pics';
@@ -68,10 +69,12 @@ export default function ApprovalClient() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [selected, setSelected] = useState<Approval | null>(null);
   const [status, setStatus] = useState('กำลังตรวจสอบเซสชัน Auth0 สำหรับการอนุมัติ');
+  const [authFailure, setAuthFailure] = useState<ApprovalAuthProblem | null>(null);
 
   useEffect(() => {
     let live = true;
     async function initialize() {
+      let authPhase: ApprovalAuthPhase = 'initialize';
       try {
         // The human-approver Auth0 credential is independently verified by
         // the website relay and AWS. A second Supabase/site login here caused
@@ -98,13 +101,15 @@ export default function ApprovalClient() {
         if (reviewApprovalId) setManualApprovalId(reviewApprovalId);
         let stepUpIntent: StepUpIntent | null = null;
         if (params.has('error')) {
-          setStatus('Auth0 ไม่อนุญาต: ' + (params.get('error') || 'AUTH0_CALLBACK_ERROR') +
-            ' — ยังไม่อนุมัติงานนี้ โปรดลองจากเบราว์เซอร์เดิม');
+          const problem = describeApprovalAuthProblem({ code: params.get('error') }, 'callback');
+          setAuthFailure(problem);
+          setStatus(problem.code + ' — ' + problem.explanation + ' · ยังไม่ได้อนุมัติงาน');
           window.history.replaceState(null, '', reviewApprovalId
             ? CALLBACK + '?approval_request_id=' + encodeURIComponent(reviewApprovalId) : CALLBACK);
           return;
         }
         if (params.has('code') && params.has('state')) {
+          authPhase = 'callback';
           const callback = await c.handleRedirectCallback();
           if (isStepUpIntent(callback.appState)) {
             stepUpIntent = callback.appState;
@@ -116,8 +121,10 @@ export default function ApprovalClient() {
           window.history.replaceState(null, '', reviewApprovalId
             ? CALLBACK + '?approval_request_id=' + encodeURIComponent(reviewApprovalId) : CALLBACK);
         }
+        authPhase = 'session';
         const authenticated = await c.isAuthenticated();
         setTokenReady(authenticated);
+        setAuthFailure(null);
         if (authenticated && reviewApprovalId) {
           setRequestedApprovalId(reviewApprovalId);
           window.history.replaceState(null, '', CALLBACK + '?approval_request_id=' + encodeURIComponent(reviewApprovalId));
@@ -129,8 +136,19 @@ export default function ApprovalClient() {
           setStatus('Auth0 ยืนยันกลับมาแล้ว กำลังตรวจ signed MFA proof กับ DSG Spacetime');
           setPendingStepUpIntent(stepUpIntent);
         }
-      } catch {
-        if (live) setStatus('ไม่สามารถยืนยันเซสชันเว็บไซต์ / Auth0 ได้');
+      } catch (error) {
+        if (!live) return;
+        const problem = describeApprovalAuthProblem(error, authPhase);
+        setTokenReady(false);
+        setAuthFailure(problem);
+        setStatus(problem.code + ' — ' + problem.explanation);
+        if (authPhase === 'callback') {
+          // Abandon failed OAuth state/code so the next explicit login starts
+          // a fresh PKCE transaction. Preserve only the nonsecret request ID.
+          const id = new URLSearchParams(window.location.search).get('approval_request_id');
+          const next = isValidApprovalRequestId(id) ? '?approval_request_id=' + encodeURIComponent(id) : '';
+          window.history.replaceState(null, '', CALLBACK + next);
+        }
       }
     }
     void initialize();
@@ -228,7 +246,13 @@ export default function ApprovalClient() {
   }, [requestedApprovalId, tokenReady, tool]);
 
   async function login() {
-    if (!client.current) return;
+    if (!client.current) {
+      const problem = describeApprovalAuthProblem(null, 'initialize');
+      setAuthFailure(problem);
+      setStatus(problem.code + ' — ' + problem.explanation);
+      return;
+    }
+    setAuthFailure(null);
     setBusy(true);
     try {
       const queryApprovalId = new URLSearchParams(window.location.search).get('approval_request_id');
@@ -239,8 +263,10 @@ export default function ApprovalClient() {
         authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE },
         ...(appState ? { appState } : {}),
       });
-    } catch {
-      setStatus('AUTH0_REDIRECT_FAILED — ตรวจ Allowed Callback URLs และ dsg.approve');
+    } catch (error) {
+      const problem = describeApprovalAuthProblem(error, 'login');
+      setAuthFailure(problem);
+      setStatus(problem.code + ' — ' + problem.explanation);
       setBusy(false);
     }
   }
@@ -433,6 +459,17 @@ export default function ApprovalClient() {
         <h1 className="text-2xl font-bold">DSG · คำขออนุมัติจากผู้ใช้จริง</h1>
         <p className="text-sm text-slate-300">ใช้บัญชี Auth0 ของคุณเพื่ออนุมัติผ่าน AWS Spacetime โดยตรง ไม่ต้องเข้าสู่ระบบเว็บไซต์ซ้ำและไม่ใช้ Owner key หรือ internal key</p>
         <p role="status" aria-live="polite" className="rounded-lg border border-slate-700 p-3 text-sm">{status}</p>
+        {authFailure && (
+          <div role="alert" className="space-y-2 rounded-lg border border-amber-500/60 bg-amber-950/30 p-3 text-sm text-amber-100">
+            <p className="font-semibold">รหัสปัญหา: {authFailure.code}</p>
+            <p>{authFailure.nextAction}</p>
+            <p className="text-xs">บน Android หากเปิดจากแชท ให้ใช้เมนูของเบราว์เซอร์ → เปิดใน Chrome แล้วกลับมายังแท็บเดิมหลัง Auth0/MFA</p>
+            <button type="button" onClick={() => window.location.assign(window.location.pathname + window.location.search)}
+              className="min-h-11 rounded-lg border border-amber-500/60 px-3 font-semibold">
+              โหลดหน้าอนุมัติใหม่
+            </button>
+          </div>
+        )
         <div className="flex flex-wrap gap-2">
           {!tokenReady && <button type="button" onClick={() => void login()} disabled={!authReady || busy}
             className="rounded-lg bg-indigo-600 px-4 py-2 disabled:opacity-40">เข้าสู่ระบบเพื่ออนุมัติ</button>}
