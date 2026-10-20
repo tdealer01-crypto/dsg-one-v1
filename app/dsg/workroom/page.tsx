@@ -19,7 +19,9 @@ export default function DsgWorkroomPage() {
   const [loading, setLoading] = useState(true);
   const [busyWorkspace, setBusyWorkspace] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'browser'
+  );
 
   const load = useCallback(async () => {
     try {
@@ -59,12 +61,6 @@ export default function DsgWorkroomPage() {
       setBusyWorkspace(null);
     }
   }, [load]);
-
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('tool') === 'browser') {
-      setAdvancedOpen(true);
-    }
-  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
