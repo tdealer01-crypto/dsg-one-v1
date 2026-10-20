@@ -3,6 +3,7 @@
 import { Auth0Client } from '@auth0/auth0-spa-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { describeApprovalAuthProblem, type ApprovalAuthPhase, type ApprovalAuthProblem } from '@/lib/dsg/client/approval-auth-diagnostics';
+import { approvalPreview } from '@/lib/dsg/client/approval-preview';
 
 const CALLBACK = 'https://dsg.pics/dsg/approvals';
 const AUDIENCE = 'https://aws.dsg.pics';
@@ -396,7 +397,7 @@ export default function ApprovalClient() {
     }
     if (decision === 'APPROVE' && selected.expires_at) {
       const expiry = Date.parse(selected.expires_at);
-      if (Number.isFinite(expiry) && expiry <= Date.now()) {
+      if (!Number.isFinite(expiry) || expiry <= Date.now()) {
         setStatus('APPROVAL_EXPIRED — คำขอหมดอายุแล้ว ต้องสร้างคำขอใหม่ที่ผูกกับ Plan และ Payload เดิม');
         return;
       }
@@ -456,8 +457,8 @@ export default function ApprovalClient() {
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
       <section className="mx-auto max-w-3xl space-y-5 rounded-2xl border border-slate-700 bg-slate-900 p-5">
-        <h1 className="text-2xl font-bold">DSG · คำขออนุมัติจากผู้ใช้จริง</h1>
-        <p className="text-sm text-slate-300">ใช้บัญชี Auth0 ของคุณเพื่ออนุมัติผ่าน AWS Spacetime โดยตรง ไม่ต้องเข้าสู่ระบบเว็บไซต์ซ้ำและไม่ใช้ Owner key หรือ internal key</p>
+        <h1 className="text-2xl font-bold">DSG ONE · เจ้าของยืนยันงาน</h1>
+        <p className="text-sm text-slate-300">ตรวจคำสั่งที่ร้องขอ แล้วให้เจ้าของยืนยันผ่าน Auth0 เพียงครั้งในขั้นตอนนี้ ระบบจะตรวจ MFA เมื่อจำเป็น โดยไม่ต้องจัดการ Token หรือ Approval ID เอง</p>
         <p role="status" aria-live="polite" className="rounded-lg border border-slate-700 p-3 text-sm">{status}</p>
         {authFailure && (
           <div role="alert" className="space-y-2 rounded-lg border border-amber-500/60 bg-amber-950/30 p-3 text-sm text-amber-100">
@@ -470,15 +471,19 @@ export default function ApprovalClient() {
             </button>
           </div>
         )
-        <div className="flex flex-wrap gap-2">
-          {!tokenReady && <button type="button" onClick={() => void login()} disabled={!authReady || busy}
-            className="rounded-lg bg-indigo-600 px-4 py-2 disabled:opacity-40">เข้าสู่ระบบเพื่ออนุมัติ</button>}
-          {/* MFA diagnostics are not part of ordinary approval UX. The signed
-              proof is checked automatically on the actual approval tap. */}
-          <button type="button" onClick={() => void load()} disabled={!authReady || !tokenReady || busy}
-            className="rounded-lg border border-slate-500 px-4 py-2 disabled:opacity-40">ดูรายการรออนุมัติ</button>
-          <a href="/dsg/autonomous-level" className="rounded-lg border border-slate-500 px-4 py-2">กลับหน้าสถานะระบบ</a>
-        </div>
+        {!tokenReady && (
+          <button type="button" onClick={() => void login()} disabled={!authReady || busy}
+            className="min-h-12 w-full rounded-xl bg-indigo-600 px-4 py-3 text-base font-bold text-white disabled:opacity-40">
+            ยืนยันว่าเป็นเจ้าของด้วย Auth0
+          </button>
+        )}
+        {tokenReady && !selected && <p className="text-sm text-emerald-200">ยืนยันเซสชันเจ้าของแล้ว · กำลังแสดงคำขอที่รอให้ตรวจ</p>}
+        <details className="rounded-xl border border-slate-700 bg-slate-950/60 p-3 text-sm">
+          <summary className="cursor-pointer font-medium text-slate-300">ตัวเลือกเพิ่มเติม · ค้นหาคำขอ / รายการงาน</summary>
+          <div className="mt-3 space-y-3">
+            <button type="button" onClick={() => void load()} disabled={!authReady || !tokenReady || busy}
+              className="min-h-11 rounded-lg border border-slate-500 px-4 py-2 disabled:opacity-40">โหลดรายการรออนุมัติใหม่</button>
+            <a href="/dsg/autonomous-level" className="ml-2 inline-flex min-h-11 items-center rounded-lg border border-slate-500 px-4 py-2">สถานะระบบ</a>
         <form onSubmit={event => { event.preventDefault(); openExactApproval(); }}
           className="space-y-2 rounded-xl border border-slate-700 bg-slate-950 p-3">
           <label htmlFor="exact-approval-request-id" className="block text-sm font-semibold">
@@ -500,33 +505,48 @@ export default function ApprovalClient() {
             หน้านี้ไม่สามารถข้าม MFA หรืออนุมัติแทนเจ้าของได้
           </p>
         </form>
-        <h2 className="font-semibold">คำขอ ({approvals.length})</h2>
-        {approvals.map(item => (
-          <div key={item.approval_request_id} className="rounded-lg border border-slate-700 p-3">
-            <p className="break-all text-sm">{item.route_id || item.plan_id || 'รายการรออนุมัติ'}</p>
-            <button type="button" disabled={busy} onClick={() => void review(item.approval_request_id)}
-              className="mt-2 rounded bg-slate-700 px-3 py-2 text-sm disabled:opacity-40">ตรวจรายละเอียด</button>
+            <h2 className="font-semibold">คำขอ ({approvals.length})</h2>
+            {approvals.map(item => (
+              <div key={item.approval_request_id} className="rounded-lg border border-slate-700 p-3">
+                <p className="break-all text-sm">{item.route_id || item.plan_id || 'รายการรออนุมัติ'}</p>
+                <button type="button" disabled={busy} onClick={() => void review(item.approval_request_id)}
+                  className="mt-2 min-h-11 rounded bg-slate-700 px-3 py-2 text-sm disabled:opacity-40">ตรวจคำขอนี้</button>
+              </div>
+            ))}
           </div>
-        ))}
+        </details>
         {selected && (
-          <section className="space-y-3 rounded-lg border border-amber-500/40 p-4">
-            <h2 className="font-semibold">ตรวจคำขอก่อนอนุมัติ</h2>
-            <p className="break-all text-sm">Route: {selected.route_id || 'ไม่พบ'} · Risk: {selected.risk || 'unknown'}</p>
-            <p className="break-all text-sm">Requester: {selected.requester?.principal || 'ไม่พบ'}</p>
-            <p className="break-all text-sm">Plan hash: {selected.plan_hash || 'ไม่พบ'}</p>
-            <p className="text-sm">หมดอายุ: {selected.expires_at || 'ไม่พบ'}</p>
-            <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-950 p-3 text-xs">
-              {JSON.stringify(selected.payload, null, 2)}
-            </pre>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={busy || !knownRiskTier(selected.risk_tier)}
-                onClick={() => void decide('APPROVE')}
-                className="rounded-lg bg-emerald-700 px-4 py-2 disabled:opacity-40">อนุมัติงานนี้</button>
-              <button type="button" disabled={busy} onClick={() => void decide('REJECT')}
-                className="rounded-lg bg-rose-700 px-4 py-2 disabled:opacity-40">ปฏิเสธ</button>
+          <section aria-label="เจ้าของยืนยันงานนี้" className="space-y-4 rounded-2xl border border-indigo-500/50 bg-slate-950 p-4 sm:p-6">
+            <div>
+              <h2 className="text-lg font-bold text-white">{approvalPreview(selected).title}</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-300">{approvalPreview(selected).description}</p>
             </div>
-            {selected.risk_tier === 'high' && <p className="text-amber-200 text-sm">งาน High Risk จะเปิด Auth0 ให้ยืนยันตัวตนซ้ำ และจะอนุมัติได้ต่อเมื่อ Spacetime ตรวจหลักฐานยืนยันตัวตนจาก Token ที่ลงลายเซ็นจริงแล้วเท่านั้น</p>}
+            <div className="space-y-1 rounded-xl bg-slate-900 p-3 text-sm">
+              <p>ผู้ขอ: {selected.requester?.principal || 'ไม่ทราบผู้ขอ'}</p>
+              <p>ระดับความเสี่ยง: {selected.risk_tier === 'high' ? 'สูง · ต้องตรวจ MFA' : selected.risk_tier === 'standard' ? 'ปกติ' : 'ไม่ทราบ · ห้ามอนุมัติ'}</p>
+              <p>หมดอายุ: {selected.expires_at || 'ไม่พบ'}</p>
+            </div>
+            <button type="button" disabled={busy || !knownRiskTier(selected.risk_tier)}
+              onClick={() => void decide('APPROVE')}
+              className="min-h-14 w-full rounded-xl bg-emerald-700 px-4 py-3 text-base font-bold text-white disabled:opacity-40">
+              ยืนยันตัวตนและอนุมัติงานนี้
+            </button>
+            <button type="button" disabled={busy} onClick={() => void decide('REJECT')}
+              className="min-h-11 w-full rounded-xl border border-slate-600 px-4 py-2 text-sm font-semibold disabled:opacity-40">
+              ไม่อนุมัติงานนี้
+            </button>
+            {selected.risk_tier === 'high' && (
+              <p className="text-xs leading-5 text-amber-200">หาก MFA ที่ลงลายเซ็นยังไม่ใหม่พอ ระบบจะพาไปยืนยันผ่าน Auth0 แล้วกลับมาดำเนินการเฉพาะงานนี้ต่อโดยอัตโนมัติ</p>
+            )}
             {!knownRiskTier(selected.risk_tier) && <p className="text-rose-200 text-sm">BLOCKED: ไม่พบระดับความเสี่ยงที่ตรวจสอบได้</p>}
+            <details className="rounded-xl border border-slate-700 p-3 text-xs">
+              <summary className="cursor-pointer font-semibold text-slate-300">รายละเอียดทางเทคนิค / คำสั่งที่ผูกกับงาน</summary>
+              <p className="mt-2 break-all">Route: {selected.route_id || 'ไม่พบ'} · Risk: {selected.risk || 'unknown'}</p>
+              <p className="mt-1 break-all">Plan hash: {selected.plan_hash || 'ไม่พบ'}</p>
+              <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-900 p-3">
+                {JSON.stringify(selected.payload, null, 2)}
+              </pre>
+            </details>
           </section>
         )}
       </section>
