@@ -58,11 +58,13 @@ export default function ApprovalClient() {
   const client = useRef<Auth0Client | null>(null);
   const reviewedApprovalId = useRef<string | null>(null);
   const completingStepUpId = useRef<string | null>(null);
+  const initialListLoaded = useRef(false);
   const [authReady, setAuthReady] = useState(false);
   const [tokenReady, setTokenReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pendingStepUpIntent, setPendingStepUpIntent] = useState<StepUpIntent | null>(null);
   const [requestedApprovalId, setRequestedApprovalId] = useState<string | null>(null);
+  const [manualApprovalId, setManualApprovalId] = useState('');
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [selected, setSelected] = useState<Approval | null>(null);
   const [status, setStatus] = useState('กำลังตรวจสอบเซสชัน Auth0 สำหรับการอนุมัติ');
@@ -93,6 +95,7 @@ export default function ApprovalClient() {
         const queryApprovalId = params.get('approval_request_id');
         let reviewApprovalId: string | null = isValidApprovalRequestId(queryApprovalId)
           ? queryApprovalId : null;
+        if (reviewApprovalId) setManualApprovalId(reviewApprovalId);
         let stepUpIntent: StepUpIntent | null = null;
         if (params.has('error')) {
           setStatus('Auth0 ไม่อนุญาต: ' + (params.get('error') || 'AUTH0_CALLBACK_ERROR') +
@@ -158,6 +161,44 @@ export default function ApprovalClient() {
     if (!res.ok || !payload.ok) throw new Error(payload.error || payload.receipt?.reason || 'MCP_REJECTED');
     return payload;
   }, [obtainToken]);
+
+  // Read-only discovery after explicit Auth0 login. Previously users saw an
+  // empty queue until pressing a second button, which looked like approval was
+  // unavailable. Never auto-approve, step up MFA, or fetch a different user's
+  // requests.
+  useEffect(() => {
+    if (!tokenReady || requestedApprovalId || pendingStepUpIntent || initialListLoaded.current) return;
+    initialListLoaded.current = true;
+    let active = true;
+    void tool('spacetime_list_pending_approvals', {}).then((data) => {
+      if (!active) return;
+      const items = Array.isArray(data.receipt?.approvals) ? data.receipt.approvals : [];
+      setApprovals(items);
+      setStatus(items.length
+        ? 'โหลดคำขอจาก AWS Spacetime แล้ว โปรดตรวจรายละเอียดก่อนอนุมัติ'
+        : 'ไม่พบคำขอที่รออนุมัติในบัญชี Auth0 นี้ — ตรวจบัญชีผู้ขอหรือเวลาหมดอายุ และเปิดด้วยรหัสคำขอได้');
+    }).catch((error) => {
+      if (active) setStatus('โหลดคำขออัตโนมัติไม่ได้: ' +
+        (error instanceof Error ? error.message : 'APPROVAL_LIST_UNAVAILABLE'));
+    });
+    return () => { active = false; };
+  }, [tokenReady, requestedApprovalId, pendingStepUpIntent, tool]);
+
+  function openExactApproval() {
+    const id = manualApprovalId.trim();
+    if (!isValidApprovalRequestId(id)) {
+      setStatus('รหัสคำขอไม่ถูกต้อง กรุณาคัดลอก approval_request_id จากข้อความ DSG');
+      return;
+    }
+    // The request id is not a credential. Preserve it across Auth0 redirects.
+    window.history.replaceState(null, '', CALLBACK + '?approval_request_id=' + encodeURIComponent(id));
+    reviewedApprovalId.current = null;
+    setRequestedApprovalId(id);
+    setSelected(null);
+    setStatus(tokenReady
+      ? 'กำลังเปิดรายละเอียดคำขอ ' + id
+      : 'บันทึกรหัสคำขอไว้ใน URL แล้ว โปรดเข้าสู่ระบบ Auth0 เพื่อดูรายละเอียด');
+  }
 
   // A Workroom handoff may point to one exact request. Load that request
   // after the approver session is ready, but never approve it automatically.
@@ -327,6 +368,13 @@ export default function ApprovalClient() {
       setStatus('BLOCKED: รายละเอียดงานหรือระดับความเสี่ยงไม่ครบ ห้ามอนุมัติโดยไม่เห็นสิ่งที่ผูกไว้');
       return;
     }
+    if (decision === 'APPROVE' && selected.expires_at) {
+      const expiry = Date.parse(selected.expires_at);
+      if (Number.isFinite(expiry) && expiry <= Date.now()) {
+        setStatus('APPROVAL_EXPIRED — คำขอหมดอายุแล้ว ต้องสร้างคำขอใหม่ที่ผูกกับ Plan และ Payload เดิม');
+        return;
+      }
+    }
     setBusy(true);
     try {
       // Reuse a genuine, *fresh*, independently verified signed MFA event
@@ -394,6 +442,27 @@ export default function ApprovalClient() {
             className="rounded-lg border border-slate-500 px-4 py-2 disabled:opacity-40">ดูรายการรออนุมัติ</button>
           <a href="/dsg/autonomous-level" className="rounded-lg border border-slate-500 px-4 py-2">กลับหน้าสถานะระบบ</a>
         </div>
+        <form onSubmit={event => { event.preventDefault(); openExactApproval(); }}
+          className="space-y-2 rounded-xl border border-slate-700 bg-slate-950 p-3">
+          <label htmlFor="exact-approval-request-id" className="block text-sm font-semibold">
+            มีรหัสคำขอจากแชท? เปิดงานนั้นโดยตรง
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input id="exact-approval-request-id" type="text" autoComplete="off"
+              value={manualApprovalId} onChange={event => setManualApprovalId(event.target.value)}
+              placeholder="dsg_apreq_…" maxLength={192}
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-900 px-3 text-sm text-white"
+            />
+            <button type="submit" disabled={busy}
+              className="min-h-11 rounded-lg border border-indigo-500 px-4 text-sm font-semibold disabled:opacity-40">
+              เปิดคำขอ
+            </button>
+          </div>
+          <p className="text-xs text-slate-400">
+            ไม่พบรายการอาจเกิดจากคำขอหมดอายุ หรือเข้าสู่ระบบ Auth0 คนละบัญชีกับผู้ขอ
+            หน้านี้ไม่สามารถข้าม MFA หรืออนุมัติแทนเจ้าของได้
+          </p>
+        </form>
         <h2 className="font-semibold">คำขอ ({approvals.length})</h2>
         {approvals.map(item => (
           <div key={item.approval_request_id} className="rounded-lg border border-slate-700 p-3">
