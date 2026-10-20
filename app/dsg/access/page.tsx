@@ -69,9 +69,9 @@ const toolCards: Array<{
   },
   {
     name: 'Cinema / Browser',
-    description: 'Open the verified public AWS Cinema surface. Browser status/action still requires its API-key and approval boundaries; reachability is not execution evidence.',
-    href: 'https://aws.dsg.pics/app',
-    badge: 'Public AWS · execution gated',
+    description: 'Enter the existing Workroom Remote Browser controls. Cinema status, connect and navigate stay governed by Spacetime, Auth0 and request-specific approvals. The AWS /app page is Evidence & Conformance, not the Cinema viewer.'
+    href: '/dsg/workroom?tool=browser',
+    badge: 'Authenticated Workroom · approval-gated',
   },
   {
     name: 'DSG Agent v0 / Governed MCP',
