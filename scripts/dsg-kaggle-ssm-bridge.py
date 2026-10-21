@@ -119,11 +119,26 @@ def status():
     if token is None:
         return emit(
             200, ok=True, connected=False, dispatchConfigured=False,
+            dispatchReason="KAGGLE_OWNER_DISPATCH_NOT_CONFIGURED",
             gpuState="UNVERIFIED", source="AWS_SSM_NOT_CONFIGURED", workflows=[],
         )
+    # A SecureString's presence is not proof that its fine-grained GitHub
+    # credential belongs to the actual owner. Verify read-only identity
+    # before the website enables the launch button. Never emit token/login.
+    owner_verified = False
+    reason = "KAGGLE_OWNER_DISPATCH_NOT_CONFIGURED"
+    if owner_token is not None:
+        try:
+            identity = github(owner_token, "/user")
+            owner_verified = isinstance(identity, dict) and identity.get("login") == OWNER
+            reason = ("KAGGLE_GITHUB_OWNER_IDENTITY_VERIFIED" if owner_verified
+                      else "KAGGLE_GITHUB_OWNER_IDENTITY_MISMATCH")
+        except (urllib.error.URLError, ValueError, OSError, TimeoutError):
+            reason = "KAGGLE_GITHUB_OWNER_IDENTITY_UNVERIFIED"
     snapshots = [snapshot(token, wf, name) for wf, name in WORKFLOWS]
     return emit(
-        200, ok=True, connected=True, dispatchConfigured=bool(owner_token),
+        200, ok=True, connected=True, dispatchConfigured=owner_verified,
+        dispatchReason=reason,
         gpuState="UNVERIFIED", source="AWS_SSM_GITHUB_ACTIONS_READ_ONLY",
         workflows=[run for run in snapshots if run is not None],
     )
