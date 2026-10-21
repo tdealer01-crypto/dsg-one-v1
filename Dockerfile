@@ -53,6 +53,8 @@ COPY --from=builder /app/automation_spacetime ./automation_spacetime
 COPY --from=builder /app/skills/dsg-autonomous-execution/SKILL.md ./skills/dsg-autonomous-execution/SKILL.md
 RUN grep -Fxq "name: dsg-autonomous-execution" ./skills/dsg-autonomous-execution/SKILL.md
 COPY --from=builder /app/scripts/dsg-one-container-entrypoint.sh /usr/local/bin/dsg-one-container-entrypoint
+# Restricted server-side bridge: secret values never enter Docker inspect env.
+COPY --from=builder /app/scripts/dsg-kaggle-ssm-bridge.py ./scripts/dsg-kaggle-ssm-bridge.py
 
 # Install only Alpine's patched zlib (CVE-2026-85091), fail closed if unavailable.
 # The minimum package constraint is validated by apk during the Docker build.
