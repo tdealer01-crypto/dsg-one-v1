@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getDsgBrowserSession, DSG_AUTH0_CALLBACK } from '@/lib/dsg/user-bound/browser-session';
 import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
+import { DsgKaggleGpuStatus } from '@/components/dsg-kaggle-gpu-status';
 import { nativeShellOutcome } from '@/lib/dsg/user-bound/native-shell-outcome';
 import {
   asRecord, catalogRoutes, composeWorkroomRoutes, publicWorkroomReceipt,
@@ -418,6 +419,7 @@ export function DsgLiveWorkroom() {
         {tab === 'agent' && <>
           <p className="text-sm text-slate-300">DSG Agent v0 ใช้ Qwen เพื่อเสนอแผนผ่าน AWS Spacetime ไม่ได้อนุมัติหรือลงมือทำเอง หาก Kaggle Worker ไม่ออนไลน์จะแสดงข้อผิดพลาดตามจริง</p>
           <p className="text-xs text-amber-200">สถานะ Route ไม่เท่ากับโมเดลพร้อมใช้ · Qwen3-30B-A3B เป็น Worker ชั่วคราวบน Kaggle (proposal-only)</p>
+          <DsgKaggleGpuStatus />
           <div role="log" aria-label="บทสนทนา Agent v0" aria-live="polite" className="max-h-80 space-y-3 overflow-y-auto">
             {chat.map((turn, index) => <p key={index} className={`whitespace-pre-wrap rounded-xl p-3 text-sm ${turn.role === 'user' ? 'bg-indigo-900/60' : 'bg-slate-950'}`}><strong>{turn.role === 'user' ? 'คุณ' : 'Agent v0'}: </strong>{turn.text}</p>)}
             <div ref={transcript} />
