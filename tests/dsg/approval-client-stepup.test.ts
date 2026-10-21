@@ -23,6 +23,7 @@ describe('human approval step-up transport', () => {
   it('keeps the step-up bearer token out of browser storage and URLs', () => {
     expect(SOURCE).toContain('getTokenSilently');
     expect(SOURCE).toContain("cacheLocation: 'memory'");
+    expect(SOURCE).toContain("useCookiesForTransactions: true");
     expect(SOURCE).not.toContain('localStorage.setItem');
     expect(SOURCE).not.toContain('sessionStorage.setItem');
   });
