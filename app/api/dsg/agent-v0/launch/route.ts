@@ -2,21 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
 import { verifyDsgAuth0Principal, DSG_AUTH0_CLIENT_ID, DSG_AUTH0_ISSUER } from '@/lib/dsg/server/auth0-identity';
 import { getDsgSupabaseRpcConfig, readDsgRest } from '@/lib/dsg/server/supabase-rpc';
+import { callKaggleOwnerBridge } from '@/lib/dsg/server/kaggle-owner-ssm-bridge';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const OWNER = 'tdealer01-crypto';
-const REPO = 'DSG-Private-Production-Runtime';
-const WORKFLOW = 'launch-kaggle-brain-oidc.yml';
-const API = 'https://api.github.com/repos/' + OWNER + '/' + REPO;
 const MAX_JSON_BYTES = 16_000;
-const COOLDOWN_MS = 10 * 60 * 1000;
-
 type LinkRow = { actor_id: string; auth0_sub: string; auth0_issuer: string; auth0_client_id: string };
-type GitHubRun = { id?: unknown; status?: unknown; created_at?: unknown };
-type RunList = { workflow_runs?: GitHubRun[] };
-type Whoami = { login?: unknown };
 
 function reply(status: number, data: Record<string, unknown>) {
   return NextResponse.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -63,25 +54,7 @@ async function linkedSubject(actorId: string) {
   return link.auth0_sub;
 }
 
-async function githubJson<T>(url: string, token: string): Promise<T> {
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Authorization: 'Bearer ' + token,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-    signal: AbortSignal.timeout(8_000),
-    cache: 'no-store',
-  });
-  if (!response.ok) throw Error('KAGGLE_GITHUB_CONTROL_UNAVAILABLE');
-  return response.json() as Promise<T>;
-}
 
-// Exact site-owner + linked Auth0 subject + owner-scoped GitHub identity.
-// This action authorizes one free-only, bounded Kaggle launch workflow.
-// It never calls Kaggle directly, bypasses Spacetime action approval,
-// or grants Agent v0 permission to execute providers.
 export async function POST(request: NextRequest) {
   if (request.headers.get('origin') !== 'https://dsg.pics') {
     return reply(403, { ok: false, error: 'ORIGIN_DENIED' });
@@ -111,55 +84,21 @@ export async function POST(request: NextRequest) {
   } catch {
     return reply(403, { ok: false, error: 'KAGGLE_OWNER_IDENTITY_LINK_UNVERIFIED' });
   }
-  const token = process.env.DSG_KAGGLE_OWNER_DISPATCH_TOKEN;
-  if (!token) return reply(503, { ok: false, error: 'KAGGLE_OWNER_DISPATCH_NOT_CONFIGURED' });
 
-  try {
-    const user = await githubJson<Whoami>('https://api.github.com/user', token);
-    // The existing owner-only workflow intentionally denies bot/service
-    // identities. Never weaken that gate or use a token from another account.
-    if (user.login !== OWNER) {
-      return reply(403, { ok: false, error: 'KAGGLE_GITHUB_OWNER_IDENTITY_MISMATCH' });
-    }
-    const current = await githubJson<RunList>(
-      API + '/actions/workflows/' + WORKFLOW + '/runs?event=workflow_dispatch&per_page=8', token);
-    if (!Array.isArray(current.workflow_runs)) throw Error('KAGGLE_RUN_LIST_INVALID');
-    const now = Date.now();
-    for (const run of current.workflow_runs) {
-      const state = run.status;
-      if (['queued', 'waiting', 'pending', 'requested', 'in_progress'].includes(String(state))) {
-        return reply(409, { ok: false, error: 'KAGGLE_LAUNCH_ALREADY_IN_PROGRESS' });
-      }
-      const created = typeof run.created_at === 'string' ? Date.parse(run.created_at) : NaN;
-      if (Number.isFinite(created) && created <= now && now - created < COOLDOWN_MS) {
-        return reply(429, { ok: false, error: 'KAGGLE_RECENT_OWNER_LAUNCH_COOLDOWN' });
-      }
-    }
-    const response = await fetch(API + '/actions/workflows/' + WORKFLOW + '/dispatches', {
-      method: 'POST',
-      headers: {
-        Authorization: 'Bearer ' + token,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ref: 'main',
-        inputs: { confirm: 'LAUNCH_DSG_KAGGLE_BRAIN', execution_runner: 'github-hosted' },
-      }),
-      signal: AbortSignal.timeout(8_000),
-      cache: 'no-store',
-    });
-    if (response.status !== 204) {
-      return reply(502, { ok: false, error: 'KAGGLE_OWNER_WORKFLOW_DISPATCH_REJECTED' });
-    }
-    return reply(202, {
-      ok: true,
-      status: 'OWNER_DISPATCH_ACCEPTED',
-      gpuState: 'UNVERIFIED',
-      details: 'Quota and kernel startup must pass the private Kaggle workflow; no GPU-ready claim.',
-    });
-  } catch {
-    return reply(503, { ok: false, error: 'KAGGLE_OWNER_DISPATCH_UNAVAILABLE' });
+  // The Python bridge reads only /dsg/one/prod/kaggle-owner-dispatch-token
+  // from SSM SecureString via EC2 IAM, and NEVER sends the token to Node.
+  // Its exact GitHub /user owner gate, run lock and free-only existing
+  // workflow checks still apply. No shell, user-selected workflow or paid GPU.
+  const outcome = await callKaggleOwnerBridge('launch');
+  if (!outcome.ok) {
+    const code = outcome.error;
+    const status = code === 'KAGGLE_OWNER_DISPATCH_LOCKED' ||
+      code === 'KAGGLE_GPU_JOB_ALREADY_IN_PROGRESS' ? 409 :
+      code === 'KAGGLE_RECENT_LAUNCH_COOLDOWN' ? 429 : 503;
+    return reply(status, { ok: false, error: code ?? 'KAGGLE_OWNER_BRIDGE_UNAVAILABLE', gpuState: 'UNVERIFIED' });
   }
+  return reply(202, {
+    ok: true, status: 'OWNER_DISPATCH_ACCEPTED', gpuState: 'UNVERIFIED',
+    details: 'Existing owner Kaggle workflow will verify free GPU quota and worker readiness.',
+  });
 }
