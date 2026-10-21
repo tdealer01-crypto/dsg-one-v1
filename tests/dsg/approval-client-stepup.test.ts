@@ -38,7 +38,7 @@ describe('human approval step-up transport', () => {
     expect(SOURCE).toContain("scope: SCOPE, ext_dsg_stepup: '1'");
     expect(SOURCE).toContain("tool('spacetime_resolve_approval'");
     expect(SOURCE).not.toContain('ทดสอบ MFA (ไม่อนุมัติ)</button>');
-    expect(SOURCE).toContain('MFA from current session');
+    expect(SOURCE).toContain('MFA was completed at the first owner login');
   });
 
   it('keeps the exact request across redirect, without persisting any bearer token', () => {
