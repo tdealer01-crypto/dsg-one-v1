@@ -61,6 +61,7 @@ COPY --from=builder /app/scripts/dsg-kaggle-ssm-bridge.py ./scripts/dsg-kaggle-s
 RUN apk add --no-cache 'zlib>=1.3.2-r1' ca-certificates python3 py3-pip \
     && python3 -m venv /opt/dsg-automation \
     && /opt/dsg-automation/bin/pip install --no-cache-dir -r /app/automation_spacetime/requirements.txt \
+    && /opt/dsg-automation/bin/python -m py_compile /app/scripts/dsg-kaggle-ssm-bridge.py \
     && chmod 0755 /usr/local/bin/dsg-one-container-entrypoint
 
 ENV DSG_AUTOMATION_PYTHON=/opt/dsg-automation/bin/python \
