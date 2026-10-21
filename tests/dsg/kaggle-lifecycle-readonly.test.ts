@@ -1,99 +1,85 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireVerifiedDsgActor } from '@/lib/dsg/server/context';
+import { runKaggleSsmBridge } from '@/lib/dsg/server/kaggle-ssm-bridge';
 import { GET, POST } from '@/app/api/dsg/agent-v0/lifecycle/route';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-vi.mock('@/lib/dsg/server/context', () => ({
-  requireVerifiedDsgActor: vi.fn(),
-}));
+vi.mock('@/lib/dsg/server/context', () => ({ requireVerifiedDsgActor: vi.fn() }));
+vi.mock('@/lib/dsg/server/kaggle-ssm-bridge', () => ({ runKaggleSsmBridge: vi.fn() }));
 
 const actor = vi.mocked(requireVerifiedDsgActor);
+const probe = vi.mocked(runKaggleSsmBridge);
 const path = (name: string) => readFileSync(join(process.cwd(), name), 'utf8');
 const req = () => new Request('https://dsg.pics/api/dsg/agent-v0/lifecycle');
 
-describe('owner Agent v0 Kaggle GPU status (read only, never invented READY)', () => {
-  const originalToken = process.env.DSG_KAGGLE_WORKFLOW_READ_TOKEN;
+describe('owner-only AWS SSM Kaggle status', () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
-    delete process.env.DSG_KAGGLE_WORKFLOW_READ_TOKEN;
     actor.mockReset();
+    probe.mockReset();
     actor.mockResolvedValue({ actorId: 'owner', workspaceId: 'workspace', role: 'OWNER' });
-  });
-  afterEach(() => {
-    if (originalToken === undefined) delete process.env.DSG_KAGGLE_WORKFLOW_READ_TOKEN;
-    else process.env.DSG_KAGGLE_WORKFLOW_READ_TOKEN = originalToken;
-    vi.unstubAllGlobals();
-  });
-
-  it('fails closed without a verified owner role', async () => {
-    actor.mockRejectedValueOnce(new Error('DSG_AUTH_REQUIRED'));
-    const unauth = await GET(req());
-    expect(unauth.status).toBe(401);
-    actor.mockResolvedValueOnce({ actorId: 'viewer', workspaceId: 'workspace', role: 'VIEWER' });
-    const viewer = await GET(req());
-    expect(viewer.status).toBe(403);
-    expect((await viewer.json()).error).toBe('KAGGLE_OWNER_REQUIRED');
-  });
-
-  it('does not claim GPU running when private workflow reader is unavailable', async () => {
-    vi.stubGlobal('fetch', vi.fn());
-    const reply = await GET(req());
-    const payload = await reply.json();
-    expect(reply.status).toBe(200);
-    expect(payload).toMatchObject({
-      ok: true, connected: false, gpuState: 'UNVERIFIED',
-      message: 'KAGGLE_WORKFLOW_READ_CREDENTIAL_NOT_CONFIGURED',
+    probe.mockResolvedValue({
+      httpStatus: 200, ok: true, connected: false, dispatchConfigured: false,
+      gpuState: 'UNVERIFIED', source: 'AWS_SSM_NOT_CONFIGURED', workflows: [],
     });
-    expect(fetch).not.toHaveBeenCalled();
+  });
+  afterEach(() => vi.clearAllMocks());
+
+  it('rejects unverified and nonowner request before reaching secret store', async () => {
+    actor.mockRejectedValueOnce(new Error('DSG_AUTH_REQUIRED'));
+    expect((await GET(req())).status).toBe(401);
+    actor.mockResolvedValueOnce({ actorId: 'viewer', workspaceId: 'workspace', role: 'VIEWER' });
+    expect((await GET(req())).status).toBe(403);
+    expect(probe).not.toHaveBeenCalled();
   });
 
-  it('reads only fixed owner workflows and never confuses Actions success with GPU health', async () => {
-    process.env.DSG_KAGGLE_WORKFLOW_READ_TOKEN = 'dummy-test-read-token';
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ workflow_runs: [{ id: 101, status: 'completed', conclusion: 'success', updated_at: '2026-10-21T09:00:00Z' }] }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ workflow_runs: [{ id: 102, status: 'in_progress', conclusion: null, updated_at: '2026-10-21T09:10:00Z' }] }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ workflow_runs: [{ id: 103, status: 'completed', conclusion: 'failure', updated_at: '2026-10-21T09:11:00Z' }] }) });
-    vi.stubGlobal('fetch', fetchMock);
-    const reply = await GET(req());
-    const payload = await reply.json();
-    expect(reply.status).toBe(200);
-    expect(payload).toMatchObject({ ok: true, connected: true, source: 'GITHUB_ACTIONS_READ_ONLY', gpuState: 'UNVERIFIED' });
-    expect(payload.workflows).toEqual([
-      { name: 'OWNER_LAUNCH', state: 'SUCCESS', runId: 101, updatedAt: '2026-10-21T09:00:00Z' },
-      { name: 'GOVERNED_E2E', state: 'IN_PROGRESS', runId: 102, updatedAt: '2026-10-21T09:10:00Z' },
-      { name: 'STOP_PROOF', state: 'FAILED', runId: 103, updatedAt: '2026-10-21T09:11:00Z' },
-    ]);
-    for (const [url, init] of fetchMock.mock.calls) {
-      expect(url).toContain('https://api.github.com/repos/tdealer01-crypto/DSG-Private-Production-Runtime/actions/workflows/');
-      expect(init.headers.Authorization).toBe('Bearer dummy-test-read-token');
-      expect(init.cache).toBe('no-store');
-    }
-    expect(JSON.stringify(payload)).not.toContain('dummy-test-read-token');
+  it('reports missing SSM SecureString without pretending the GPU is ready', async () => {
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      ok: true, connected: false, dispatchConfigured: false,
+      source: 'AWS_SSM_NOT_CONFIGURED', gpuState: 'UNVERIFIED',
+    });
+    expect(probe).toHaveBeenCalledWith('status');
   });
 
-  it('rejects upstream errors and does not dispatch an owner GPU from a status API', async () => {
-    process.env.DSG_KAGGLE_WORKFLOW_READ_TOKEN = 'dummy-test-read-token';
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403 }));
-    const reply = await GET(req());
-    expect(reply.status).toBe(503);
-    expect((await reply.json()).gpuState).toBe('UNVERIFIED');
+  it('reads workflow metadata without turning GitHub success into GPU READY', async () => {
+    probe.mockResolvedValueOnce({
+      httpStatus: 200, ok: true, connected: true, dispatchConfigured: true,
+      gpuState: 'UNVERIFIED', source: 'AWS_SSM_GITHUB_ACTIONS_READ_ONLY',
+      workflows: [{ name: 'OWNER_LAUNCH', state: 'SUCCESS', runId: 123,
+        updatedAt: '2026-10-21T09:00:00Z' }],
+    });
+    const res = await GET(req());
+    const obj = await res.json();
+    expect(obj.gpuState).toBe('UNVERIFIED');
+    expect(obj.workflows[0]).toMatchObject({ name: 'OWNER_LAUNCH', state: 'SUCCESS' });
+    expect(JSON.stringify(obj)).not.toMatch(/github_pat_|ghp_|AWS_SECRET_ACCESS_KEY/);
+  });
+
+  it('fails closed for any SSM/GitHub bridge error and does not accept POST', async () => {
+    probe.mockResolvedValueOnce({ httpStatus: 503, ok: false, error: 'KAGGLE_OWNER_SECURE_BRIDGE_UNAVAILABLE', gpuState: 'UNVERIFIED' });
+    const res = await GET(req());
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe('KAGGLE_OWNER_SECURE_BRIDGE_UNAVAILABLE');
     const launch = await POST();
     expect(launch.status).toBe(405);
-    expect((await launch.json()).error).toBe('KAGGLE_OWNER_SIGNED_DISPATCH_NOT_CONNECTED');
   });
 
-  it('reuses the real Workroom Qwen route; no false START button or browser credentials', () => {
+  it('uses owner-only SSM adapter in original Workroom, no localStorage secrets', () => {
     const live = path('components/dsg-live-workroom.tsx');
     const status = path('components/dsg-kaggle-gpu-status.tsx');
     const api = path('app/api/dsg/agent-v0/lifecycle/route.ts');
+    const adapter = path('lib/dsg/server/kaggle-ssm-bridge.ts');
+    const python = path('scripts/dsg-kaggle-ssm-bridge.py');
     expect(live).toContain('<DsgKaggleGpuStatus />');
     expect(live).toContain("run('action.plan', 'node.agent.dsg-v0'");
     expect(status).toContain("credentials: 'include'");
-    expect(status).toContain('Workroom ไม่ได้เปิด GPU อัตโนมัติ');
     expect(api).toContain("requireVerifiedDsgActor(request.headers, 'job:read')");
-    expect(api).not.toContain('kernels push');
-    expect(api).not.toContain("method: 'POST'");
+    expect(api).toContain("runKaggleSsmBridge('status')");
+    expect(adapter).toContain("execFileAsync(PYTHON, [BRIDGE, action]");
+    expect(python).toContain("WithDecryption=True");
+    expect(python).not.toContain("print(token)");
     expect(status).not.toContain('localStorage');
   });
 });
