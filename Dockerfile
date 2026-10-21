@@ -55,6 +55,8 @@ RUN grep -Fxq "name: dsg-autonomous-execution" ./skills/dsg-autonomous-execution
 COPY --from=builder /app/scripts/dsg-one-container-entrypoint.sh /usr/local/bin/dsg-one-container-entrypoint
 # Restricted server-side bridge: secret values never enter Docker inspect env.
 COPY --from=builder /app/scripts/dsg-kaggle-ssm-bridge.py ./scripts/dsg-kaggle-ssm-bridge.py
+# Run isolated dummy-only tests at image build time; remove from runtime layer.
+COPY --from=builder /app/tests/test_dsg_kaggle_ssm_bridge.py ./tests/test_dsg_kaggle_ssm_bridge.py
 
 # Install only Alpine's patched zlib (CVE-2026-85091), fail closed if unavailable.
 # The minimum package constraint is validated by apk during the Docker build.
@@ -63,6 +65,8 @@ RUN apk add --no-cache 'zlib>=1.3.2-r1' ca-certificates python3 py3-pip \
     && /opt/dsg-automation/bin/pip install --no-cache-dir -r /app/automation_spacetime/requirements.txt \
     && /opt/dsg-automation/bin/pip install --no-cache-dir boto3==1.40.70 \
     && /opt/dsg-automation/bin/python -m py_compile /app/scripts/dsg-kaggle-ssm-bridge.py \
+    && PYTHONPATH=/app /opt/dsg-automation/bin/python -m unittest discover -s /app/tests -p test_dsg_kaggle_ssm_bridge.py -q \
+    && rm /app/tests/test_dsg_kaggle_ssm_bridge.py \
     && chmod 0755 /usr/local/bin/dsg-one-container-entrypoint
 
 ENV DSG_AUTOMATION_PYTHON=/opt/dsg-automation/bin/python \
