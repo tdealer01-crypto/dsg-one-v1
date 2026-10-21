@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { verifiedGovernedReadProof } from '@/lib/dsg/user-bound/read-proof';
 import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
 import { getDsgBrowserSession, finishDsgBrowserRedirect } from '@/lib/dsg/user-bound/browser-session';
+import { dsgAuth0ReturnTo } from '@/lib/dsg/user-bound/auth0-return-route';
 
 const callback = 'https://dsg.pics/dsg/autonomous-level';
 
@@ -107,7 +108,8 @@ export default function DsgIdentityBridge() {
           setMessage('Auth0 token verified for this session. The SDK refreshes through a rotating refresh token when the Auth0 client allows offline_access. N2N remains governed.');
           const appState = completed.appState && typeof completed.appState === 'object'
             ? completed.appState as { returnTo?: unknown } : null;
-          if (appState?.returnTo === '/dsg/workroom') router.replace('/dsg/workroom');
+          const returnTo = dsgAuth0ReturnTo(appState?.returnTo);
+          if (returnTo) router.replace(returnTo);
         } else {
           // Linked account != live delegated authorization. Never present a stored
           // Auth0 subject as an authenticated connector/session after a reload.
