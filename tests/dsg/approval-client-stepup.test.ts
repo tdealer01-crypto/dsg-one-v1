@@ -33,9 +33,12 @@ describe('human approval step-up transport', () => {
     expect(SOURCE).not.toContain("prompt: 'login'");
     expect(SOURCE).not.toContain('max_age: 0,');
     expect(SOURCE).toContain("proof.error === 'FRESH_SIGNED_MFA_REQUIRED'");
+    expect(SOURCE).toContain("setMfaSessionExpired(true)");
+    expect(SOURCE).not.toContain("await startStepUp({ kind: 'approve', approvalRequestId: selected.approval_request_id })");
+    expect(SOURCE).toContain("scope: SCOPE, ext_dsg_stepup: '1'");
     expect(SOURCE).toContain("tool('spacetime_resolve_approval'");
     expect(SOURCE).not.toContain('ทดสอบ MFA (ไม่อนุมัติ)</button>');
-    expect(SOURCE).toContain('signed MFA');
+    expect(SOURCE).toContain('MFA from current session');
   });
 
   it('keeps the exact request across redirect, without persisting any bearer token', () => {
