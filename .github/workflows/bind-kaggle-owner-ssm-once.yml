@@ -59,7 +59,7 @@ jobs:
           role-to-assume: ${{ env.DEPLOY_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Verify pinned SSM document and SecureString presence (never decrypt in Actions)
+      - name: Verify immutable SSM binder document (do not read PAT in Actions)
         shell: bash
         run: |
           set -euo pipefail
@@ -69,13 +69,11 @@ jobs:
           }
           STATUS="$(aws ssm describe-document --name "$SSM_DOCUMENT" --query 'Document.Status' --output text)"
           [[ "$STATUS" == Active ]] || { echo 'BLOCK=BIND_SSM_DOCUMENT_NOT_ACTIVE'; exit 42; }
-          TYPE="$(aws ssm describe-parameters             --parameter-filters "Key=Name,Option=Equals,Values=$PAT_PARAMETER"             --query 'Parameters[0].Type' --output text)"
-          [[ "$TYPE" == SecureString ]] || {
-            echo 'BLOCK=OWNER_FINE_GRAINED_PAT_NOT_PROVISIONED_IN_AWS_SSM'
-            echo 'nextAction=Store owner github_pat_... in AWS SSM SecureString under the exact approved parameter name'
-            exit 42
-          }
-          echo 'SSM_OWNER_TOKEN_METADATA=VERIFIED_NO_DECRYPT'
+          # The deploy role intentionally has no SSM GetParameter or DescribeParameters
+          # permission for this owner PAT. The pinned on-host SSM document checks
+          # whether the exact SecureString exists, decrypts only on the existing EC2
+          # instance role, and validates GitHub /user identity before any restart.
+          echo 'SSM_OWNER_TOKEN_READ=HOST_ONLY'
 
       - name: Bind once to existing container with pinned owner-gated SSM document
         shell: bash
