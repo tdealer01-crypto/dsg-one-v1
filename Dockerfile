@@ -53,12 +53,15 @@ COPY --from=builder /app/automation_spacetime ./automation_spacetime
 COPY --from=builder /app/skills/dsg-autonomous-execution/SKILL.md ./skills/dsg-autonomous-execution/SKILL.md
 RUN grep -Fxq "name: dsg-autonomous-execution" ./skills/dsg-autonomous-execution/SKILL.md
 COPY --from=builder /app/scripts/dsg-one-container-entrypoint.sh /usr/local/bin/dsg-one-container-entrypoint
+# Server-only owner GPU bridge: no embedded token; AWS SSM SecureString is
+# fetched at call time through the pre-existing EC2 IAM instance profile.
+COPY --from=builder /app/scripts/dsg_kaggle_owner_ssm_bridge.py /app/scripts/dsg_kaggle_owner_ssm_bridge.py
 
 # Install only Alpine's patched zlib (CVE-2026-85091), fail closed if unavailable.
 # The minimum package constraint is validated by apk during the Docker build.
 RUN apk add --no-cache 'zlib>=1.3.2-r1' ca-certificates python3 py3-pip \
     && python3 -m venv /opt/dsg-automation \
-    && /opt/dsg-automation/bin/pip install --no-cache-dir -r /app/automation_spacetime/requirements.txt \
+    && /opt/dsg-automation/bin/pip install --no-cache-dir -r /app/automation_spacetime/requirements.txt boto3==1.40.50 \
     && chmod 0755 /usr/local/bin/dsg-one-container-entrypoint
 
 ENV DSG_AUTOMATION_PYTHON=/opt/dsg-automation/bin/python \
