@@ -71,15 +71,16 @@ export async function GET(request: Request) {
 
   // No private logs, Kaggle credentials, handoff URLs, quota guesses or
   // inferred live GPU state appear in the HTTP response.
+  const dispatchConfigured = Boolean(process.env.DSG_KAGGLE_OWNER_DISPATCH_TOKEN);
   const token = process.env.DSG_KAGGLE_WORKFLOW_READ_TOKEN;
   if (!token) return json(200, {
-    ok: true, connected: false, source: 'NOT_CONFIGURED', gpuState: 'UNVERIFIED',
+    ok: true, connected: false, dispatchConfigured, source: 'NOT_CONFIGURED', gpuState: 'UNVERIFIED',
     message: 'KAGGLE_WORKFLOW_READ_CREDENTIAL_NOT_CONFIGURED', workflows: [],
   });
   try {
     const snapshots = await Promise.all(WORKFLOWS.map(item => readWorkflow(token, item)));
     return json(200, {
-      ok: true, connected: true, source: 'GITHUB_ACTIONS_READ_ONLY',
+      ok: true, connected: true, dispatchConfigured, source: 'GITHUB_ACTIONS_READ_ONLY',
       gpuState: 'UNVERIFIED',
       workflows: snapshots.filter((item): item is WorkflowSnapshot => item !== null),
     });
