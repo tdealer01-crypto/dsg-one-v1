@@ -475,7 +475,7 @@ export default function ApprovalClient() {
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
       <section className="mx-auto max-w-3xl space-y-5 rounded-2xl border border-slate-700 bg-slate-900 p-5">
         <h1 className="text-2xl font-bold">DSG ONE · เจ้าของยืนยันงาน</h1>
-        <p className="text-sm text-slate-300">เข้าสู่ระบบพร้อม MFA ครั้งเดียวต่อเซสชัน จากนั้นตรวจคำสั่งและกดตกลงเพื่ออนุมัติเป็นรายงาน ไม่ต้องทำ MFA ซ้ำทุกครั้ง</p>
+        <p className="text-sm text-slate-300">เข้าสู่ระบบพร้อม MFA ครั้งเดียวต่อเซสชัน จากนั้นตรวจคำสั่งและกดตกลงเพื่ออนุมัติเป็นรายคำสั่ง ไม่ต้องทำ MFA ซ้ำทุกครั้ง</p>
         <p role="status" aria-live="polite" className="rounded-lg border border-slate-700 p-3 text-sm">{status}</p>
         {authFailure && (
           <div role="alert" className="space-y-2 rounded-lg border border-amber-500/60 bg-amber-950/30 p-3 text-sm text-amber-100">
