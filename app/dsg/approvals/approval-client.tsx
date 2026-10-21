@@ -90,6 +90,9 @@ export default function ApprovalClient() {
           clientId: 'jI1uiKcQu7mqORsaCrogKTQVsAcZuQSt',
           authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE },
           cacheLocation: 'memory',
+          // Auth0 documents this for cross-tab callbacks (Android app-switch / external browser).
+          // A short-lived, host-only transaction cookie carries PKCE state; access tokens remain memory-only.
+          useCookiesForTransactions: true,
           useRefreshTokens: false,
         });
         client.current = c;
@@ -126,19 +129,12 @@ export default function ApprovalClient() {
         const authenticated = await c.isAuthenticated();
         setTokenReady(authenticated);
         setAuthFailure(null);
-        // A user who clicked an exact pending-request link already asked to
-        // review that request. Start the existing PKCE Auth0 login immediately
-        // rather than requiring another tiny tap in an Android webview.
-        // Never auto-approve, run MFA, or redirect for the generic approvals
-        // page. Do not loop if an OAuth callback was just handled.
-        if (!authenticated && reviewApprovalId && !(params.has('code') && params.has('state'))) {
-          authPhase = 'login';
-          setStatus('กำลังพาไปยืนยันว่าเป็นเจ้าของผ่าน Auth0 สำหรับคำขอนี้');
-          await c.loginWithRedirect({
-            authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE },
-            appState: { kind: 'review' as const, approvalRequestId: reviewApprovalId },
-          });
-          return;
+        // An exact pending link is a REVIEW intent, not permission to redirect
+        // automatically. On Android an automatic redirect after a lost callback
+        // can strand the user in a login loop across in-app browser contexts.
+        // Preserve the ID and wait for a deliberate, single sign-in click.
+        if (!authenticated && reviewApprovalId) {
+          setStatus('คำขอพร้อมตรวจแล้ว · กดยืนยันตัวตนหนึ่งครั้งเพื่อดูงานนี้');
         }
         if (authenticated && reviewApprovalId) {
           setRequestedApprovalId(reviewApprovalId);
@@ -146,7 +142,9 @@ export default function ApprovalClient() {
         }
         setStatus(authenticated
           ? 'เข้าสู่ระบบ Auth0 แล้ว พร้อมตรวจรายการรออนุมัติ'
-          : 'กดเข้าสู่ระบบเพื่อรับสิทธิ์ dsg.approve สำหรับเซสชันนี้');
+          : reviewApprovalId
+            ? 'คำขอพร้อมตรวจแล้ว · กดยืนยันตัวตนหนึ่งครั้งเพื่อดูงานนี้'
+            : 'กดเข้าสู่ระบบเพื่อรับสิทธิ์ dsg.approve สำหรับเซสชันนี้');
         if (stepUpIntent) {
           setStatus('Auth0 ยืนยันกลับมาแล้ว กำลังตรวจ signed MFA proof กับ DSG Spacetime');
           setPendingStepUpIntent(stepUpIntent);
@@ -478,11 +476,7 @@ export default function ApprovalClient() {
           <div role="alert" className="space-y-2 rounded-lg border border-amber-500/60 bg-amber-950/30 p-3 text-sm text-amber-100">
             <p className="font-semibold">รหัสปัญหา: {authFailure.code}</p>
             <p>{authFailure.nextAction}</p>
-            <p className="text-xs">บน Android หากเปิดจากแชท ให้ใช้เมนูของเบราว์เซอร์ → เปิดใน Chrome แล้วกลับมายังแท็บเดิมหลัง Auth0/MFA</p>
-            <button type="button" onClick={() => window.location.assign(window.location.pathname + window.location.search)}
-              className="min-h-11 rounded-lg border border-amber-500/60 px-3 font-semibold">
-              โหลดหน้าอนุมัติใหม่
-            </button>
+            <p className="text-xs">ระบบหยุดการเปลี่ยนหน้าซ้ำไว้แล้ว เพื่อไม่ให้ต้องกรอกข้อมูลใหม่วนไปมา โปรดใช้ Chrome โปรไฟล์เดียวกันตลอดการยืนยัน</p>
           </div>
         )}
         {!tokenReady && (
