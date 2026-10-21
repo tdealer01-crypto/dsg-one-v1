@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { getDsgBrowserSession } from '@/lib/dsg/user-bound/browser-session';
+import { getDsgBrowserSession, DSG_AUTH0_CALLBACK } from '@/lib/dsg/user-bound/browser-session';
+import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
 
 type SafeState = 'QUEUED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILED' | 'UNKNOWN';
 type Entry = { name: 'OWNER_LAUNCH' | 'GOVERNED_E2E' | 'STOP_PROOF'; state: SafeState; runId: number; updatedAt: string };
@@ -25,6 +26,7 @@ export function DsgKaggleGpuStatus() {
   const [busy, setBusy] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startResult, setStartResult] = useState<string | null>(null);
+  const [signInRequired, setSignInRequired] = useState(false);
 
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -44,27 +46,74 @@ export function DsgKaggleGpuStatus() {
     return () => window.clearTimeout(timer);
   }, [refresh]);
 
+  async function signInForKaggle() {
+    setStarting(true);
+    setStartResult('กำลังเปิด Auth0 เพื่อตรวจสิทธิ์เจ้าของ · หลังเข้าสู่ระบบให้กดเปิด GPU อีกครั้ง');
+    try {
+      await getDsgBrowserSession().loginWithRedirect({
+        authorizationParams: { redirect_uri: DSG_AUTH0_CALLBACK },
+        // Exact allowlisted Workroom tab is restored by identity-bridge.
+        appState: { returnTo: '/dsg/workroom?tool=agent-v0' },
+      });
+    } catch {
+      setStartResult('AUTH0_OWNER_LOGIN_REDIRECT_UNAVAILABLE · ใช้ปุ่มเข้าสู่ระบบเครื่องมือด้านบน');
+    } finally {
+      setStarting(false);
+    }
+  }
+
   async function startFreeGpu() {
     if (!data?.ok || data.dispatchConfigured !== true || starting) return;
     setStarting(true);
     setStartResult(null);
     try {
-      const accessToken = await getDsgBrowserSession().getTokenSilently();
-      if (!accessToken) throw Error('AUTH0_OWNER_SESSION_REQUIRED');
+      const session = getDsgBrowserSession();
+      if (!await session.isAuthenticated()) {
+        setSignInRequired(true);
+        // User clicked to start; redirect only on this explicit interaction.
+        // Never silently loop through Auth0 or dispatch a kernel before login.
+        await signInForKaggle();
+        return;
+      }
+      let accessToken: string;
+      try {
+        const token = await session.getTokenSilently();
+        if (typeof token !== 'string' || !token) throw new Error('AUTH0_NO_DELEGATED_TOKEN');
+        accessToken = token;
+      } catch (error) {
+        const reason = classifyAuth0SessionFailure(error);
+        setSignInRequired(reason === 'AUTH0_REFRESH_NOT_AVAILABLE');
+        setStartResult(reason === 'AUTH0_REFRESH_NOT_AVAILABLE'
+          ? 'AUTH0_REAUTH_REQUIRED · กดเข้าสู่ระบบเครื่องมือ แล้วกลับมาเปิด GPU'
+          : 'AUTH0_IDENTITY_UNAVAILABLE · โปรดลองตรวจเซสชันหรือเครือข่าย');
+        return;
+      }
+      setSignInRequired(false);
       const res = await fetch('/api/dsg/agent-v0/launch', {
         method: 'POST', credentials: 'include', cache: 'no-store',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'start_free_gpu', accessToken }),
       });
-      const outcome = await res.json() as { ok?: boolean; error?: string; status?: string };
+      let outcome: { ok?: boolean; error?: string; status?: string };
+      try {
+        outcome = await res.json() as typeof outcome;
+      } catch {
+        setStartResult('KAGGLE_OWNER_RESPONSE_UNREADABLE · ไม่มีหลักฐานว่า GPU เริ่มแล้ว');
+        return;
+      }
       if (!res.ok || !outcome.ok) {
-        setStartResult(outcome.error ?? 'KAGGLE_OWNER_DISPATCH_UNAVAILABLE');
+        // This is a fixed, server-sanitized code, never Auth0/GitHub raw text.
+        const code = typeof outcome.error === 'string' && /^[A-Z0-9_]{3,100}$/.test(outcome.error)
+          ? outcome.error : 'KAGGLE_OWNER_DISPATCH_UNAVAILABLE';
+        setStartResult(code);
+        if (code === 'KAGGLE_SIGNED_AUTH0_USER_REQUIRED' ||
+            code === 'KAGGLE_VERIFIED_OWNER_SESSION_REQUIRED') setSignInRequired(true);
       } else {
-        setStartResult('GitHub รับคำขอเปิด GPU แล้ว · ต้องรอ Kaggle ตรวจโควตาและยืนยัน Worker จริง');
+        setStartResult('GitHub รับคำขอเปิด GPU แล้ว · รอ Kaggle ตรวจโควตาฟรีและยืนยัน Worker จริง');
       }
       await refresh();
     } catch {
-      setStartResult('ไม่สามารถยืนยันเซสชันเจ้าของหรือเชื่อม Workflow ได้ · ไม่มีการยืนยันว่า GPU เปิดสำเร็จ');
+      setStartResult('KAGGLE_OWNER_NETWORK_UNAVAILABLE · ไม่มีหลักฐานว่า GPU เริ่มแล้ว');
     } finally {
       setStarting(false);
     }
@@ -84,10 +133,10 @@ export function DsgKaggleGpuStatus() {
       </p>
       {data?.ok && (
         <div className="mt-3 space-y-2">
-          <button type="button" onClick={() => void startFreeGpu()}
+          <button type="button" onClick={() => void (signInRequired ? signInForKaggle() : startFreeGpu())}
             disabled={busy || starting || data.dispatchConfigured !== true}
             className="min-h-11 rounded-lg border border-indigo-400 bg-indigo-800 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
-            {starting ? 'กำลังขอเปิด GPU ฟรี…' : 'เปิด Kaggle GPU ฟรี'}
+            {starting ? 'กำลังตรวจสิทธิ์…' : signInRequired ? 'เข้าสู่ระบบเครื่องมือเพื่อเปิด GPU' : 'เปิด Kaggle GPU ฟรี'}
           </button>
           {data.dispatchConfigured !== true && (
             <p className="text-amber-200">
