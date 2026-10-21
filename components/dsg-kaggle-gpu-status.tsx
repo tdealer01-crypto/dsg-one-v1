@@ -77,8 +77,9 @@ export function DsgKaggleGpuStatus() {
       }
       let accessToken: string;
       try {
-        accessToken = await session.getTokenSilently();
-        if (!accessToken) throw new Error('AUTH0_NO_DELEGATED_TOKEN');
+        const token = await session.getTokenSilently();
+        if (typeof token !== 'string' || !token) throw new Error('AUTH0_NO_DELEGATED_TOKEN');
+        accessToken = token;
       } catch (error) {
         const reason = classifyAuth0SessionFailure(error);
         setSignInRequired(reason === 'AUTH0_REFRESH_NOT_AVAILABLE');
