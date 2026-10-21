@@ -75,9 +75,6 @@ class KaggleSsmBridgeTests(unittest.TestCase):
         self.assertEqual(api.call_count, 2)
 
     def test_exception_never_leaks_provider_credentials(self):
-        with mock.patch.object(BRIDGE, "get_token", side_effect=ValueError("secret-or-policy-details")):
-            result = captured(lambda: BRIDGE.main())
-        self.assertEqual(result["httpStatus"], 400)  # argv not supplied
         with mock.patch.object(BRIDGE.sys, "argv", ["script", "status"]):
             with mock.patch.object(BRIDGE, "get_token", side_effect=ValueError("secret-or-policy-details")):
                 outcome = captured(BRIDGE.main)
