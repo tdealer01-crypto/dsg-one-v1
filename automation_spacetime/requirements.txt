@@ -1,2 +1,4 @@
 agent-framework-core==1.18.0
 agent-framework-orchestrations==1.1.1
+# Runtime-only AWS EC2 instance-role SSM SecureString binding for Kaggle owner.
+boto3==1.40.70
