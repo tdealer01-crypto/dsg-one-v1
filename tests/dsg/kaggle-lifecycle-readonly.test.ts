@@ -93,7 +93,7 @@ describe('owner Agent v0 Kaggle GPU status (read only, never invented READY)', (
     expect(status).toContain('Workroom ไม่ได้เปิด GPU อัตโนมัติ');
     expect(api).toContain("requireVerifiedDsgActor(request.headers, 'job:read')");
     expect(api).not.toContain('kernels push');
-    expect(api).not.toContain('workflow_dispatch');
+    expect(api).not.toContain("method: 'POST'");
     expect(status).not.toContain('localStorage');
   });
 });
