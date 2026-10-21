@@ -57,6 +57,22 @@ describe('owner-only AWS SSM Kaggle status', () => {
     expect(JSON.stringify(obj)).not.toMatch(/github_pat_|ghp_|AWS_SECRET_ACCESS_KEY/);
   });
 
+  it('does not enable owner dispatch for a credential bound to the wrong GitHub account', async () => {
+    probe.mockResolvedValueOnce({
+      httpStatus: 200, ok: true, connected: true, dispatchConfigured: false,
+      dispatchReason: 'KAGGLE_GITHUB_OWNER_IDENTITY_MISMATCH',
+      gpuState: 'UNVERIFIED', source: 'AWS_SSM_GITHUB_ACTIONS_READ_ONLY',
+      workflows: [],
+    });
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      dispatchConfigured: false,
+      dispatchReason: 'KAGGLE_GITHUB_OWNER_IDENTITY_MISMATCH',
+      gpuState: 'UNVERIFIED',
+    });
+  });
+
   it('fails closed for any SSM/GitHub bridge error and does not accept POST', async () => {
     probe.mockResolvedValueOnce({ httpStatus: 503, ok: false, error: 'KAGGLE_OWNER_SECURE_BRIDGE_UNAVAILABLE', gpuState: 'UNVERIFIED' });
     const res = await GET(req());
@@ -79,6 +95,9 @@ describe('owner-only AWS SSM Kaggle status', () => {
     expect(api).toContain("runKaggleSsmBridge('status')");
     expect(adapter).toContain("execFileAsync(PYTHON, [BRIDGE, action]");
     expect(python).toContain("WithDecryption=True");
+    expect(python).toContain('owner_verified = isinstance(identity, dict) and identity.get("login") == OWNER');
+    expect(python).toContain('dispatchConfigured=owner_verified');
+    expect(status).toContain('KAGGLE_GITHUB_OWNER_IDENTITY_MISMATCH');
     expect(python).not.toContain("print(token)");
     expect(status).not.toContain('localStorage');
   });
