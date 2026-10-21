@@ -19,11 +19,11 @@ describe('Owner-confirmation UX and Auth0 callback recovery', () => {
     expect(JSON.stringify(result)).not.toContain('SECRET');
   });
   it('simplifies the protected UX to signed-in owner plus one exact confirmation', () => {
-    expect(source).toContain('ยืนยันว่าเป็นเจ้าของด้วย Auth0');
+    expect(source).toContain('เข้าสู่ระบบและยืนยัน MFA ครั้งเดียว');
     expect(source).toContain('useCookiesForTransactions: true');
     expect(source).not.toContain('โหลดหน้าอนุมัติใหม่');
     expect(source).toContain("if (!authenticated && reviewApprovalId)");
-    expect(source).toContain('ยืนยันตัวตนและอนุมัติงานนี้');
+    expect(source).toContain('ตกลง · อนุมัติคำสั่งนี้');
     expect(source).toContain('ไม่อนุมัติงานนี้');
     expect(source).toContain('<details className="rounded-xl border border-slate-700 p-3 text-xs">');
     expect(source).toContain('onClick={() => void decide(\'APPROVE\')}');
@@ -34,6 +34,8 @@ describe('Owner-confirmation UX and Auth0 callback recovery', () => {
     expect(source).toContain("tool('spacetime_get_approval'");
     expect(source).toContain("tool('spacetime_resolve_approval'");
     expect(source).toContain("proof.error === 'FRESH_SIGNED_MFA_REQUIRED'");
+    expect(source).not.toContain("await startStepUp({ kind: 'approve', approvalRequestId: selected.approval_request_id })");
+    expect(source).toContain("setMfaSessionExpired(true)");
     expect(source).toContain("ext_dsg_stepup: '1'");
     expect(source).toContain("expiry <= Date.now()");
     expect(source).toContain('knownRiskTier(selected.risk_tier)');
