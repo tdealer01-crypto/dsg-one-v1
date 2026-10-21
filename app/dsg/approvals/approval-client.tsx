@@ -433,6 +433,11 @@ export default function ApprovalClient() {
         const proof = await proofResponse.json() as {
           ok?: boolean; mfaVerified?: boolean; error?: string;
         };
+        if (!proofResponse.ok && proofResponse.status === 401) {
+          setMfaSessionExpired(true);
+          setStatus('SESSION_LOGIN_EXPIRED — เซสชัน Auth0 หมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง');
+          return;
+        }
         if (!proofResponse.ok && proofResponse.status === 403 &&
             proof.error === 'FRESH_SIGNED_MFA_REQUIRED') {
           setMfaSessionExpired(true);
@@ -467,7 +472,14 @@ export default function ApprovalClient() {
       setSelected(null);
       setApprovals(items => items.filter(item => item.approval_request_id !== selected.approval_request_id));
     } catch (err) {
-      setStatus('ดำเนินการไม่ผ่าน: ' + (err instanceof Error ? err.message : 'NOT_VERIFIED'));
+      const authProblem = describeApprovalAuthProblem(err, 'session');
+      if (authProblem.code === 'AUTH0_INTERACTIVE_LOGIN_REQUIRED' ||
+          authProblem.code === 'AUTH0_SESSION_CHECK_FAILED') {
+        setMfaSessionExpired(true);
+        setStatus('SESSION_LOGIN_EXPIRED — ต้องเข้าสู่ระบบ Auth0 อีกครั้งก่อนอนุมัติ');
+      } else {
+        setStatus('ดำเนินการไม่ผ่าน: ' + (err instanceof Error ? err.message : 'NOT_VERIFIED'));
+      }
     } finally { setBusy(false); }
   }
 
