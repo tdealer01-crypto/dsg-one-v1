@@ -67,7 +67,9 @@ describe('separate Auth0 agents and human approver', () => {
     expect((await verifyDsgAuth0Principal(token, 'dsg.approve'))?.mfaProofVerified).toBe(false);
     for (const proof of [
       { at: now - 4, method: 'pwd', valid: false },
-      { at: now - 121, method: 'mfa', valid: false },
+      { at: now - 121, method: 'mfa', valid: true },
+      { at: now - 7200, method: 'mfa', valid: true },
+      { at: now - 28801, method: 'mfa', valid: false },
       { at: now + 15, method: 'mfa', valid: false },
       { at: now - 4, method: 'mfa', valid: true },
     ]) {
