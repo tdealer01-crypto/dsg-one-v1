@@ -34,9 +34,9 @@ STATES = {"queued", "waiting", "pending", "requested", "in_progress"}
 CONFIG = Config(connect_timeout=2, read_timeout=4, retries={"max_attempts": 1})
 
 
-def emit(status: int, **body: object) -> int:
+def emit(http_status: int, **body: object) -> int:
     # Fixed error codes only; no exception string, policy ARN or raw replies.
-    print(json.dumps({"httpStatus": status, **body}, separators=(",", ":")))
+    print(json.dumps({"httpStatus": http_status, **body}, separators=(",", ":")))
     return 0
 
 
