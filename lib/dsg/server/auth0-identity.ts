@@ -45,11 +45,14 @@ export async function verifyDsgAuth0Principal(token: unknown, requiredScope: 'ds
     const reauthAt = payload['https://dsg.pics/claims/reauth_at'];
     const reauthMethod = payload['https://dsg.pics/claims/reauth_method'];
     const now = Math.floor(Date.now() / 1000);
+    // A real Auth0-signed MFA method remains valid for one bounded owner
+    // approval session (8h), never beyond JWT expiration or another login.
+    const sessionMfaSeconds = 8 * 60 * 60;
     const signedRecentMfa = requiredScope === 'dsg.approve'
       && reauthMethod === 'mfa'
       && typeof reauthAt === 'number' && Number.isInteger(reauthAt)
-      && reauthAt > 0 && reauthAt <= now + 5 && now - reauthAt <= 120
-      && reauthAt <= payload.iat + 5 && payload.iat - reauthAt <= 120;
+      && reauthAt > 0 && reauthAt <= now + 5 && now - reauthAt <= sessionMfaSeconds
+      && reauthAt <= payload.iat + 5 && payload.iat - reauthAt <= sessionMfaSeconds;
     return {
       subject: payload.sub,
       issuer: DSG_AUTH0_ISSUER,
