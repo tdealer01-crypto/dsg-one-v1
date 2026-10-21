@@ -1,0 +1,118 @@
+name: Bind Kaggle Owner Credential to Existing AWS Website
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type BIND_DSG_KAGGLE_OWNER_TOKEN after setting the GitHub owner fine-grained PAT in AWS SSM SecureString
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: dsg-one-kaggle-owner-one-time-binding
+  cancel-in-progress: false
+
+jobs:
+  owner-bind:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.repository == 'tdealer01-crypto/dsg-one-v1' &&
+      github.actor == 'tdealer01-crypto' &&
+      github.triggering_actor == 'tdealer01-crypto' &&
+      github.run_attempt == 1 &&
+      inputs.confirm == 'BIND_DSG_KAGGLE_OWNER_TOKEN'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AWS_REGION: us-east-1
+      DEPLOY_ROLE: arn:aws:iam::121205961822:role/dsg-one-v1-github-deploy
+      HOST: i-01a2ee90890a558c3
+      SSM_DOCUMENT: DSG-ONE-Kaggle-Owner-Secret-Bind-v1
+      PINNED_DOCUMENT_HASH: 1e6193632da016ef74d2e58945ed0522a0bd8017ce3b4d4d195f25f46eb73e87
+      PAT_PARAMETER: /dsg/one/prod/kaggle-owner-dispatch-token
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify current main and public source before binding
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')" == "$GITHUB_SHA" ]] || {
+            echo 'BLOCK=SUPERSEDED_SOURCE'; exit 42;
+          }
+          STATUS="$(curl -fsS --max-time 12 https://dsg.pics/api/agent/status)"
+          jq -e --arg sha "$GITHUB_SHA"             '.ok==true and .version==$sha and .deployment.sourceBound==true and .deployment.digestBound==true'             <<< "$STATUS" >/dev/null || { echo 'BLOCK=WEBSITE_NOT_SERVING_MAIN'; exit 42; }
+          echo 'OWNER_WEBSITE_SOURCE=VERIFIED'
+
+      - name: Assume existing least-privilege AWS website deploy role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify pinned SSM document and SecureString presence (never decrypt in Actions)
+        shell: bash
+        run: |
+          set -euo pipefail
+          HASH="$(aws ssm describe-document --name "$SSM_DOCUMENT" --query 'Document.Hash' --output text)"
+          [[ "$HASH" == "$PINNED_DOCUMENT_HASH" ]] || {
+            echo 'BLOCK=KAGGLE_BIND_SSM_DOCUMENT_DRIFT'; exit 42;
+          }
+          STATUS="$(aws ssm describe-document --name "$SSM_DOCUMENT" --query 'Document.Status' --output text)"
+          [[ "$STATUS" == Active ]] || { echo 'BLOCK=BIND_SSM_DOCUMENT_NOT_ACTIVE'; exit 42; }
+          TYPE="$(aws ssm describe-parameters             --parameter-filters "Key=Name,Option=Equals,Values=$PAT_PARAMETER"             --query 'Parameters[0].Type' --output text)"
+          [[ "$TYPE" == SecureString ]] || {
+            echo 'BLOCK=OWNER_FINE_GRAINED_PAT_NOT_PROVISIONED_IN_AWS_SSM'
+            echo 'nextAction=Store owner github_pat_... in AWS SSM SecureString under the exact approved parameter name'
+            exit 42
+          }
+          echo 'SSM_OWNER_TOKEN_METADATA=VERIFIED_NO_DECRYPT'
+
+      - name: Bind once to existing container with pinned owner-gated SSM document
+        shell: bash
+        run: |
+          set -euo pipefail
+          PARAMS="$(jq -cn --arg source "$GITHUB_SHA"             '{ExpectedSourceSha:[$source],OwnerConfirm:["BIND_DSG_KAGGLE_OWNER_TOKEN"]}')"
+          COMMAND_ID="$(aws ssm send-command --instance-ids "$HOST"             --document-name "$SSM_DOCUMENT" --document-version 1             --parameters "$PARAMS" --timeout-seconds 360             --comment "DSG ONE owner-only existing-host Kaggle SecureString binding"             --query 'Command.CommandId' --output text)"
+          STATE=""
+          for _ in $(seq 1 65); do
+            STATE="$(aws ssm get-command-invocation --command-id "$COMMAND_ID"               --instance-id "$HOST" --query 'Status' --output text 2>/dev/null || true)"
+            case "$STATE" in
+              Success|Failed|TimedOut|Cancelled) break ;;
+            esac
+            sleep 5
+          done
+          # Do not print stdout/stderr: a failed provider could have emitted
+          # environment details. Accept exact fixed PASS marker only.
+          RESULT="$(aws ssm get-command-invocation             --command-id "$COMMAND_ID" --instance-id "$HOST" --output json)"
+          if [[ "$STATE" != Success ]] || ! jq -e             '.StandardOutputContent | contains("DSG_KAGGLE_OWNER_BIND=PASS") or
+              contains("DSG_KAGGLE_OWNER_BIND=ALREADY_BOUND_VERIFIED")'               <<< "$RESULT" >/dev/null; then
+            echo "BLOCK=KAGGLE_OWNER_BIND_FAILED ssm_command_id=$COMMAND_ID"
+            echo 'nextAction=Inspect SSM status privately; do not rerun if rollback outcome is unknown'
+            exit 42
+          fi
+          echo "DSG_KAGGLE_OWNER_BIND=VERIFIED ssm_command_id=$COMMAND_ID"
+
+      - name: Independently verify website revision stayed healthy
+        shell: bash
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 8); do
+            if curl -fsS --max-time 12 https://dsg.pics/api/agent/status |
+              jq -e --arg sha "$GITHUB_SHA"                 '.ok==true and .version==$sha and .deployment.sourceBound==true and .deployment.digestBound==true' >/dev/null; then
+              echo "DSG_KAGGLE_BIND_PUBLIC_HEALTH=PASS source=$GITHUB_SHA"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'BLOCK=DSG_KAGGLE_BIND_PUBLIC_HEALTH_NOT_VERIFIED'
+          exit 42
