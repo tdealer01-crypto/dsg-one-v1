@@ -51,7 +51,7 @@ def get_token(name: str) -> str | None:
         if code == "ParameterNotFound":
             return None
         raise
-    if not isinstance(value, str) or not (value.startswith("github_pat_") or value.startswith("ghp_")):
+    if not isinstance(value, str) or not value.startswith("github_pat_"):
         raise ValueError("OWNER_GITHUB_TOKEN_FORMAT_INVALID")
     if not 40 <= len(value) <= 512 or any(ch.isspace() for ch in value):
         raise ValueError("OWNER_GITHUB_TOKEN_FORMAT_INVALID")
