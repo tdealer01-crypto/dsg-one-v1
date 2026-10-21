@@ -14,6 +14,7 @@ export type KaggleBridgeResult = {
   ok: boolean;
   connected?: boolean;
   dispatchConfigured?: boolean;
+  dispatchReason?: string;
   gpuState?: 'UNVERIFIED';
   source?: string;
   workflows?: unknown[];
@@ -39,7 +40,7 @@ export async function runKaggleSsmBridge(action: 'status' | 'start'): Promise<Ka
         typeof data.ok !== 'boolean') throw Error('INVALID_RESPONSE');
     const safeKeys = new Set([
       'httpStatus', 'ok', 'connected', 'dispatchConfigured', 'gpuState',
-      'source', 'workflows', 'error', 'status', 'details',
+      'source', 'workflows', 'error', 'status', 'details', 'dispatchReason',
     ]);
     if (Object.keys(data).some(key => !safeKeys.has(key))) throw Error('UNEXPECTED_BRIDGE_FIELD');
     return data as KaggleBridgeResult;
