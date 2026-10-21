@@ -6,7 +6,7 @@ import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh'
 
 type SafeState = 'QUEUED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILED' | 'UNKNOWN';
 type Entry = { name: 'OWNER_LAUNCH' | 'GOVERNED_E2E' | 'STOP_PROOF'; state: SafeState; runId: number; updatedAt: string };
-type Lifecycle = { ok: boolean; connected?: boolean; dispatchConfigured?: boolean; source?: string; gpuState?: string; workflows?: Entry[]; error?: string };
+type Lifecycle = { ok: boolean; connected?: boolean; dispatchConfigured?: boolean; dispatchReason?: string; source?: string; gpuState?: string; workflows?: Entry[]; error?: string };
 
 const labels: Record<Entry['name'], string> = {
   OWNER_LAUNCH: 'เปิด Kaggle Worker',
@@ -140,7 +140,11 @@ export function DsgKaggleGpuStatus() {
           </button>
           {data.dispatchConfigured !== true && (
             <p className="text-amber-200">
-              ยังไม่เชื่อมสิทธิ์ Dispatch ของเจ้าของบนเซิร์ฟเวอร์ · ปุ่มเปิด GPU จึงไม่พร้อมใช้งาน
+              {data.dispatchReason === 'KAGGLE_GITHUB_OWNER_IDENTITY_MISMATCH'
+                ? 'Token ใน AWS ไม่ใช่บัญชี GitHub เจ้าของที่อนุญาต · ปุ่มเปิด GPU ถูกปิดเพื่อความปลอดภัย'
+                : data.dispatchReason === 'KAGGLE_GITHUB_OWNER_IDENTITY_UNVERIFIED'
+                  ? 'อ่านบัญชีเจ้าของ GitHub จาก Token ไม่สำเร็จ · ยังไม่ส่งคำสั่งเปิด GPU'
+                  : 'ยังไม่มี SecureString สำหรับ Owner Dispatch · ปุ่มเปิด GPU จึงไม่พร้อมใช้งาน'}
             </p>
           )}
           {startResult && <p role="status" className="text-slate-200">{startResult}</p>}
