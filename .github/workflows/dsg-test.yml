@@ -41,7 +41,7 @@ jobs:
         run: npx vitest run tests/dsg/chat-history-model.test.ts tests/dsg/chat-history-recovery-route.test.ts
 
       - name: Cinema Free Auth0 signed-member proof negative controls
-        run: npx vitest run tests/dsg/cinema-free-link-proof.test.ts
+        run: npx vitest run tests/dsg/cinema-free-link-proof.test.ts tests/dsg/cinema-controller-contract.test.ts
 
       - name: Claim gate
         run: npm run dsg:claim-gate
