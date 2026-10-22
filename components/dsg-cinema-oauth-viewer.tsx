@@ -9,6 +9,23 @@ type Reply = { ok?: boolean; linked?: boolean; connected?: boolean; provider?: s
   browser_session_id?: string; embed_url?: string; account?: { plan?: string };
   detail?: string | { error?: string }; error?: string };
 
+export function describeCinemaAccountIssue(reason: string): string {
+  switch (reason) {
+    case 'CINEMA_FREE_ACCOUNT_NOT_LINKED':
+      return 'เข้าสู่ระบบ DSG ONE แล้ว แต่ยังไม่ผูกบัญชี Cinema Free เดิม — ยืนยันบัญชีเดิมครั้งเดียวด้านล่าง ไม่ต้องล็อกอิน Google ซ้ำ';
+    case 'SAME_ACCOUNT_BROWSER_VIEWER_NOT_READY':
+      return 'Shared Browser ของบัญชีนี้ยังไม่พร้อม โปรดตรวจ Remote ON และบัญชีที่ผูกอยู่ก่อน ไม่สร้างโปรไฟล์ใหม่';
+    case 'AUTH0_REAUTH_REQUIRED':
+    case 'AUTH0_TOKEN_UNAVAILABLE':
+      return 'DSG Auth0 session ไม่มี token ที่ใช้ได้ ต้องเข้าสู่ระบบใหม่จาก Workroom เพียงครั้งเดียว';
+    case 'SITE_MEMBERSHIP_OR_SIGNER_UNAVAILABLE':
+    case 'SITE_IDENTITY_PROOF_NOT_READY':
+      return 'เว็บไซต์ออกหลักฐานยืนยัน Workspace ที่ลงลายเซ็นไม่ได้ ต้องตรวจ Identity Link / Signing Key ไม่ใช่ลองล็อกอิน Google ซ้ำ';
+    default:
+      return reason;
+  }
+}
+
 async function callCinema(path: '/status' | '/link' | '/viewer', oldFreeKey?: string): Promise<Reply> {
   const token = await getDsgBrowserSession().getTokenSilently();
   const issuerResponse = await fetch('/api/dsg/cinema/free-link-proof', {
@@ -51,7 +68,7 @@ export function DsgCinemaOauthViewer({ ready }: { ready: boolean }) {
       setMessage('เชื่อมบัญชี Free แล้ว ใช้ Auth0 เปิด Viewer ได้');
     } catch (error) {
       setLinked(false);
-      setMessage(error instanceof Error ? error.message : 'ACCOUNT_LINK_UNVERIFIED');
+      setMessage(describeCinemaAccountIssue(error instanceof Error ? error.message : 'ACCOUNT_LINK_UNVERIFIED'));
     } finally {
       setWorking(false);
     }
@@ -67,7 +84,7 @@ export function DsgCinemaOauthViewer({ ready }: { ready: boolean }) {
       setLinked(result.linked === true);
       setMessage('ยืนยันและผูกบัญชี Free เดิมแล้ว');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'ACCOUNT_LINK_FAILED');
+      setMessage(describeCinemaAccountIssue(error instanceof Error ? error.message : 'ACCOUNT_LINK_FAILED'));
     } finally {
       setWorking(false);
     }
@@ -91,7 +108,7 @@ export function DsgCinemaOauthViewer({ ready }: { ready: boolean }) {
       setMessage('เปิด Viewer ของบัญชี Free แล้ว · Agent ยังต้องได้รับ Signed Approval');
     } catch (error) {
       tab?.close();
-      setMessage(error instanceof Error ? error.message : 'HUMAN_VIEWER_UNAVAILABLE');
+      setMessage(describeCinemaAccountIssue(error instanceof Error ? error.message : 'HUMAN_VIEWER_UNAVAILABLE'));
     } finally {
       setWorking(false);
     }
