@@ -64,8 +64,11 @@ export function DsgCinemaOauthViewer({ ready }: { ready: boolean }) {
     setWorking(true);
     try {
       const status = await callCinema('/status');
-      setLinked(status.linked === true && status.account?.plan === 'free');
-      setMessage('เชื่อมบัญชี Free แล้ว ใช้ Auth0 เปิด Viewer ได้');
+      const verifiedFreeLink = status.linked === true && status.account?.plan === 'free';
+      setLinked(verifiedFreeLink);
+      setMessage(verifiedFreeLink
+        ? 'ยืนยันบัญชี Free เดิมแล้ว ใช้ Auth0 เปิด Viewer ของบัญชีนี้ได้'
+        : describeCinemaAccountIssue('CINEMA_FREE_ACCOUNT_NOT_LINKED'));
     } catch (error) {
       setLinked(false);
       setMessage(describeCinemaAccountIssue(error instanceof Error ? error.message : 'ACCOUNT_LINK_UNVERIFIED'));
@@ -82,7 +85,9 @@ export function DsgCinemaOauthViewer({ ready }: { ready: boolean }) {
     try {
       const result = await callCinema('/link', proof);
       setLinked(result.linked === true);
-      setMessage('ยืนยันและผูกบัญชี Free เดิมแล้ว');
+      setMessage(result.linked === true
+        ? 'ยืนยันและผูกบัญชี Free เดิมแล้ว'
+        : describeCinemaAccountIssue('CINEMA_FREE_ACCOUNT_NOT_LINKED'));
     } catch (error) {
       setMessage(describeCinemaAccountIssue(error instanceof Error ? error.message : 'ACCOUNT_LINK_FAILED'));
     } finally {
