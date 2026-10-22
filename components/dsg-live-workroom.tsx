@@ -5,6 +5,7 @@ import { getDsgBrowserSession, DSG_AUTH0_CALLBACK } from '@/lib/dsg/user-bound/b
 import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
 import { DsgKaggleGpuStatus } from '@/components/dsg-kaggle-gpu-status';
 import { DsgCinemaOauthViewer } from '@/components/dsg-cinema-oauth-viewer';
+import { cinemaAgentToolContracts, cinemaVerifierKind, cinemaVerifierReadPayload } from '@/lib/dsg/user-bound/cinema-controller-contract';
 import { nativeShellOutcome } from '@/lib/dsg/user-bound/native-shell-outcome';
 import {
   asRecord, catalogRoutes, composeWorkroomRoutes, publicWorkroomReceipt,
@@ -335,6 +336,7 @@ export function DsgLiveWorkroom() {
     const available = catalogLoaded ? routes : await loadCatalog();
     const contracts = [
       { name: 'browser.remote.status', target: browserTarget, description: 'อ่านสถานะการเชื่อมต่อ Remote Browser', required: [], optional: [], risk: 'read' },
+      ...cinemaAgentToolContracts(browserTarget),
       { name: 'device.remote.status', target: desktopTarget, description: 'อ่านสถานะ DSG Desktop Native ที่ผูกอยู่', required: [], optional: [], risk: 'read' },
       { name: 'device.process.list', target: desktopTarget, description: 'อ่านรายการ process ของ DSG Desktop Native', required: [], optional: [], risk: 'read' },
       { name: 'device.fs.read', target: desktopTarget, description: 'อ่านไฟล์จาก DSG Desktop Native', required: ['path'], optional: ['offset', 'length'], risk: 'read' },
@@ -371,9 +373,37 @@ export function DsgLiveWorkroom() {
     } }), 'เชื่อม Remote Browser');
   }
 
-  async function browserNavigate() {
-    const destination = new URL(url);
-    if (!['https:', 'http:'].includes(destination.protocol) || destination.username || destination.password) throw new Error('PUBLIC_BROWSER_URL_REQUIRED');
+  async function browserVerifier(kind: 'browser.extract' | 'browser.screenshot') {
+    await run('browser.remote.read', browserTarget,
+      planId => cinemaVerifierReadPayload(planId, agent().agent_id, kind),
+      kind === 'browser.screenshot' ? 'ตรวจภาพหน้าเว็บด้วย Agent Verifier' : 'อ่านหน้าเว็บด้วย Agent Verifier');
+  }
+
+  async function executeAgentProposal(action: Action) {
+    // Planner selects intent, but Workroom constructs the exact plan-bound
+    // controller payload. Model proposals cannot mint permits or credentials.
+    if (action.capability === 'browser.remote.read') {
+      await browserVerifier(cinemaVerifierKind(action.arguments.kind));
+      return;
+    }
+    if (action.capability === 'browser.remote.connect') {
+      await browserConnect();
+      return;
+    }
+    if (action.capability === 'browser.remote.execute') {
+      if (typeof action.arguments.url !== 'string') throw new Error('PUBLIC_BROWSER_URL_REQUIRED');
+      await browserNavigate(action.arguments.url);
+      return;
+    }
+    await run(action.capability, action.target,
+      () => ({ action: action.capability, arguments: action.arguments }), action.label);
+  }
+
+  async function browserNavigate(targetUrl: string = url) {
+    let destination: URL;
+    try { destination = new URL(targetUrl); }
+    catch { throw new Error('PUBLIC_BROWSER_URL_REQUIRED'); }
+    if (destination.protocol !== 'https:' || destination.username || destination.password) throw new Error('PUBLIC_BROWSER_URL_REQUIRED');
     await runSteps([
       {
         capability: 'browser.remote.connect',
@@ -420,6 +450,9 @@ export function DsgLiveWorkroom() {
         {tab === 'agent' && <>
           <p className="text-sm text-slate-300">DSG Agent v0 ใช้ Qwen เพื่อเสนอแผนผ่าน AWS Spacetime ไม่ได้อนุมัติหรือลงมือทำเอง หาก Kaggle Worker ไม่ออนไลน์จะแสดงข้อผิดพลาดตามจริง</p>
           <p className="text-xs text-amber-200">สถานะ Route ไม่เท่ากับโมเดลพร้อมใช้ · Qwen3-30B-A3B เป็น Worker ชั่วคราวบน Kaggle (proposal-only)</p>
+          <button type="button" className={button} onClick={() => selectTool('browser')}>
+            Shared Browser / Multi-Controller · เปิดเครื่องมือที่ใช้ร่วมกับ Agent
+          </button>
           <DsgKaggleGpuStatus />
           <div role="log" aria-label="บทสนทนา Agent v0" aria-live="polite" className="max-h-80 space-y-3 overflow-y-auto">
             {chat.map((turn, index) => <p key={index} className={`whitespace-pre-wrap rounded-xl p-3 text-sm ${turn.role === 'user' ? 'bg-indigo-900/60' : 'bg-slate-950'}`}><strong>{turn.role === 'user' ? 'คุณ' : 'Agent v0'}: </strong>{turn.text}</p>)}
@@ -434,18 +467,21 @@ export function DsgLiveWorkroom() {
             <p className="font-semibold">ขั้นตอนที่เสนอ: {proposal.label}</p>
             <pre className="mt-2 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(publicWorkroomReceipt(proposal.arguments), null, 2)}</pre>
             <button className={`${button} mt-3`} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => {
-              await run(proposal.capability, proposal.target, () => ({ action: proposal.capability, arguments: proposal.arguments }), proposal.label);
+              await executeAgentProposal(proposal);
               setProposal(null);
             })}>ทำตามขั้นตอนนี้</button>
           </div>}
         </>}
         {tab === 'browser' && <>
           <p className="text-sm text-slate-300">ใช้ Cinema บน AWS เดิม การเชื่อมและการควบคุมต้องผ่านคำขออนุมัติที่ผูกกับแผน</p>
+          <p className="text-xs text-slate-400">Human Viewer: ต้องยืนยันบัญชี Cinema เดิม · Agent Executor: ควบคุมตามแผนที่อนุมัติ · Agent Verifier: อ่านหน้าเว็บ/ภาพหน้าจอเท่านั้น ทั้งสามบทบาทใช้โปรไฟล์ Browser เดียวกันเมื่อการผูกเซสชันผ่านการตรวจสอบ</p>
           <DsgCinemaOauthViewer ready={ready} />
           {catalogLoaded && !isAvailable('browser.remote.status', browserTarget) && <p className="text-amber-200">runtime ยังไม่เปิดเส้นทาง Browser — ตรวจ deployment ก่อนเชื่อม</p>}
           <div className="flex flex-wrap gap-2">
             <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('browser.remote.status', browserTarget, () => ({ action: 'browser.remote.status', arguments: {} }), 'อ่านสถานะ Browser'); })}>ตรวจสถานะ Browser</button>
             <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(browserConnect)}>ขอเชื่อม Browser</button>
+            <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await browserVerifier('browser.extract'); })}>Agent Verifier · อ่านหน้าเว็บ</button>
+            <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await browserVerifier('browser.screenshot'); })}>Agent Verifier · ภาพหน้าจอ</button>
             <a href="https://aws.dsg.pics/app" target="_blank" rel="noopener noreferrer" className={button}>Evidence &amp; Conformance ↗ (ไม่ใช่ Cinema Viewer)</a>
           </div>
           <label htmlFor="workroom-browser-url" className="block text-sm font-semibold">เว็บที่จะเปิด</label>
