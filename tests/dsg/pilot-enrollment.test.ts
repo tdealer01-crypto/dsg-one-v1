@@ -29,7 +29,7 @@ describe('DSG ONE v1 pilot enrollment — never execution authority', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ status: 'SIGNUP_SUBMITTED', accessGranted: false });
     expect(upstream).toHaveBeenCalledTimes(1);
-    expect(String(upstream.mock.calls[0][0])).toEndWith('/auth/v1/signup');
+    expect(String(upstream.mock.calls[0][0])).toMatch(/\/auth\/v1\/signup$/);
     expect(JSON.stringify(upstream.mock.calls[0][1])).not.toMatch(/service_role|workspace_members|OWNER/);
   });
 
