@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const EMAIL = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function authConfiguration() {
   const url = process.env.DSG_ONE_V1_SUPABASE_URL ?? process.env.NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_DSG_ONE_V1_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) throw new Error('DSG_AUTH_CONFIG_REQUIRED');
-  return { url: url.replace(/\\/$/, ''), key };
+  return { url: url.replace(/\/$/, ''), key };
 }
 
 export async function POST(request: NextRequest) {
