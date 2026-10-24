@@ -6,6 +6,7 @@ import {
   evaluateAutomationRun,
   getAutomationSteps,
   getLatestAutomationRun,
+  projectAutomationWorkQuest,
   startAutomationRun,
   transitionAutomationStep,
 } from '@/lib/dsg/server/automation-spacetime';
@@ -23,10 +24,12 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
   const { jobId } = await context.params;
   try {
     const repo = repositoryContext(actor, request);
+    // Reuse existing authenticated job:read scope and workspace-row guard.
+    const job = await getRuntimeJob(repo, jobId);
     const run = await getLatestAutomationRun(repo, jobId);
-    if (!run) return NextResponse.json({ ok: true, data: { run: null, steps: [] }, source: 'supabase' });
-    const steps = await getAutomationSteps(repo, run.id);
-    return NextResponse.json({ ok: true, data: { run, steps }, source: 'supabase' });
+    const steps = run ? await getAutomationSteps(repo, run.id) : [];
+    const workQuest = projectAutomationWorkQuest({ job, run, steps, viewer: actor });
+    return NextResponse.json({ ok: true, data: { run, steps, workQuest }, source: 'supabase' });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: { code: error instanceof Error ? error.message : 'AUTOMATION_STATUS_FAILED' } },
