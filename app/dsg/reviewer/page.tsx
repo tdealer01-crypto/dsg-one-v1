@@ -49,7 +49,22 @@ export default function DsgReviewerAccessPage() {
     }
   }, []);
 
-  useEffect(() => { void check(); }, [check]);
+  useEffect(() => {
+    let active = true;
+    fetch('/api/dsg/reviewer/preflight', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+    })
+      .then(response => response.json() as Promise<Preflight>)
+      .then(payload => { if (active) setData(payload); })
+      .catch(() => {
+        if (active) setData({
+          status: 'BLOCKED', reason: 'REVIEWER_PREFLIGHT_BACKEND_UNAVAILABLE',
+        });
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   const eligible = data?.status === 'PREFLIGHT_ELIGIBLE';
   const reason = data?.reason || 'REVIEWER_PREFLIGHT_BACKEND_UNAVAILABLE';
