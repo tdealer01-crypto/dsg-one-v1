@@ -77,6 +77,13 @@ const systemEntries = [
     external: false,
   },
   {
+    title: 'Pilot Verification · 24 Oct 2026',
+    description: 'Read dated production execution evidence, approval-denial results and explicitly unverified member E2E.',
+    href: '/pilot-verification-2026-10-24.md',
+    badge: 'Public Markdown · No login',
+    external: false,
+  },
+  {
     title: 'Browser Execution Pilot',
     description: 'Read the supervised browser pilot scope and request a governed trial.',
     href: '/remote-browser-execution',
@@ -241,6 +248,30 @@ export default function HomePage() {
         </section>
 
         <PublicProductionSnapshot />
+        <section id="pilot-verification" aria-labelledby="pilot-verification-heading" className="scroll-mt-24 rounded-3xl border border-cyan-400/30 bg-slate-900/90 p-7 sm:p-9">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="font-mono text-xs uppercase tracking-[0.22em] text-cyan-300">Public Pilot · Dated Evidence · 24 October 2026</p>
+              <h2 id="pilot-verification-heading" className="mt-3 text-2xl font-black sm:text-3xl">
+                DSG ONE Supervised Trial — ผลตรวจที่ยืนยันได้จริง
+              </h2>
+              <p className="mt-3 text-sm leading-7 text-slate-300">
+                Published Markdown for reviewers and AI tools. Read-only GitHub execution, plan binding and evidence-chain verification have scope-bound proof; the Native Shell no-approval test returned BLOCK / APPROVAL_REQUIRED. These are dated records, not live telemetry.
+              </p>
+              <p className="mt-3 text-sm leading-7 text-amber-200">
+                External member login/job E2E, two-account isolation, member Native/Cinema compute, and owner MFA signed high-risk execution remain NOT VERIFIED. AppDeploy deployment READY is not proof of a completed member run.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col gap-3">
+              <Link href="/pilot-verification-2026-10-24.md" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 hover:bg-cyan-200">
+                อ่านรายงาน Markdown <ArrowUpRight className="h-4 w-4" />
+              </Link>
+              <a href="https://dsg-one-cloud-computer-dmsmbp.v2.appdeploy.ai/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-600 px-5 py-3 text-sm font-bold text-slate-200 hover:border-cyan-300">
+                สมัครทดลองในเบราว์เซอร์ <ArrowUpRight className="h-4 w-4" />
+              </a>
+            </div>
+          </div>
+        </section>
         <section id="how-it-works" className="scroll-mt-24">
           <div className="mx-auto max-w-2xl text-center">
             <p className="font-mono text-xs uppercase tracking-[0.22em] text-cyan-300">เริ่มใช้งาน 3 ขั้นตอน</p>
