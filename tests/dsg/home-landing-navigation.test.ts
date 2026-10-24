@@ -30,4 +30,17 @@ describe('DSG ONE production landing first-value flow', () => {
     expect(landing).toContain('Cinema browser Connect/Execute, Quest/Unity and whole-system E2E remain NOT VERIFIED');
     expect(landing).toContain('not live telemetry.');
   });
+  it('shows a public, dated pilot verification report without upgrading member E2E claims', () => {
+    const report = readFileSync(resolve(process.cwd(), 'public/pilot-verification-2026-10-24.md'), 'utf8');
+    expect(landing).toContain('DSG ONE Supervised Trial');
+    expect(landing).toContain('href="/pilot-verification-2026-10-24.md"');
+    expect(landing).toContain('External member login/job E2E');
+    expect(landing).toContain('remain NOT VERIFIED');
+    expect(report).toContain('Evidence checkpoint:** 24 October 2026');
+    expect(report).toContain('BLOCK / APPROVAL_REQUIRED');
+    expect(report).toContain('Two-account data isolation');
+    expect(report).toContain('**Partial Pass only.**');
+    expect(report).not.toContain('Member Pilot E2E PASS');
+  });
+
 });
