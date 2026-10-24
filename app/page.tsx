@@ -184,6 +184,10 @@ export default function HomePage() {
               เริ่มสั่งงานผ่านแชท
               <ArrowRight className="h-4 w-4" />
             </Link>
+            <Link href="/try" className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-indigo-500 px-6 py-3.5 text-sm font-black text-white hover:bg-indigo-400">
+              สมัครทดลอง DSG ONE (รออนุมัติ)
+              <ArrowRight className="h-4 w-4" />
+            </Link>
             <Link href="/dsg/access" className="inline-flex min-h-12 items-center gap-2 rounded-2xl border border-slate-700 bg-slate-900/60 px-6 py-3.5 text-sm font-bold text-slate-200 hover:border-cyan-300/50 hover:bg-slate-800">
               ดูสถานะและเครื่องมือ
               <ArrowUpRight className="h-4 w-4" />
