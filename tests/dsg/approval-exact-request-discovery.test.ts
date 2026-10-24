@@ -34,10 +34,13 @@ describe('DSG exact-request human approval UX', () => {
     expect(ui).toContain("decision === 'APPROVE' && selected.risk_tier === 'high'");
     expect(ui).toContain("onClick={() => void decide('REJECT')}");
   });
-  it('automatically starts interactive Auth0 only for a user-clicked exact request link', () => {
-    expect(ui).toContain("!authenticated && reviewApprovalId && !(params.has('code') && params.has('state'))");
-    expect(ui).toContain("appState: { kind: 'review' as const, approvalRequestId: reviewApprovalId }");
-    expect(ui).toContain("authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE }");
+  it('does not automatically redirect exact requests into a mobile Auth0 login loop', () => {
+    expect(ui).not.toContain("!authenticated && reviewApprovalId && !(params.has('code') && params.has('state'))");
+    expect(ui).toContain("if (!authenticated && reviewApprovalId)");
+    expect(ui).toContain("appState = isValidApprovalRequestId(queryApprovalId)");
+    expect(ui).toContain("await client.current.loginWithRedirect({");
+    expect(ui).toContain("useCookiesForTransactions: true");
+    expect(ui).toContain("cacheLocation: 'memory'");
     expect(ui).not.toContain("decision: 'APPROVE', approvalRequestId: reviewApprovalId");
     expect(ui).not.toContain("localStorage.setItem");
     expect(ui).not.toContain("sessionStorage.setItem");

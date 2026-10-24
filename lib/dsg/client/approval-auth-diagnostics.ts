@@ -25,7 +25,7 @@ export function describeApprovalAuthProblem(error: unknown, phase: ApprovalAuthP
     return {
       code: 'AUTH0_CALLBACK_TRANSACTION_LOST',
       explanation: 'เบราว์เซอร์ไม่พบธุรกรรมล็อกอินที่เริ่มไว้ จึงตรวจ callback ไม่ได้',
-      nextAction: 'เปิดลิงก์ใน Chrome แท็บปกติ เริ่มเข้าสู่ระบบใหม่ และกลับมาที่แท็บเดิมหลัง Auth0/MFA',
+      nextAction: 'หยุดการลงชื่อเข้าใช้ซ้ำ เปิดหน้าอนุมัติใน Chrome โปรไฟล์เดียวตลอด Auth0/MFA แล้วเริ่มธุรกรรมใหม่ด้วยการกดยืนยันเพียงครั้งเดียวเมื่อพร้อม',
     };
   }
   if (code === 'login_required' || code === 'interaction_required') {

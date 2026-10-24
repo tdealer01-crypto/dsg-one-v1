@@ -62,6 +62,7 @@ export default function ApprovalClient() {
   const completingStepUpId = useRef<string | null>(null);
   const initialListLoaded = useRef(false);
   const [authReady, setAuthReady] = useState(false);
+  const [mfaSessionExpired, setMfaSessionExpired] = useState(false);
   const [tokenReady, setTokenReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pendingStepUpIntent, setPendingStepUpIntent] = useState<StepUpIntent | null>(null);
@@ -90,6 +91,9 @@ export default function ApprovalClient() {
           clientId: 'jI1uiKcQu7mqORsaCrogKTQVsAcZuQSt',
           authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE },
           cacheLocation: 'memory',
+          // Auth0 documents this for cross-tab callbacks (Android app-switch / external browser).
+          // A short-lived, host-only transaction cookie carries PKCE state; access tokens remain memory-only.
+          useCookiesForTransactions: true,
           useRefreshTokens: false,
         });
         client.current = c;
@@ -126,19 +130,12 @@ export default function ApprovalClient() {
         const authenticated = await c.isAuthenticated();
         setTokenReady(authenticated);
         setAuthFailure(null);
-        // A user who clicked an exact pending-request link already asked to
-        // review that request. Start the existing PKCE Auth0 login immediately
-        // rather than requiring another tiny tap in an Android webview.
-        // Never auto-approve, run MFA, or redirect for the generic approvals
-        // page. Do not loop if an OAuth callback was just handled.
-        if (!authenticated && reviewApprovalId && !(params.has('code') && params.has('state'))) {
-          authPhase = 'login';
-          setStatus('กำลังพาไปยืนยันว่าเป็นเจ้าของผ่าน Auth0 สำหรับคำขอนี้');
-          await c.loginWithRedirect({
-            authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE },
-            appState: { kind: 'review' as const, approvalRequestId: reviewApprovalId },
-          });
-          return;
+        // An exact pending link is a REVIEW intent, not permission to redirect
+        // automatically. On Android an automatic redirect after a lost callback
+        // can strand the user in a login loop across in-app browser contexts.
+        // Preserve the ID and wait for a deliberate, single sign-in click.
+        if (!authenticated && reviewApprovalId) {
+          setStatus('คำขอพร้อมตรวจแล้ว · กดยืนยันตัวตนหนึ่งครั้งเพื่อดูงานนี้');
         }
         if (authenticated && reviewApprovalId) {
           setRequestedApprovalId(reviewApprovalId);
@@ -146,7 +143,9 @@ export default function ApprovalClient() {
         }
         setStatus(authenticated
           ? 'เข้าสู่ระบบ Auth0 แล้ว พร้อมตรวจรายการรออนุมัติ'
-          : 'กดเข้าสู่ระบบเพื่อรับสิทธิ์ dsg.approve สำหรับเซสชันนี้');
+          : reviewApprovalId
+            ? 'คำขอพร้อมตรวจแล้ว · กดยืนยันตัวตนหนึ่งครั้งเพื่อดูงานนี้'
+            : 'กดเข้าสู่ระบบเพื่อรับสิทธิ์ dsg.approve สำหรับเซสชันนี้');
         if (stepUpIntent) {
           setStatus('Auth0 ยืนยันกลับมาแล้ว กำลังตรวจ signed MFA proof กับ DSG Spacetime');
           setPendingStepUpIntent(stepUpIntent);
@@ -268,14 +267,17 @@ export default function ApprovalClient() {
       return;
     }
     setAuthFailure(null);
+    setMfaSessionExpired(false);
     setBusy(true);
     try {
       const queryApprovalId = new URLSearchParams(window.location.search).get('approval_request_id');
       const appState = isValidApprovalRequestId(queryApprovalId)
         ? { kind: 'review' as const, approvalRequestId: queryApprovalId }
         : undefined;
+      // Complete real MFA at the start of the owner session, once.
+      // Auth0 Action skips a new challenge if a signed, still-valid MFA event exists.
       await client.current.loginWithRedirect({
-        authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE },
+        authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE, ext_dsg_stepup: '1' },
         ...(appState ? { appState } : {}),
       });
     } catch (error) {
@@ -418,9 +420,9 @@ export default function ApprovalClient() {
     }
     setBusy(true);
     try {
-      // Reuse a genuine, *fresh*, independently verified signed MFA event
-      // during the server's 120-second validity window. This avoids forcing
-      // another login/OTP for each exact request; it never skips MFA when stale.
+      // MFA was completed at the first owner login, not at each approval tap.
+      // Require its signed, bounded session proof again without redirecting.
+      // If expired, offer one explicit new login; never start a redirect loop.
       if (decision === 'APPROVE' && selected.risk_tier === 'high') {
         const token = await obtainToken();
         const proofResponse = await fetch('/api/dsg/approvals/mfa-check', {
@@ -431,9 +433,15 @@ export default function ApprovalClient() {
         const proof = await proofResponse.json() as {
           ok?: boolean; mfaVerified?: boolean; error?: string;
         };
+        if (!proofResponse.ok && proofResponse.status === 401) {
+          setMfaSessionExpired(true);
+          setStatus('SESSION_LOGIN_EXPIRED — เซสชัน Auth0 หมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง');
+          return;
+        }
         if (!proofResponse.ok && proofResponse.status === 403 &&
             proof.error === 'FRESH_SIGNED_MFA_REQUIRED') {
-          await startStepUp({ kind: 'approve', approvalRequestId: selected.approval_request_id });
+          setMfaSessionExpired(true);
+          setStatus('SESSION_MFA_EXPIRED — เซสชันยืนยันตัวตนหมดอายุแล้ว เข้าสู่ระบบอีกครั้งก่อนอนุมัติ');
           return;
         }
         if (!proofResponse.ok || proof.ok !== true || proof.mfaVerified !== true) {
@@ -464,7 +472,14 @@ export default function ApprovalClient() {
       setSelected(null);
       setApprovals(items => items.filter(item => item.approval_request_id !== selected.approval_request_id));
     } catch (err) {
-      setStatus('ดำเนินการไม่ผ่าน: ' + (err instanceof Error ? err.message : 'NOT_VERIFIED'));
+      const authProblem = describeApprovalAuthProblem(err, 'session');
+      if (authProblem.code === 'AUTH0_INTERACTIVE_LOGIN_REQUIRED' ||
+          authProblem.code === 'AUTH0_SESSION_CHECK_FAILED') {
+        setMfaSessionExpired(true);
+        setStatus('SESSION_LOGIN_EXPIRED — ต้องเข้าสู่ระบบ Auth0 อีกครั้งก่อนอนุมัติ');
+      } else {
+        setStatus('ดำเนินการไม่ผ่าน: ' + (err instanceof Error ? err.message : 'NOT_VERIFIED'));
+      }
     } finally { setBusy(false); }
   }
 
@@ -472,26 +487,28 @@ export default function ApprovalClient() {
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
       <section className="mx-auto max-w-3xl space-y-5 rounded-2xl border border-slate-700 bg-slate-900 p-5">
         <h1 className="text-2xl font-bold">DSG ONE · เจ้าของยืนยันงาน</h1>
-        <p className="text-sm text-slate-300">ตรวจคำสั่งที่ร้องขอ แล้วให้เจ้าของยืนยันผ่าน Auth0 เพียงครั้งในขั้นตอนนี้ ระบบจะตรวจ MFA เมื่อจำเป็น โดยไม่ต้องจัดการ Token หรือ Approval ID เอง</p>
+        <p className="text-sm text-slate-300">เข้าสู่ระบบพร้อม MFA ครั้งเดียวต่อเซสชัน จากนั้นตรวจคำสั่งและกดตกลงเพื่ออนุมัติเป็นรายคำสั่ง ไม่ต้องทำ MFA ซ้ำทุกครั้ง</p>
         <p role="status" aria-live="polite" className="rounded-lg border border-slate-700 p-3 text-sm">{status}</p>
         {authFailure && (
           <div role="alert" className="space-y-2 rounded-lg border border-amber-500/60 bg-amber-950/30 p-3 text-sm text-amber-100">
             <p className="font-semibold">รหัสปัญหา: {authFailure.code}</p>
             <p>{authFailure.nextAction}</p>
-            <p className="text-xs">บน Android หากเปิดจากแชท ให้ใช้เมนูของเบราว์เซอร์ → เปิดใน Chrome แล้วกลับมายังแท็บเดิมหลัง Auth0/MFA</p>
-            <button type="button" onClick={() => window.location.assign(window.location.pathname + window.location.search)}
-              className="min-h-11 rounded-lg border border-amber-500/60 px-3 font-semibold">
-              โหลดหน้าอนุมัติใหม่
-            </button>
+            <p className="text-xs">ระบบหยุดการเปลี่ยนหน้าซ้ำไว้แล้ว เพื่อไม่ให้ต้องกรอกข้อมูลใหม่วนไปมา โปรดใช้ Chrome โปรไฟล์เดียวกันตลอดการยืนยัน</p>
           </div>
         )}
         {!tokenReady && (
           <button type="button" onClick={() => void login()} disabled={!authReady || busy}
             className="min-h-12 w-full rounded-xl bg-indigo-600 px-4 py-3 text-base font-bold text-white disabled:opacity-40">
-            ยืนยันว่าเป็นเจ้าของด้วย Auth0
+            เข้าสู่ระบบและยืนยัน MFA ครั้งเดียว
           </button>
         )}
-        {tokenReady && !selected && <p className="text-sm text-emerald-200">ยืนยันเซสชันเจ้าของแล้ว · กำลังแสดงคำขอที่รอให้ตรวจ</p>}
+        {mfaSessionExpired && (
+          <button type="button" onClick={() => void login()} disabled={!authReady || busy}
+            className="min-h-12 w-full rounded-xl border border-amber-500 bg-amber-900/30 px-4 py-3 font-bold text-white disabled:opacity-40">
+            เริ่มเซสชันใหม่ (MFA หมดอายุ)
+          </button>
+        )}
+        {tokenReady && !selected && !mfaSessionExpired && <p className="text-sm text-emerald-200">เข้าสู่ระบบแล้ว · ตรวจและกดตกลงเพื่ออนุมัติรายการที่ต้องการ</p>}
         <details className="rounded-xl border border-slate-700 bg-slate-950/60 p-3 text-sm">
           <summary className="cursor-pointer font-medium text-slate-300">ตัวเลือกเพิ่มเติม · ค้นหาคำขอ / รายการงาน</summary>
           <div className="mt-3 space-y-3">
@@ -537,20 +554,20 @@ export default function ApprovalClient() {
             </div>
             <div className="space-y-1 rounded-xl bg-slate-900 p-3 text-sm">
               <p>ผู้ขอ: {selected.requester?.principal || 'ไม่ทราบผู้ขอ'}</p>
-              <p>ระดับความเสี่ยง: {selected.risk_tier === 'high' ? 'สูง · ต้องตรวจ MFA' : selected.risk_tier === 'standard' ? 'ปกติ' : 'ไม่ทราบ · ห้ามอนุมัติ'}</p>
+              <p>ระดับความเสี่ยง: {selected.risk_tier === 'high' ? 'สูง · ใช้ MFA จากเซสชันที่ยืนยันแล้ว' : selected.risk_tier === 'standard' ? 'ปกติ' : 'ไม่ทราบ · ห้ามอนุมัติ'}</p>
               <p>หมดอายุ: {selected.expires_at || 'ไม่พบ'}</p>
             </div>
             <button type="button" disabled={busy || !knownRiskTier(selected.risk_tier)}
               onClick={() => void decide('APPROVE')}
               className="min-h-14 w-full rounded-xl bg-emerald-700 px-4 py-3 text-base font-bold text-white disabled:opacity-40">
-              ยืนยันตัวตนและอนุมัติงานนี้
+              ตกลง · อนุมัติคำสั่งนี้
             </button>
             <button type="button" disabled={busy} onClick={() => void decide('REJECT')}
               className="min-h-11 w-full rounded-xl border border-slate-600 px-4 py-2 text-sm font-semibold disabled:opacity-40">
               ไม่อนุมัติงานนี้
             </button>
             {selected.risk_tier === 'high' && (
-              <p className="text-xs leading-5 text-amber-200">หาก MFA ที่ลงลายเซ็นยังไม่ใหม่พอ ระบบจะพาไปยืนยันผ่าน Auth0 แล้วกลับมาดำเนินการเฉพาะงานนี้ต่อโดยอัตโนมัติ</p>
+              <p className="text-xs leading-5 text-amber-200">ตรวจหลักฐาน MFA ของเซสชันเดิมโดยไม่เปลี่ยนหน้า หากเซสชันหมดอายุจะแจ้งให้เริ่มใหม่ ไม่อนุมัติอัตโนมัติ</p>
             )}
             {!knownRiskTier(selected.risk_tier) && <p className="text-rose-200 text-sm">BLOCKED: ไม่พบระดับความเสี่ยงที่ตรวจสอบได้</p>}
             <details className="rounded-xl border border-slate-700 p-3 text-xs">
