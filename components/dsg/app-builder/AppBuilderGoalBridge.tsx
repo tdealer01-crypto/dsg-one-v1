@@ -89,5 +89,6 @@ export function SelectedTemplateNotice() {
   const draft = useAppBuilderGoalBridge()?.templateDraft;
   return draft ? <p role="status" className="mt-4 rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm text-slate-200">
     เทมเพลตที่เลือก: <strong>{draft.name}</strong> · ปรับเป้าหมายและเงื่อนไขก่อนส่งงานได้
+    {draft.descriptionTruncated ? <span className="mt-2 block text-amber-200">คำอธิบายเทมเพลตยาวเกินขีดจำกัดของฟอร์ม ระบบจึงใส่เพียงส่วนต้นให้แก้ไขได้ กรุณาตรวจรายละเอียดและเติมเงื่อนไขสำคัญก่อนสร้างแผน</span> : null}
   </p> : null;
 }
