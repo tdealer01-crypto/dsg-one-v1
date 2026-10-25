@@ -40,7 +40,7 @@ export default function DsgActionLayerPage() {
   ];
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#121414] text-[#e2e2e2] selection:bg-[#f2ca50]/30 selection:text-[#f2ca50]">
+    <main className="dsg-page min-h-screen overflow-x-hidden bg-[#121414] text-[#e2e2e2] selection:bg-[#f2ca50]/30 selection:text-[#f2ca50]">
       <header className="fixed top-0 z-50 hidden h-16 w-full items-center justify-between border-b border-[#4d4635] bg-[#121414] px-16 text-[#f2ca50] md:flex">
         <div className="font-serif text-2xl font-semibold uppercase tracking-tight md:text-[32px]">Aegis Governance</div>
         <div className="flex items-center gap-4 text-[#d0c5af]">
@@ -93,7 +93,7 @@ export default function DsgActionLayerPage() {
                   Live Sync
                 </span>
               </div>
-              <h1 className="font-serif text-2xl font-semibold tracking-tight text-[#e2e2e2] md:text-[32px] md:leading-10">
+              <h1 className="dsg-page-title font-serif text-2xl font-semibold tracking-tight text-[#e2e2e2] md:text-[32px] md:leading-10">
                 Database Telemetry
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[#d0c5af]">

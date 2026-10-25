@@ -8,13 +8,13 @@ export const metadata = {
 
 export default function DSGOSWorkspacePage() {
   return (
-    <main className="min-h-screen bg-slate-950 px-5 py-10 text-slate-100 sm:px-8">
+    <main className="dsg-page min-h-screen bg-slate-950 px-5 py-10 text-slate-100 sm:px-8">
       <div className="mx-auto max-w-4xl">
         <Link href="/" className="inline-flex items-center gap-2 text-sm text-cyan-200 hover:text-white">
           <ArrowLeft className="h-4 w-4" /> DSG ONE home
         </Link>
         <p className="mt-9 text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">DSG OS · Browser workspace</p>
-        <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Adapter Builder & Evidence Verifier</h1>
+        <h1 className="dsg-page-title mt-3 text-4xl font-black tracking-tight sm:text-5xl">Adapter Builder & Evidence Verifier</h1>
         <p className="mt-5 max-w-3xl text-slate-300">
           Two local tools backed by DSG Spacetime contract source. Author a bounded provider definition
           and verify integrity and signer identity without granting the browser execution authority.

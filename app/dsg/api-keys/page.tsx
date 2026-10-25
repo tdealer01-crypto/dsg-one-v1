@@ -121,7 +121,7 @@ export default function ApiKeysPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
+    <main className="dsg-page min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
       <div className="mx-auto max-w-3xl space-y-6">
 
         {/* Header */}
@@ -129,7 +129,7 @@ export default function ApiKeysPage() {
           <div className="flex items-center gap-3">
             <Key className="h-5 w-5 text-violet-400" />
             <div>
-              <h1 className="text-lg font-bold text-violet-100">API Keys</h1>
+              <h1 className="dsg-page-title text-lg font-bold text-violet-100">API Keys</h1>
               <p className="mt-0.5 text-sm text-violet-300/70">
                 DSG ONE MCP access — ฿490/month · 10,000 calls/month
               </p>
@@ -139,7 +139,7 @@ export default function ApiKeysPage() {
 
         {/* Error */}
         {error && (
-          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          <div role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
             {error}
           </div>
         )}
@@ -171,13 +171,14 @@ export default function ApiKeysPage() {
         {/* Generate form */}
         <div className="rounded-2xl border border-slate-700/50 bg-slate-900/60 p-5">
           <h2 className="mb-4 text-sm font-semibold text-slate-300">Generate New Key</h2>
-          <div className="flex gap-3">
-            <input
+          <label htmlFor="api-key-label" className="mb-2 block text-sm font-medium text-slate-300">ชื่อ API Key</label>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input id="api-key-label"
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Label (e.g. Cursor, Claude Desktop)"
-              className="flex-1 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:border-violet-500 focus:outline-none"
+              className="min-w-0 flex-1 rounded-xl border border-slate-600 bg-slate-900 px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:border-violet-500 focus:outline-none"
             />
             <button
               onClick={handleGenerate}
@@ -196,9 +197,9 @@ export default function ApiKeysPage() {
             <h2 className="text-sm font-semibold text-slate-300">Your Keys</h2>
           </div>
           {loading ? (
-            <div className="px-5 py-8 text-center text-sm text-slate-500">Loading…</div>
+            <div role="status" className="px-5 py-8 text-center text-sm text-slate-400">กำลังอ่านรายการ…</div>
           ) : keys.length === 0 ? (
-            <div className="px-5 py-8 text-center text-sm text-slate-500">
+            <div className="px-5 py-8 text-center text-sm text-slate-400">
               No active keys — generate one above
             </div>
           ) : (
@@ -236,7 +237,7 @@ export default function ApiKeysPage() {
                         <button
                           onClick={() => handleRevoke(k.key_id)}
                           disabled={revoking === k.key_id}
-                          className="rounded-lg p-1.5 text-slate-500 hover:text-red-400 transition-colors disabled:opacity-50"
+                          className="rounded-lg p-1.5 text-slate-400 hover:text-red-400 transition-colors disabled:opacity-50"
                           aria-label="Revoke key"
                         >
                           {revoking === k.key_id ? (
@@ -247,7 +248,7 @@ export default function ApiKeysPage() {
                         </button>
                       </div>
                     </div>
-                    <div className="flex gap-4 text-xs text-slate-500">
+                    <div className="flex gap-4 text-xs text-slate-400">
                       <span>{k.plan_id}</span>
                       <span>Limit: {k.calls_limit.toLocaleString()} calls</span>
                       <span>Renews {new Date(k.period_end).toLocaleDateString()}</span>
@@ -262,7 +263,7 @@ export default function ApiKeysPage() {
         {/* Claude Desktop config */}
         <div className="rounded-2xl border border-slate-700/50 bg-slate-900/60 p-5">
           <h2 className="mb-3 text-sm font-semibold text-slate-300">Claude Desktop Config</h2>
-          <pre className="overflow-x-auto rounded-xl bg-slate-950 px-4 py-3 text-xs text-slate-300">
+          <pre tabIndex={0} className="overflow-x-auto rounded-xl bg-slate-950 px-4 py-3 text-xs text-slate-300">
 {`{
   "mcpServers": {
     "dsg-one": {
@@ -279,6 +280,6 @@ export default function ApiKeysPage() {
         </div>
 
       </div>
-    </div>
+    </main>
   );
 }

@@ -53,8 +53,8 @@ const VARIANT_STYLES: Record<
 const AUTO_DISMISS_MS: Record<ToastVariant, number> = {
   success: 4000,
   info: 4000,
-  warning: 6000,
-  error: 6000,
+  warning: 0,
+  error: 0,
 };
 
 const MAX_TOASTS = 3;
@@ -85,7 +85,7 @@ function ToastItem({
   useEffect(() => {
     const enterTimer = setTimeout(() => setVisible(true), 10);
 
-    timerRef.current = setTimeout(() => {
+    if (AUTO_DISMISS_MS[toast.variant] > 0) timerRef.current = setTimeout(() => {
       setVisible(false);
       setTimeout(() => onDismiss(toast.id), 300);
     }, AUTO_DISMISS_MS[toast.variant]);
@@ -105,8 +105,8 @@ function ToastItem({
 
   return (
     <div
-      role="alert"
-      aria-live="assertive"
+      role={toast.variant === 'error' ? 'alert' : 'status'}
+      aria-atomic="true"
       style={{
         transition: 'opacity 300ms ease, transform 300ms ease',
         opacity: visible ? 1 : 0,
@@ -124,8 +124,8 @@ function ToastItem({
         </div>
         <button
           onClick={handleClose}
-          className="rounded-lg p-0.5 opacity-60 transition-opacity hover:opacity-100"
-          aria-label="Dismiss notification"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-current opacity-80 transition-opacity hover:opacity-100"
+          aria-label="ปิดการแจ้งเตือน"
         >
           <X className="h-4 w-4" />
         </button>
@@ -168,7 +168,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       {/* portal: bottom-right, stacks upward */}
       <div
-        aria-label="Notifications"
+        role="region" aria-label="การแจ้งเตือน"
         className="fixed bottom-5 right-5 z-[9999] flex flex-col-reverse gap-2"
       >
         {toasts.map((t) => (

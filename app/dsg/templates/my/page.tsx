@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, BookOpen, Loader2, ShoppingBag } from 'lucide-react';
 
@@ -51,35 +53,39 @@ export default function MyTemplatesPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
+      <main className="dsg-page flex min-h-screen items-center justify-center bg-slate-950">
+        <div><h1 className="dsg-page-title">เทมเพลตของฉัน</h1><p role="status" className="mt-3 flex items-center gap-2 text-sm text-slate-300"><Loader2 aria-hidden="true" className="h-5 w-5 animate-spin" />กำลังอ่านข้อมูล…</p></div>
       </main>
     );
   }
 
   if (error) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
-        <p>{error === 'DSG_AUTH_REQUIRED' ? 'กรุณาเข้าสู่ระบบ' : `เกิดข้อผิดพลาด: ${error}`}</p>
+      <main className="dsg-page flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
+        <section className="dsg-state-panel"><h1 className="dsg-page-title">เทมเพลตของฉัน</h1>
+          <p role="alert">{error === 'DSG_AUTH_REQUIRED' ? 'กรุณาเข้าสู่ระบบเพื่อดูรายการของบัญชีนี้' : 'ยังอ่านข้อมูลไม่ได้ กรุณาลองโหลดใหม่'}</p>
+          <div className="dsg-action-row"><button type="button" onClick={() => window.location.reload()} className="dsg-button-secondary">ลองโหลดใหม่</button><Link href="/dsg/workroom" className="dsg-button-primary">เปิดพื้นที่ทำงาน</Link></div>
+          <details className="mt-4 text-sm"><summary>รหัสปัญหา</summary><p className="mt-2 break-all">{error}</p></details>
+        </section>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+    <main className="dsg-page min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
       <div className="mx-auto max-w-6xl space-y-8">
         {/* Header */}
         <section className="rounded-3xl border border-violet-500/20 bg-violet-500/10 p-6 md:p-8">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-violet-400/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-violet-200">
             <BookOpen className="h-3.5 w-3.5" /> My Library
           </div>
-          <h1 className="text-3xl font-black tracking-tight md:text-4xl">Templates ของฉัน</h1>
+          <h1 className="dsg-page-title text-3xl font-black tracking-tight md:text-4xl">Templates ของฉัน</h1>
           <p className="mt-2 text-sm text-slate-300">Templates ที่ซื้อและรับมาทั้งหมด — พร้อมใช้งานใน App Builder</p>
         </section>
 
         {/* Count */}
         {purchases.length > 0 && (
-          <p className="text-sm text-slate-500">{purchases.length} template{purchases.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-slate-400">{purchases.length} template{purchases.length !== 1 ? 's' : ''}</p>
         )}
 
         {/* Empty state */}
@@ -87,7 +93,7 @@ export default function MyTemplatesPage() {
           <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-800 bg-slate-900 py-24 text-center">
             <ShoppingBag className="mb-4 h-10 w-10 text-slate-600" />
             <p className="text-lg font-bold text-slate-300">ยังไม่มี templates</p>
-            <p className="mt-1 text-sm text-slate-500">ไปดู templates ที่มีให้เลือก</p>
+            <p className="mt-1 text-sm text-slate-400">ไปดู templates ที่มีให้เลือก</p>
             <a
               href="/dsg/templates"
               className="mt-6 inline-flex items-center gap-1.5 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-500"
@@ -132,7 +138,7 @@ export default function MyTemplatesPage() {
                 {/* Footer */}
                 <div className="mt-5 flex items-center justify-between">
                   <div className="flex flex-col">
-                    <span className="text-xs text-slate-500">ซื้อเมื่อ {formatDate(tmpl.purchasedAt)}</span>
+                    <span className="text-xs text-slate-400">ซื้อเมื่อ {formatDate(tmpl.purchasedAt)}</span>
                     <span className={`text-xs font-bold ${tmpl.priceSatang === 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
                       {formatPrice(tmpl.priceSatang)}
                     </span>

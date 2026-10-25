@@ -12,11 +12,11 @@ export default function EnterpriseMarketPage() {
   const report = getAgentAppBuilderMarketReport();
 
   return (
-    <main className="min-h-screen bg-[#090b0f] px-5 py-8 text-slate-100 md:px-10">
+    <main className="dsg-page min-h-screen bg-[#090b0f] px-5 py-8 text-slate-100 md:px-10">
       <section className="mx-auto max-w-6xl">
         <header className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6">
           <p className="font-mono text-xs uppercase tracking-[0.24em] text-[#f2ca50]">Market intelligence registry</p>
-          <h1 className="mt-3 font-serif text-4xl font-black tracking-tight md:text-6xl">Evidence-first AI app builder market map</h1>
+          <h1 className="dsg-page-title mt-3 font-serif text-4xl font-black tracking-tight md:text-6xl">Evidence-first AI app builder market map</h1>
           <p className="mt-4 max-w-4xl text-sm leading-7 text-slate-300">{report.positioning}</p>
           <p className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4 font-mono text-xs leading-6 text-slate-400">{report.noMockPolicy.rule}</p>
         </header>
@@ -24,7 +24,7 @@ export default function EnterpriseMarketPage() {
         <section className="mt-6 grid gap-4 lg:grid-cols-2">
           {report.competitors.map((competitor) => (
             <article key={competitor.id} className="rounded-[2rem] border border-white/10 bg-[#111827] p-5">
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500">{competitor.category}</p>
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">{competitor.category}</p>
               <h2 className="mt-2 text-2xl font-black text-white">{competitor.name}</h2>
               <p className="mt-3 text-sm leading-7 text-slate-300">{competitor.positioning}</p>
               <div className="mt-5 grid gap-4 md:grid-cols-2">

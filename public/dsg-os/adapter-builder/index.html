@@ -15,9 +15,12 @@
     #status[data-state="error"] { color:#f48771; }
     small { color:#a8b0c2; }
   </style>
+<link rel="stylesheet" href="/dsg-reference-ui.css">
 </head>
 <body>
-<main>
+<a class="dsg-skip-link" href="#main-content">ข้ามไปเนื้อหาหลัก</a>
+<nav class="dsg-reference-nav" aria-label="เมนู DSG ONE"><a href="/">DSG ONE</a><a href="/dsg/workroom">พื้นที่ทำงาน</a><a href="/dsg-os">Adapter และหลักฐาน</a></nav>
+<main id="main-content">
   <h1>DSG OS Adapter Builder</h1>
   <p>Compile a provider definition into a deterministic Spacetime Route contract. This page does not execute providers or grant permissions.</p>
   <textarea id="input" spellcheck="false"></textarea>
@@ -25,7 +28,7 @@
     <button id="compile">Compile Adapter Contract</button>
   </div>
   <p id="status">Ready.</p>
-  <pre id="output" hidden></pre>
+  <pre tabindex="0" id="output" hidden></pre>
   <small>Execution remains: DSG OS → Spacetime → approval/payload binding → Provider Adapter v2 → provider → evidence/attestation.</small>
 </main>
 <script type="module">

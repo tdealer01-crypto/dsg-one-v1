@@ -78,16 +78,16 @@ export default function AgentSkillsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-8 font-mono">
-      <h1 className="text-2xl font-bold text-green-400 mb-2">DSG SkillGate</h1>
+    <main className="dsg-page min-h-screen bg-slate-950 text-slate-100 p-8 font-mono">
+      <h1 className="dsg-page-title text-2xl font-bold text-green-400 mb-2">DSG SkillGate</h1>
       <p className="text-slate-400 text-sm mb-8">
         Search → Inspect → Verify → Lock → Gate — open-source skills under DSG governance
       </p>
 
       {/* Search */}
-      <div className="flex gap-3 mb-6">
-        <input
-          className="flex-1 bg-slate-900 border border-slate-700 rounded px-4 py-2 text-sm focus:outline-none focus:border-green-500"
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+        <input aria-label="Search GitHub skills"
+          className="min-w-0 flex-1 bg-slate-900 border border-slate-700 rounded px-4 py-2 text-sm focus:outline-none focus:border-green-500"
           placeholder="Search GitHub skills (e.g. 'github repo auditor')"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -131,7 +131,7 @@ export default function AgentSkillsPage() {
                 {r.description && (
                   <p className="text-slate-400 text-xs mt-1 truncate">{r.description}</p>
                 )}
-                <div className="flex gap-4 mt-2 text-xs text-slate-500">
+                <div className="flex gap-4 mt-2 text-xs text-slate-400">
                   <span>★ {r.stars}</span>
                   {r.license && <span>{r.license}</span>}
                   <span className={statusColor[r.status] ?? 'text-slate-400'}>{r.status}</span>
@@ -156,7 +156,7 @@ export default function AgentSkillsPage() {
             <span className={`text-xs font-semibold ${statusColor[verifyResult.verification.status] ?? 'text-slate-400'}`}>
               {verifyResult.verification.status.replace(/_/g, ' ').toUpperCase()}
             </span>
-            <span className="text-xs text-slate-500 ml-auto">
+            <span className="text-xs text-slate-400 ml-auto">
               risk: {verifyResult.draft.riskLevel}
             </span>
           </div>

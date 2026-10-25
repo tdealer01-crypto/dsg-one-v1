@@ -1,3 +1,4 @@
+import { DsgCopy } from '@/components/app-language-copy-bridge';
 export type ProofPanelItem = {
   id: string;
   title: string;
@@ -41,7 +42,7 @@ export function AppBuilderProofPanel({ items, productionReadyClaim }: { items: P
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <div>
-                <h4 className="text-sm font-bold text-emerald-200">Evidence</h4>
+                <h4 className="text-sm font-bold text-emerald-200"><DsgCopy value="Evidence" /></h4>
                 <ul className="mt-2 space-y-1 text-xs leading-5 text-slate-300">{(item.evidence.length ? item.evidence : ['No evidence attached']).map((entry) => <li key={entry}>• {entry}</li>)}</ul>
               </div>
               <div>

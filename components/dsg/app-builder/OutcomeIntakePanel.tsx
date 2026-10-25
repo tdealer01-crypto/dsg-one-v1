@@ -75,7 +75,7 @@ export function OutcomeIntakePanel() {
           <input value={requiredIntegrations} onChange={(event) => setRequiredIntegrations(event.target.value)} placeholder="Stripe, SSO, email, marketplace entitlement" className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 p-3 text-sm text-white outline-none focus:border-[#f2ca50]/60" />
         </label>
         <div className="flex flex-wrap gap-3 lg:col-span-2">
-          <select value={riskLevel} onChange={(event) => setRiskLevel(event.target.value as typeof riskLevel)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-sm text-white">
+          <select aria-label="ระดับความเสี่ยง" value={riskLevel} onChange={(event) => setRiskLevel(event.target.value as typeof riskLevel)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-sm text-white">
             <option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="regulated">regulated</option>
           </select>
           <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-slate-200">

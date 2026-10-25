@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 type Lang = 'th' | 'en';
 type CopyPair = readonly [string, string];
@@ -33,44 +33,52 @@ const pairs: readonly CopyPair[] = [
 const enToTh: ReadonlyMap<string, string> = new Map<string, string>(pairs);
 const thToEn: ReadonlyMap<string, string> = new Map<string, string>(pairs.map(([en, th]) => [th, en]));
 
+const LANGUAGE_CHANGED = 'dsg-language-changed';
+let sessionLanguage: Lang | null = null;
+
 function currentLang(): Lang {
-  return typeof window !== 'undefined' && window.localStorage.getItem('dsg:language') === 'en' ? 'en' : 'th';
+  if (sessionLanguage) return sessionLanguage;
+  try { return window.localStorage.getItem('dsg:language') === 'en' ? 'en' : 'th'; }
+  catch { return 'th'; }
 }
 
-function translateText(value: string, lang: Lang) {
+function subscribe(onChange: () => void) {
+  const onStorage = () => { sessionLanguage = null; onChange(); };
+  window.addEventListener('storage', onStorage);
+  window.addEventListener(LANGUAGE_CHANGED, onChange);
+  return () => { window.removeEventListener('storage', onStorage); window.removeEventListener(LANGUAGE_CHANGED, onChange); };
+}
+
+export function useDsgLanguage(): Lang {
+  return useSyncExternalStore(subscribe, currentLang, () => 'th');
+}
+
+export function translateDsgCopy(value: string, lang: Lang): string {
   const trimmed = value.trim();
   const next = lang === 'th' ? enToTh.get(trimmed) : thToEn.get(trimmed);
-  if (!next) return value;
-  return value.replace(trimmed, next);
+  return next ? value.replace(trimmed, next) : value;
 }
 
-function applyCopy(lang: Lang) {
-  document.documentElement.lang = lang;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  const nodes: Text[] = [];
-  while (walker.nextNode()) nodes.push(walker.currentNode as Text);
-  for (const node of nodes) node.nodeValue = translateText(node.nodeValue || '', lang);
-  document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach((item) => {
-    const el = item as HTMLInputElement | HTMLTextAreaElement;
-    el.placeholder = translateText(el.placeholder, lang);
-  });
+/** Opt-in owned UI copy. Never rewrite user content, code, IDs or a React DOM tree. */
+export function DsgCopy({ value }: { value: string }) {
+  const lang = useDsgLanguage();
+  return <>{translateDsgCopy(value, lang)}</>;
 }
 
 export function AppLanguageCopyBridge() {
+  const lang = useDsgLanguage();
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
   useEffect(() => {
-    let lang = currentLang();
-    const applySoon = () => window.setTimeout(() => applyCopy(lang), 30);
     const onClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      const text = target?.textContent?.trim();
-      if (text === 'ไทย') { lang = 'th'; window.localStorage.setItem('dsg:language', 'th'); applySoon(); }
-      if (text === 'EN') { lang = 'en'; window.localStorage.setItem('dsg:language', 'en'); applySoon(); }
+      const button = (event.target as Element | null)?.closest('button');
+      const label = button?.textContent?.trim();
+      if (label !== 'ไทย' && label !== 'EN') return;
+      sessionLanguage = label === 'EN' ? 'en' : 'th';
+      try { window.localStorage.setItem('dsg:language', sessionLanguage); } catch { /* Keep the session choice when storage is unavailable. */ }
+      window.dispatchEvent(new Event(LANGUAGE_CHANGED));
     };
-    const observer = new MutationObserver(applySoon);
     document.addEventListener('click', onClick, true);
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-    applySoon();
-    return () => { document.removeEventListener('click', onClick, true); observer.disconnect(); };
+    return () => document.removeEventListener('click', onClick, true);
   }, []);
   return null;
 }

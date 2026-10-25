@@ -60,10 +60,10 @@ export default function GeneratedDsgAppPage() {
 
         <section className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
           <div className="flex flex-col gap-3 md:flex-row">
-            <input
+            <input aria-label="ชื่อรายการที่ต้องการเพิ่ม"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              className="flex-1 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none focus:border-indigo-500"
+              className="min-w-0 flex-1 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none focus:border-indigo-500"
               placeholder="Add a database-backed item"
             />
             <button onClick={() => addItem().catch((error) => setStatus(error instanceof Error ? error.message : 'GENERATED_APP_CREATE_FAILED'))} className="rounded-2xl bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-500">
@@ -75,10 +75,10 @@ export default function GeneratedDsgAppPage() {
             {items.map((item) => (
               <div key={item.id} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
                 <p className="font-semibold text-slate-100">{item.title}</p>
-                <p className="mt-1 text-xs text-slate-500">{new Date(item.created_at).toLocaleString()}</p>
+                <p className="mt-1 text-xs text-slate-400">{new Date(item.created_at).toLocaleString()}</p>
               </div>
             ))}
-            {!items.length && <div className="rounded-2xl border border-dashed border-slate-700 p-6 text-sm text-slate-500">No rows yet, or database migration has not been applied.</div>}
+            {!items.length && <div className="rounded-2xl border border-dashed border-slate-700 p-6 text-sm text-slate-400">No rows yet, or database migration has not been applied.</div>}
           </div>
         </section>
       </div>

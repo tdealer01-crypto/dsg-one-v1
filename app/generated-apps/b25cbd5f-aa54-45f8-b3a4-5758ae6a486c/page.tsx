@@ -88,7 +88,7 @@ export default function VirtualPcAgentAppPage() {
             <div className="grid gap-2 rounded-2xl border border-[#C8A24D]/40 bg-[#071326] p-3 text-xs font-mono text-[#D7D9DE]">
               <div className="truncate">planHash: <span className="text-[#E0B95B]">{PLAN_HASH}</span></div>
               <div className="truncate">approvalHash: <span className="text-[#E0B95B]">{APPROVAL_HASH}</span></div>
-              <div>claim: <span className="text-[#D9363E]">IMPLEMENTED_UNVERIFIED</span></div>
+              <div>claim: <span className="text-[#ffb4b8]">IMPLEMENTED_UNVERIFIED</span></div>
             </div>
           </div>
         </section>
@@ -132,7 +132,7 @@ export default function VirtualPcAgentAppPage() {
               <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#E0B95B]">Remote Mouse API</p>
               <h2 className="mt-2 text-xl font-black">Agent Control Contract</h2>
               <label className="mt-4 block text-xs font-black uppercase text-[#D7D9DE]">Agent token label</label>
-              <input value={agentToken} onChange={(event) => setAgentToken(event.target.value)} className="mt-2 w-full rounded-xl border border-[#C8A24D]/50 bg-[#071326] px-3 py-2 text-sm text-white outline-none" />
+              <input aria-label="Agent token สำหรับการทดสอบขั้นสูง" type="password" autoComplete="off" value={agentToken} onChange={(event) => setAgentToken(event.target.value)} className="mt-2 w-full rounded-xl border border-[#C8A24D]/50 bg-[#071326] px-3 py-2 text-sm text-white outline-none" />
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <button onClick={() => sendMouseAction('move', 500, 320)} className="rounded-xl border border-[#C8A24D] bg-[#071326] px-3 py-2 text-xs font-black text-[#E0B95B]">Center</button>
                 <button onClick={() => sendMouseAction('click', cursor.x, cursor.y)} className="rounded-xl border border-[#C8A24D] bg-[#E0B95B] px-3 py-2 text-xs font-black text-[#071326]">Click</button>

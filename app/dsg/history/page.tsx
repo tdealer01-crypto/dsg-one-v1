@@ -1,5 +1,7 @@
 'use client';
 
+import { DsgWorkspaceActivity } from '@/components/dsg-workspace-activity';
+
 import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
@@ -132,7 +134,10 @@ export default function BuildHistoryPage() {
   const isEmpty = filtered.length === 0;
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+    <main className="dsg-page min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+      <DsgWorkspaceActivity view="history" />
+      <details className="dsg-example-panel">
+        <summary>ดูตัวอย่างประวัติ Build · ข้อมูลสาธิต</summary>
       <aside role="note" className="mx-auto mb-4 max-w-6xl rounded-2xl border border-amber-400/50 bg-amber-500/10 p-4 text-sm text-amber-100">
         <strong>ตัวอย่างประวัติ Build — ไม่ใช่ข้อมูลจริง</strong>
         <p className="mt-1">รายการ Build ด้านล่างเป็นข้อมูลตัวอย่าง ไม่ใช่ประวัติ Deploy ของ DSG ONE จริง</p>
@@ -147,7 +152,7 @@ export default function BuildHistoryPage() {
               <History className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight">Build History</h1>
+              <h2 className="dsg-page-title text-2xl font-black tracking-tight">Build History</h2>
               <p className="text-sm text-slate-400">All versions of your generated apps</p>
             </div>
           </div>
@@ -159,8 +164,8 @@ export default function BuildHistoryPage() {
         {/* Filter bar */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <input
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input aria-label="Search example build history"
               type="text"
               value={search}
               onChange={handleSearchChange}
@@ -168,7 +173,7 @@ export default function BuildHistoryPage() {
               className="w-full rounded-2xl border border-slate-800 bg-slate-900 py-2.5 pl-10 pr-4 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-indigo-500"
             />
           </div>
-          <select
+          <select aria-label="Example build status"
             value={statusFilter}
             onChange={handleStatusChange}
             className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500"
@@ -189,23 +194,23 @@ export default function BuildHistoryPage() {
               </div>
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="rounded-xl border border-indigo-400/30 bg-slate-900 px-3 py-1 font-mono text-indigo-300">{compare.a.version} — {compare.a.appName}</span>
-                <span className="text-slate-500">vs</span>
+                <span className="text-slate-400">vs</span>
                 {compare.b ? (
                   <span className="rounded-xl border border-emerald-400/30 bg-slate-900 px-3 py-1 font-mono text-emerald-300">{compare.b.version} — {compare.b.appName}</span>
                 ) : (
-                  <span className="rounded-xl border border-dashed border-slate-600 px-3 py-1 text-slate-500">Select a second version below</span>
+                  <span className="rounded-xl border border-dashed border-slate-600 px-3 py-1 text-slate-400">Select a second version below</span>
                 )}
               </div>
               {compare.b && (
                 <div className="flex items-start gap-4 rounded-2xl border border-slate-700 bg-slate-900 p-3 text-xs">
                   <div>
                     <p className="font-bold text-slate-300">{compare.a.version}</p>
-                    <p className="mt-1 text-slate-500">{compare.a.summary}</p>
+                    <p className="mt-1 text-slate-400">{compare.a.summary}</p>
                     <p className="mt-1 font-mono"><span className="text-emerald-400">+{compare.a.addedLines}</span> <span className="text-red-400">-{compare.a.removedLines}</span></p>
                   </div>
                   <div className="border-l border-slate-700 pl-4">
                     <p className="font-bold text-slate-300">{compare.b.version}</p>
-                    <p className="mt-1 text-slate-500">{compare.b.summary}</p>
+                    <p className="mt-1 text-slate-400">{compare.b.summary}</p>
                     <p className="mt-1 font-mono"><span className="text-emerald-400">+{compare.b.addedLines}</span> <span className="text-red-400">-{compare.b.removedLines}</span></p>
                   </div>
                 </div>
@@ -222,7 +227,7 @@ export default function BuildHistoryPage() {
           <div className="rounded-3xl border border-slate-800 bg-slate-900 p-12 text-center">
             <History className="mx-auto h-10 w-10 text-slate-600" />
             <p className="mt-4 text-lg font-bold text-slate-400">No builds yet</p>
-            <p className="mt-2 text-sm text-slate-500">Start building your first app in the App Builder to see version history here.</p>
+            <p className="mt-2 text-sm text-slate-400">Start building your first app in the App Builder to see version history here.</p>
             <Link href="/dsg/app-builder" className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-500">
               Open App Builder
             </Link>
@@ -262,7 +267,7 @@ export default function BuildHistoryPage() {
                             <p className="mt-0.5 font-bold text-slate-100">{entry.appName}</p>
                           </div>
                         </div>
-                        <span className="text-xs text-slate-500">{entry.relativeTime}</span>
+                        <span className="text-xs text-slate-400">{entry.relativeTime}</span>
                       </div>
 
                       <p className="mt-3 text-sm leading-6 text-slate-300">{entry.summary}</p>
@@ -354,6 +359,7 @@ export default function BuildHistoryPage() {
           </div>
         )}
       </div>
+      </details>
     </main>
   );
 }

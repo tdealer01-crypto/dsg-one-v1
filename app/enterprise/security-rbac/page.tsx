@@ -1,3 +1,4 @@
+import { DsgCopy } from '@/components/app-language-copy-bridge';
 import { getSecurityRbacReport } from '@/lib/dsg/marketplace/security-rbac';
 
 const tone = {
@@ -12,13 +13,13 @@ export default function EnterpriseSecurityRbacPage() {
   const report = getSecurityRbacReport();
 
   return (
-    <main className="min-h-screen bg-[#090b0f] px-5 py-8 text-slate-100 md:px-10">
+    <main className="dsg-page min-h-screen bg-[#090b0f] px-5 py-8 text-slate-100 md:px-10">
       <section className="mx-auto max-w-6xl">
         <header className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6">
           <p className="font-mono text-xs uppercase tracking-[0.24em] text-rose-200">Enterprise Security Evidence</p>
           <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-              <h1 className="font-serif text-4xl font-black tracking-tight md:text-6xl">Security RBAC Evidence</h1>
+              <h1 className="dsg-page-title font-serif text-4xl font-black tracking-tight md:text-6xl">Security RBAC Evidence</h1>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300">Evidence checklist for server-side RBAC, organization isolation, audit events, and deny-by-default review. PASS requires real enforcement and negative tests.</p>
             </div>
             <span className={`w-fit rounded-full border px-4 py-2 font-mono text-xs font-black uppercase tracking-[0.18em] ${tone[report.verdict]}`}>{report.verdict}</span>
@@ -31,14 +32,14 @@ export default function EnterpriseSecurityRbacPage() {
             <article key={check.id} className="rounded-[2rem] border border-white/10 bg-[#111827] p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500">{check.id}</p>
+                  <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">{check.id}</p>
                   <h2 className="mt-2 text-2xl font-black text-white">{check.title}</h2>
                 </div>
                 <span className={`rounded-full border px-3 py-1 font-mono text-xs font-bold ${tone[check.status]}`}>{check.status}</span>
               </div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/5 p-4">
-                  <h3 className="font-bold text-emerald-200">Evidence</h3>
+                  <h3 className="font-bold text-emerald-200"><DsgCopy value="Evidence" /></h3>
                   <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
                     {(check.evidence.length ? check.evidence : ['No attached evidence yet']).map((item) => <li key={item}>• {item}</li>)}
                   </ul>

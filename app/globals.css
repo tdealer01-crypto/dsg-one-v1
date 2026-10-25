@@ -89,3 +89,93 @@ input::placeholder, textarea::placeholder { color: #94a3b8; opacity: 1; }
   .dsg-sidebar-mobile-overlay { display: flex !important; }
 }
 
+/* DSG application surfaces. These explicit classes leave generated app content
+   and public presentation styles intact. Status colours remain semantic. */
+.dsg-application {
+  --dsg-surface: #0f172a;
+  --dsg-surface-raised: #172033;
+  display: flex;
+  height: 100dvh;
+  min-height: 0;
+  background: var(--dsg-black);
+  color: #e2e8f0;
+  font-size: 0.9375rem;
+}
+.dsg-app-body { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; }
+.dsg-app-content { min-width: 0; min-height: 0; flex: 1; overflow: auto; scrollbar-gutter: stable; }
+.dsg-app-content:focus-visible { outline: 2px solid var(--dsg-sapphire-2); outline-offset: -2px; }
+.dsg-app-header {
+  display: flex; min-height: 4rem; flex-shrink: 0; align-items: center; gap: .75rem;
+  border-bottom: 1px solid #1e293b; background: #020617; padding: .5rem 1.5rem;
+}
+.dsg-breadcrumb { display: flex; min-width: 0; flex: 1; align-items: center; gap: .5rem; color: #94a3b8; font-size: .8125rem; }
+.dsg-breadcrumb a { color: #cbd5e1; }
+.dsg-breadcrumb [aria-current] { overflow: hidden; color: #e2e8f0; text-overflow: ellipsis; white-space: nowrap; }
+.dsg-breadcrumb svg { flex-shrink: 0; }
+.dsg-desktop-navigation { display: none; width: 16rem; flex-shrink: 0; }
+.dsg-app-navigation { display: flex; width: 16rem; max-width: 88vw; height: 100%; min-height: 0; flex-direction: column; border-right: 1px solid #1e293b; background: #0b1220; }
+.dsg-app-brand { display: flex; min-height: 4rem; flex-shrink: 0; align-items: center; justify-content: space-between; padding: .5rem 1rem; }
+.dsg-brand-link { display: inline-flex; min-height: 2.75rem; align-items: center; gap: .625rem; color: #f8fafc; font-size: 1rem; font-weight: 650; letter-spacing: -.025em; }
+.dsg-brand-link svg { color: #a5b4fc; }
+.dsg-app-nav-items { flex: 1; overflow: auto; overscroll-behavior: contain; padding: .25rem .625rem 1rem; }
+.dsg-nav-group { margin-top: .75rem; }
+.dsg-nav-group h2, .dsg-nav-group summary { display: flex; min-height: 2.75rem; align-items: center; padding: .625rem .75rem; color: #94a3b8; font-size: .75rem; font-weight: 600; }
+.dsg-nav-group summary { cursor: pointer; list-style: none; }
+.dsg-nav-group summary::after { content: '+'; margin-left: auto; font-size: 1rem; }
+.dsg-nav-group[open] summary::after { content: '−'; }
+.dsg-nav-links { display: grid; gap: .125rem; }
+.dsg-nav-link { display: flex; min-height: 2.75rem; align-items: center; gap: .5rem; border: 1px solid transparent; border-radius: .625rem; padding: .625rem .75rem; color: #cbd5e1; font-size: .8125rem; line-height: 1.5; }
+.dsg-nav-link:hover { background: #172033; color: #f8fafc; }
+.dsg-nav-link[aria-current="page"] { border-color: #3730a3; background: #1e1b4b; color: #e0e7ff; font-weight: 600; }
+.dsg-app-nav-footer { flex-shrink: 0; border-top: 1px solid #1e293b; padding: .625rem; }
+.dsg-icon-button { display: inline-flex; min-width: 2.75rem; min-height: 2.75rem; flex-shrink: 0; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: .625rem; color: #cbd5e1; }
+.dsg-icon-button:hover { border-color: #334155; background: #172033; }
+.dsg-navigation-dialog { position: fixed; inset: 0 auto 0 0; width: 16rem; max-width: 88vw; height: 100dvh; max-height: none; margin: 0; border: 0; padding: 0; color: #e2e8f0; background: #0b1220; }
+.dsg-navigation-dialog::backdrop { background: rgb(2 6 23 / .72); }
+.dsg-button-primary, .dsg-button-secondary {
+  display: inline-flex; min-width: 2.75rem; min-height: 2.75rem; align-items: center; justify-content: center; gap: .5rem;
+  border: 1px solid transparent; border-radius: .625rem; padding: .625rem 1rem; font-size: .875rem; font-weight: 600; line-height: 1.5; text-align: center;
+}
+.dsg-button-primary { border-color: #6366f1; background: #4338ca; color: #fff; }
+.dsg-button-primary:hover { background: #3730a3; }
+.dsg-button-secondary { border-color: #475569; background: #0f172a; color: #e2e8f0; }
+.dsg-button-secondary:hover { background: #1e293b; }
+.dsg-button-primary:disabled, .dsg-button-secondary:disabled { opacity: .6; }
+.dsg-action-row { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: 1.25rem; }
+.dsg-text-link { color: #a5b4fc; text-decoration: underline; text-underline-offset: .2em; }
+.dsg-eyebrow { color: #a5b4fc; font-size: .8125rem; font-weight: 600; }
+.dsg-page { min-height: 100%; min-width: 0; padding: 1.5rem; background: #020617; color: #e2e8f0; overflow-wrap: anywhere; }
+.dsg-page :where(section, article, header, aside, div) { min-width: 0; }
+.dsg-page-title { font-family: inherit; font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem); font-weight: 650; line-height: 1.4; letter-spacing: -.025em; color: #f8fafc; overflow-wrap: anywhere; }
+.dsg-page-header { border: 1px solid #334155; border-radius: 1rem; background: #0f172a; padding: 1.5rem; box-shadow: none; }
+.dsg-state-panel { max-width: 42rem; margin: 3rem auto; border: 1px solid #334155; border-radius: 1rem; padding: 1.5rem; }
+.dsg-state-panel > p { margin-top: .75rem; line-height: 1.8; }
+.dsg-application :where(button, summary, select, input:not([type="checkbox"]):not([type="radio"])) { min-height: 2.75rem; }
+.dsg-application :where(button) { min-width: 2.75rem; }
+.dsg-application :where(input, textarea, select) { max-width: 100%; }
+.dsg-application :where(pre) { max-width: 100%; overflow-x: auto; }
+.dsg-application :where(th) { text-align: start; }
+.dsg-preview-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; border-bottom: 1px solid #334155; background: #020617; padding: .625rem 1rem; font-family: system-ui, sans-serif; font-size: .875rem; color: #cbd5e1; }
+.dsg-preview-toolbar > span { flex: 1; }
+.dsg-preview-frame > main { min-width: 0; overflow-wrap: anywhere; }
+.dsg-preview-frame :where(section, article, header, aside, div) { min-width: 0; }
+.dsg-preview-frame :where(button, input, select) { min-height: 2.75rem; }
+.dsg-preview-frame :where(button) { min-width: 2.75rem; }
+.dsg-preview-frame :where(input, textarea, select, pre) { max-width: 100%; }
+.dsg-example-panel { max-width: 80rem; margin: 1.5rem auto 0; border: 1px solid #334155; border-radius: 1rem; padding: 1rem; }
+.dsg-example-panel > summary { cursor: pointer; color: #cbd5e1; font-size: .875rem; font-weight: 600; }
+.dsg-example-panel[open] > summary { margin-bottom: 1.5rem; }
+@media (min-width: 1024px) {
+  .dsg-desktop-navigation { display: flex; }
+  .dsg-menu-toggle { display: none; }
+  .dsg-page { padding: 2rem; }
+}
+@media (max-width: 639px) {
+  .dsg-app-header { gap: .5rem; padding: .5rem .75rem; }
+  .dsg-breadcrumb > a, .dsg-breadcrumb > span:not([aria-current]), .dsg-breadcrumb svg { display: none; }
+  .dsg-header-action { padding-inline: .75rem; font-size: .8125rem; }
+  .dsg-page { padding: 1rem; }
+  .dsg-page-header { padding: 1.25rem; }
+  .dsg-state-panel { margin-block: 1rem; padding: 1.25rem; }
+}
+

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { AppLanguageCopyBridge } from '@/components/app-language-copy-bridge';
 import { ToastProvider } from '@/components/toast';
+import { DsgApplicationShell } from '@/components/dsg-application-shell';
 import './globals.css';
 
 const appName = 'DSG ONE V1';
@@ -36,7 +37,7 @@ export default function RootLayout({
     <html lang="th">
       <body suppressHydrationWarning>
         <AppLanguageCopyBridge />
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider><DsgApplicationShell>{children}</DsgApplicationShell></ToastProvider>
       </body>
     </html>
   );

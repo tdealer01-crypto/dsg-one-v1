@@ -120,7 +120,7 @@ export default function GeneratedDsgAbcGamePage() {
         <section className="rounded-3xl border border-slate-800 bg-slate-900 p-5 md:p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Live ABC Game</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Live ABC Game</p>
               <h2 className="mt-2 text-2xl font-black text-white">{round.prompt}</h2>
             </div>
             <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm font-bold text-amber-100">
@@ -155,7 +155,7 @@ export default function GeneratedDsgAbcGamePage() {
                 </button>
                 <button
                   onClick={() => saveResult(`ABC manual save score ${score}/${rounds.length} tries ${tries}`).catch((error) => setMessage(error instanceof Error ? error.message : 'SAVE_FAILED'))}
-                  className="rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-500"
+                  className="rounded-2xl bg-emerald-700 px-5 py-3 font-bold text-white hover:bg-emerald-600"
                 >
                   บันทึกคะแนน
                 </button>
@@ -168,7 +168,7 @@ export default function GeneratedDsgAbcGamePage() {
         <section className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Backend evidence</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Backend evidence</p>
               <h2 className="mt-2 text-2xl font-black text-white">ผลที่บันทึกไว้</h2>
             </div>
             <p className="text-sm text-slate-400">{status}</p>
@@ -177,10 +177,10 @@ export default function GeneratedDsgAbcGamePage() {
             {savedItems.map((item) => (
               <div key={item.id} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
                 <p className="font-semibold text-slate-100">{item.title}</p>
-                <p className="mt-1 text-xs text-slate-500">{new Date(item.created_at).toLocaleString()}</p>
+                <p className="mt-1 text-xs text-slate-400">{new Date(item.created_at).toLocaleString()}</p>
               </div>
             ))}
-            {!savedItems.length && <div className="rounded-2xl border border-dashed border-slate-700 p-6 text-sm text-slate-500">ยังไม่มีผลคะแนนที่บันทึกไว้</div>}
+            {!savedItems.length && <div className="rounded-2xl border border-dashed border-slate-700 p-6 text-sm text-slate-400">ยังไม่มีผลคะแนนที่บันทึกไว้</div>}
           </div>
         </section>
       </div>

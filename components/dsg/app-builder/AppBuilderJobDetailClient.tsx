@@ -32,14 +32,14 @@ export function AppBuilderJobDetailClient({ jobId }: { jobId: string }) {
   const job = view.job;
   const verifiedProduction = job?.claimStatus === 'PRODUCTION_VERIFIED';
   return (
-    <main className="min-h-dvh bg-slate-950 px-4 py-6 text-slate-100 md:px-6 md:py-10">
+    <main className="dsg-page min-h-dvh bg-slate-950 px-4 py-6 text-slate-100 md:px-6 md:py-10">
       <div className="mx-auto max-w-4xl space-y-5">
         <a href="/dsg/app-builder" className="inline-flex min-h-11 items-center rounded-xl border border-slate-700 px-4 text-cyan-200">
           กลับไป App Builder
         </a>
         <section className="rounded-3xl border border-cyan-500/30 bg-slate-900 p-5">
           <p className="text-xs uppercase tracking-widest text-cyan-200">Authenticated Workspace Job · Evidence first</p>
-          <h1 className="mt-3 break-all text-xl font-black sm:text-3xl">Job {jobId}</h1>
+          <h1 className="dsg-page-title mt-3 break-all text-xl font-black sm:text-3xl">Job {jobId}</h1>
           <p role="status" className="mt-3 rounded-xl bg-slate-950 p-3 text-sm">
             {view.status === 'loading' ? 'กำลังอ่าน Job จริงจากฐานข้อมูล…' :
              view.status === 'blocked' ? `BLOCKED · ${view.error}` : `Job status: ${job?.status}`}
@@ -56,7 +56,7 @@ export function AppBuilderJobDetailClient({ jobId }: { jobId: string }) {
               <p className="mt-2 whitespace-pre-wrap text-sm text-slate-200">{job.goal?.originalGoal || 'GOAL_UNAVAILABLE'}</p>
               <p className="mt-3 text-sm text-slate-400">สถานะที่บันทึก: {job.status}</p>
               <p className="mt-2 text-sm text-slate-400">ระดับ Claim ที่บันทึก: {job.claimStatus}</p>
-              <p className="mt-2 text-xs text-slate-500">Updated: {job.updatedAt}</p>
+              <p className="mt-2 text-xs text-slate-400">Updated: {job.updatedAt}</p>
             </section>
             <section className="rounded-2xl border border-slate-700 bg-slate-900 p-5">
               <h2 className="font-bold">Plan / Approval Evidence</h2>
