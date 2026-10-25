@@ -8,6 +8,7 @@ import { DsgCinemaOauthViewer } from '@/components/dsg-cinema-oauth-viewer';
 import { cinemaAgentToolContracts, cinemaVerifierKind, cinemaVerifierReadPayload } from '@/lib/dsg/user-bound/cinema-controller-contract';
 import { nativeShellOutcome } from '@/lib/dsg/user-bound/native-shell-outcome';
 import { isVerifiedCinemaConnectResult, mayReuseRecentCinemaConnection } from '@/lib/dsg/user-bound/cinema-session-reuse';
+import { describeWorkroomFailure } from '@/lib/dsg/user-bound/workroom-failure';
 import {
   asRecord, catalogRoutes, composeWorkroomRoutes, publicWorkroomReceipt,
   uniqueWorkroomRoute, workroomReceiptMatches,
@@ -114,12 +115,7 @@ export function DsgLiveWorkroom() {
     setBusy(true);
     try { await work(); }
     catch (error) {
-      const reason = error instanceof Error ? error.message : 'REQUEST_FAILED';
-      setStatus(reason.includes('DSG_BRAIN_BASE_URL_INVALID')
-        ? 'DSG Agent v0 ยังเรียกโมเดลไม่ได้: Brain Endpoint ของ AWS ไม่พร้อม · ต้องเชื่อม Kaggle Worker รุ่นที่ตรวจสอบแล้วก่อน ไม่มีการเรียกโมเดลจำลองหรือ GPU เสียเงิน'
-        : reason === 'HUMAN_APPROVAL_NOT_READY' || reason === 'APPROVAL_PENDING'
-        ? 'ยังรอการอนุมัติในหน้าเจ้าของ เมื่ออนุมัติแล้วกลับมาแท็บนี้หรือกดตรวจการอนุมัติ'
-        : `ยังทำงานไม่สำเร็จ: ${reason} — ตรวจเซสชันหรือสถานะ provider ก่อนลองใหม่`);
+      setStatus(describeWorkroomFailure(error));
     } finally { busyRef.current = false; setBusy(false); }
   }
 
