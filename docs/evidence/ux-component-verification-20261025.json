@@ -1,0 +1,141 @@
+{
+  "scope": "isolated component UI tests; local unauthenticated/error fixtures, not real Auth0/provider or deployed full-system E2E",
+  "browser": "153.0.8010.0",
+  "checks": [
+    {
+      "name": "Home has no horizontal overflow at 320",
+      "status": "PASS"
+    },
+    {
+      "name": "Home has no horizontal overflow at 390",
+      "status": "PASS"
+    },
+    {
+      "name": "axe home-390",
+      "status": "PASS",
+      "count": 0
+    },
+    {
+      "name": "Home has no horizontal overflow at 768",
+      "status": "PASS"
+    },
+    {
+      "name": "Home has no horizontal overflow at 1440",
+      "status": "PASS"
+    },
+    {
+      "name": "axe home-1440",
+      "status": "PASS",
+      "count": 0
+    },
+    {
+      "name": "Every original public tool and evidence URL remains directly linked",
+      "status": "PASS"
+    },
+    {
+      "name": "Skip link is first keyboard stop and reaches main content",
+      "status": "PASS"
+    },
+    {
+      "name": "Mobile public menu closes on Escape and restores summary focus",
+      "status": "PASS"
+    },
+    {
+      "name": "axe login-mobile",
+      "status": "PASS",
+      "count": 0
+    },
+    {
+      "name": "Login keeps destination and password manager autocomplete",
+      "status": "PASS"
+    },
+    {
+      "name": "Optional password visibility does not change the credential or submit",
+      "status": "PASS"
+    },
+    {
+      "name": "Sign-in uses the existing endpoint once and announces a real error",
+      "status": "PASS"
+    },
+    {
+      "name": "Login fits 320 CSS-pixel width with 44-pixel controls",
+      "status": "PASS"
+    },
+    {
+      "name": "Every original administrator navigation destination remains available",
+      "status": "PASS"
+    },
+    {
+      "name": "axe mobile-drawer",
+      "status": "PASS",
+      "count": 0
+    },
+    {
+      "name": "Mobile drawer traps focus and Escape returns to its opener",
+      "status": "PASS"
+    },
+    {
+      "name": "Tool tabs support Arrow keys, Home/End, roving focus and valid panel references",
+      "status": "PASS"
+    },
+    {
+      "name": "Changing UI tabs does not issue provider mutations or new approvals",
+      "status": "PASS"
+    },
+    {
+      "name": "axe workroom-device-no-identity",
+      "status": "PASS",
+      "count": 0
+    },
+    {
+      "name": "Agent, Cinema and Native retain every original visible operation and input",
+      "status": "PASS"
+    },
+    {
+      "name": "No unexpected browser runtime exceptions",
+      "status": "PASS"
+    }
+  ],
+  "violations": [],
+  "errors": [],
+  "passed": 22,
+  "failed": 0,
+  "backend_fixture": "only local 401 JSON; no real account, cookie, token or provider execution",
+  "kind": "unsigned-local-ui-component-verification",
+  "source_base_sha": "b0730238d8439734d9e8bd32acfaf1c771ca9d5e",
+  "recorded_at": "2026-10-26T00:37:07.820466+07:00",
+  "changed_files_sha256": {
+    "app/globals.css": "1e8dbee91e937053c8dc78a86764aeea203e773c0d2a6093f2e0fcf4bd2de5c0",
+    "app/page.tsx": "729b99cca17a589b59a7945603bf858b331b27a1f5d14e699770532264506663",
+    "app/login/page.tsx": "73434c67388ab25c12aab15f1571f69af275b07f68f45a9af98e57794a629c74",
+    "app/dsg/layout.tsx": "1984ac8d104dfe6dbf8773f619616d95caae98073ab5340c9d4b4cfef94a2296",
+    "components/dsg-live-workroom.tsx": "ac461b53cd5bfda6f8a70cef0905bffea37d7bc2298dd47982a98bd232c9decd",
+    "lib/dsg/user-bound/native-device-summary.ts": "371d81daabb1c3b8271efa074f695dea4adc5cbfce0edbff2979907df22ba3a0",
+    "tests/dsg/native-device-summary.test.ts": "e6acb87cb02eec4bc478ee7d1361a641fb79bc9cf6d5f5e69e62d1f9eede5a55"
+  },
+  "vitest": {
+    "files": 4,
+    "passed": 21,
+    "exit_code": 0
+  },
+  "strict_typescript": {
+    "exit_code": 0,
+    "scope": "changed components and actual imported dependencies; temporary validation setup"
+  },
+  "limitations": [
+    "Not a full clean Git checkout or independent CI attestation",
+    "Next link/router adapters and local unauthenticated/error fixtures only",
+    "Not live owner Auth0 MFA, provider write, two-account isolation or whole-system E2E",
+    "Automated axe checks do not certify complete WCAG conformance"
+  ],
+  "whole_goal_e2e": "NOT_VERIFIED",
+  "control_inventory_meaning": "capability preservation only; not working navigation or task completion",
+  "actual_click_failure": {
+    "plan_id": "plan_ui_clickthrough_20261025_01",
+    "reason": "EXECUTION_FAILED:CINEMA_TOOL_SPACETIME_ARGUMENTS_SCOPE_MISMATCH",
+    "independent_read_record": 408,
+    "observed_page": "AWS Startups; no navigation",
+    "source_repair": "https://github.com/tdealer01-crypto/DSG-Private-Production-Runtime/pull/842",
+    "production_repair_verified": false
+  }
+}

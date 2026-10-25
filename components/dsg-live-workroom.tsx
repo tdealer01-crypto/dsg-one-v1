@@ -7,6 +7,7 @@ import { DsgKaggleGpuStatus } from '@/components/dsg-kaggle-gpu-status';
 import { DsgCinemaOauthViewer } from '@/components/dsg-cinema-oauth-viewer';
 import { cinemaAgentToolContracts, cinemaNavigationSteps, cinemaVerifierKind, cinemaVerifierObservation, cinemaVerifierReadPayload } from '@/lib/dsg/user-bound/cinema-controller-contract';
 import { nativeShellOutcome } from '@/lib/dsg/user-bound/native-shell-outcome';
+import { nativeDeviceSummary, type NativeDeviceSummary } from '@/lib/dsg/user-bound/native-device-summary';
 import { isVerifiedCinemaConnectResult, mayReuseRecentCinemaConnection } from '@/lib/dsg/user-bound/cinema-session-reuse';
 import { describeWorkroomFailure } from '@/lib/dsg/user-bound/workroom-failure';
 import {
@@ -28,7 +29,7 @@ const flowStages: { phase: FlowPhase; label: string }[] = [
   { phase: 'verify', label: 'ตรวจผล' }, { phase: 'evidence', label: 'หลักฐาน' },
 ];
 const button = 'min-h-11 rounded-xl border border-slate-600 px-4 py-2 text-sm font-semibold disabled:opacity-40 hover:border-indigo-400';
-const field = 'w-full rounded-xl border border-slate-600 bg-slate-950 p-3 text-sm text-white';
+const field = 'w-full rounded-xl border border-slate-500 bg-slate-950 p-3 text-sm text-white';
 const browserTarget = 'node.cinema-remote';
 const desktopTarget = 'node.desktop-native';
 
@@ -67,6 +68,7 @@ export function DsgLiveWorkroom() {
   const [verifiedAction, setVerifiedAction] = useState<string | null>(null);
   const [shellProcessId, setShellProcessId] = useState<string | null>(null);
   const [shellOutcome, setShellOutcome] = useState<'running' | 'succeeded' | 'failed' | 'unknown' | null>(null);
+  const [nativeDevice, setNativeDevice] = useState<NativeDeviceSummary | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -163,6 +165,7 @@ export function DsgLiveWorkroom() {
     const chain = await tool('spacetime_verify_evidence', {});
     if (!chain.evidenceVerified || chain.receipt?.valid !== true) throw new Error('EVIDENCE_CHAIN_NOT_VERIFIED');
     const result = asRecord(data.receipt?.result)!;
+    if (request.route_id === 'route.desktop-native.status') setNativeDevice(nativeDeviceSummary(result));
     const browserArguments = asRecord(request.payload.arguments);
     if (request.route_id === 'route.cinema-remote.read' && Array.isArray(browserArguments?.steps) &&
         browserArguments.steps.some(step => asRecord(asRecord(step)?.action)?.kind === 'browser.extract')) {
@@ -452,7 +455,7 @@ export function DsgLiveWorkroom() {
       </ol>
       {flowPhase === 'needs-check' && <p className="mb-3 text-sm text-amber-200">ต้องตรวจผลหรือแก้สาเหตุตามข้อความด้านล่างก่อนทำต่อ · ไม่ส่งคำสั่งเดิมซ้ำอัตโนมัติ</p>}
       <p className="mt-2 text-sm text-slate-300">เลือกงาน → ตรวจสิทธิ์ → อนุมัติเฉพาะเมื่อจำเป็น → ดูผลและหลักฐานจริง</p>
-      <p role="status" aria-live="polite" className="mt-4 break-words rounded-xl bg-slate-950 p-4 text-sm text-indigo-100">{status}</p>
+      <p role="status" aria-live="polite" aria-atomic="true" className="mt-4 break-words rounded-xl bg-slate-950 p-4 text-sm text-indigo-100">{status}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {!ready && <button className={button} disabled={busy || initializing} onClick={() => void login()}>เข้าสู่ระบบเครื่องมือ</button>}
         <details className="rounded-xl border border-slate-700 p-2 text-sm"><summary className="cursor-pointer px-2 py-1">การเชื่อมต่อ (ขั้นสูง)</summary><button className={`${button} mt-2`} disabled={busy || !ready} onClick={() => void act(async () => { await loadCatalog(); })}>ตรวจรายการเครื่องมือ</button></details>
@@ -461,12 +464,28 @@ export function DsgLiveWorkroom() {
       <div role="tablist" aria-label="เลือกเครื่องมือ" className="mt-6 flex flex-wrap gap-2">
         {(['agent', 'browser', 'desktop'] as const).map((item, index) => (
           <button key={item} role="tab" id={`workroom-tab-${item}`} aria-controls={`workroom-panel-${item}`} aria-selected={tab === item}
+            tabIndex={tab === item ? 0 : -1}
+            onKeyDown={event => {
+              const items = ['agent', 'browser', 'desktop'] as const;
+              const index = items.indexOf(item);
+              const next = event.key === 'ArrowRight' ? items[(index + 1) % items.length] :
+                event.key === 'ArrowLeft' ? items[(index + items.length - 1) % items.length] :
+                event.key === 'Home' ? items[0] : event.key === 'End' ? items[items.length - 1] : null;
+              if (next) {
+                event.preventDefault();
+                selectTool(next);
+                document.getElementById(`workroom-tab-${next}`)?.focus();
+              }
+            }}
             onClick={() => selectTool(item)} className={`${button} ${tab === item ? 'bg-indigo-700 border-indigo-400' : ''}`}>
             {['Agent v0 · วางแผนด้วย Qwen', 'ควบคุมเว็บ', 'สั่งงานอุปกรณ์'][index]}
           </button>
         ))}
       </div>
-      <div role="tabpanel" id={`workroom-panel-${tab}`} aria-labelledby={`workroom-tab-${tab}`} className="mt-5 space-y-4">
+      {(['agent', 'browser', 'desktop'] as const).filter(item => item !== tab).map(item =>
+        <div key={item} role="tabpanel" hidden id={`workroom-panel-${item}`} aria-labelledby={`workroom-tab-${item}`} />
+      )}
+      <div role="tabpanel" tabIndex={0} id={`workroom-panel-${tab}`} aria-labelledby={`workroom-tab-${tab}`} className="mt-5 space-y-4">
         {tab === 'agent' && <>
           <p className="text-sm text-slate-300">DSG Agent v0 ใช้ Qwen เพื่อเสนอแผนผ่าน AWS Spacetime ไม่ได้อนุมัติหรือลงมือทำเอง หาก Kaggle Worker ไม่ออนไลน์จะแสดงข้อผิดพลาดตามจริง</p>
           <p className="text-xs text-amber-200">สถานะ Route ไม่เท่ากับโมเดลพร้อมใช้ · Qwen3-30B-A3B เป็น Worker ชั่วคราวบน Kaggle (proposal-only)</p>
@@ -509,7 +528,14 @@ export function DsgLiveWorkroom() {
           <button className={button} disabled={busy || !ready || Boolean(pending) || !url.trim()} onClick={() => void act(browserNavigate)}>ขอเชื่อม เปิดเว็บ และอ่านผล</button>
         </>}
         {tab === 'desktop' && <>
-          <p className="text-sm text-slate-300">สั่งงานบนอุปกรณ์ DSG Native ที่เชื่อมอยู่ (ปัจจุบันคือ Android/Termux) ไม่ใช่ Linux EC2 ที่เปิดผ่าน Chrome Remote Desktop</p>
+          <p className="text-sm text-slate-300">สั่งงานบนอุปกรณ์ DSG Native ที่ระบบเชื่อมไว้ ชื่อเครื่องและความพร้อมจะแสดงจากผลตรวจจริง</p>
+          {nativeDevice ? <div className="rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm">
+            <p className="font-semibold text-white">อุปกรณ์ที่ตรวจได้: {nativeDevice.label}</p>
+            <p className="mt-1 text-slate-300">{nativeDevice.online === true ? 'ออนไลน์จากการตรวจล่าสุด' : nativeDevice.online === false ? 'ออฟไลน์จากการตรวจล่าสุด' : 'ยังไม่ยืนยันสถานะออนไลน์'}</p>
+            <details className="mt-2 text-slate-400"><summary className="cursor-pointer py-2">รายละเอียดอุปกรณ์</summary>
+              <p className="break-all">{nativeDevice.deviceId}</p>{nativeDevice.platform && <p className="break-all">{nativeDevice.platform}</p>}
+            </details>
+          </div> : <p className="text-sm text-slate-400">ยังไม่มีผลตรวจอุปกรณ์ในหน้านี้ · ใช้ปุ่มตรวจอุปกรณ์เพื่อดูข้อมูลล่าสุด</p>}
           {catalogLoaded && !isAvailable('device.remote.status', desktopTarget) && <p className="text-amber-200">DSG Desktop Native ยังไม่ได้ enroll กับ runtime — จับคู่เครื่องก่อนใช้งาน</p>}
           <div className="flex flex-wrap gap-2">
             <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('device.remote.status', desktopTarget, () => ({ action: 'device.remote.status', arguments: {} }), 'ตรวจ Remote Desktop'); })}>ตรวจอุปกรณ์ที่เชื่อมต่อ</button>
