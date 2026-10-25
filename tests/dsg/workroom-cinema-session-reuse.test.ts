@@ -40,6 +40,9 @@ describe('Workroom Cinema verified session reuse', () => {
     expect(source).toContain("request.route_id === 'route.cinema-remote.connect'");
     expect(source).toContain('isVerifiedCinemaConnectResult(result)');
     expect(source).toContain('mayReuseRecentCinemaConnection(cinemaConnectedVerifiedAt.current, Date.now())');
+    expect(source).toContain('async function browserConnect()');
+    expect(source).toContain('ไม่ต้องขอ Connect ซ้ำ');
+    expect(source).toContain('Cinema เชื่อมต่อแล้วในเซสชันที่ตรวจไว้');
     expect(source).toContain("tool('spacetime_request_approval'");
     expect(source).toContain("tool('spacetime_claim_approval'");
     expect(source).toContain("tool('spacetime_execute'");
