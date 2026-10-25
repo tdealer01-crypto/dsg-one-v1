@@ -34,8 +34,11 @@ describe('new DSG Agent v0 governed Workroom entry', () => {
     expect(live).toContain("run('action.plan', 'node.agent.dsg-v0'");
     expect(live).toContain("result.authority !== 'proposal-only'");
     expect(live).toContain("result.model.startsWith('DSG-Agent-v0')");
-    expect(live).toContain("reason.includes('DSG_BRAIN_BASE_URL_INVALID')");
-    expect(live).toContain('ไม่มีการเรียกโมเดลจำลองหรือ GPU เสียเงิน');
+    // User-facing errors are now mapped centrally without exposing raw provider text.
+    const failure = source('lib/dsg/user-bound/workroom-failure.ts');
+    expect(live).toContain('describeWorkroomFailure(error)');
+    expect(failure).toContain('DSG_BRAIN_BASE_URL_INVALID:');
+    expect(failure).toContain('ไม่เปิด GPU เสียเงิน');
     expect(chatModel).toContain('dsgV0ChatBound: false');
     expect(live).not.toContain('DSG_BRAIN_BASE_URL=https://');
     expect(live).not.toContain('localStorage.setItem');
