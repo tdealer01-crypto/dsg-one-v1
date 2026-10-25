@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import Link from 'next/link';
 import { Search, Star, ArrowRight, Zap, ShoppingCart, Loader2 } from 'lucide-react';
 
 type Template = {
@@ -36,19 +37,25 @@ function formatPrice(priceSatang: number): string {
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  const [catalogIssue, setCatalogIssue] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [purchasing, setPurchasing] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/dsg/templates')
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.ok) setTemplates(res.data ?? []);
+    const abort = new AbortController();
+    fetch('/api/dsg/templates', { credentials: 'include', cache: 'no-store', signal: abort.signal })
+      .then(async response => {
+        const result = await response.json();
+        if (!response.ok || result.ok !== true || !Array.isArray(result.data)) throw new Error('CATALOG_UNAVAILABLE');
+        return result.data as Template[];
       })
-      .catch(() => {/* silently degrade — grid stays empty */})
-      .finally(() => setLoading(false));
-  }, []);
+      .then(rows => { if (!abort.signal.aborted) { setTemplates(rows); setCatalogIssue(null); } })
+      .catch(() => { if (!abort.signal.aborted) setCatalogIssue('ยังอ่านรายการเทมเพลตไม่ได้ โปรดลองอีกครั้ง'); })
+      .finally(() => { if (!abort.signal.aborted) setLoading(false); });
+    return () => abort.abort();
+  }, [reload]);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(templates.map((t) => t.category)));
@@ -101,7 +108,7 @@ export default function TemplatesPage() {
           </div>
           <h1 className="dsg-page-title text-3xl font-black tracking-tight md:text-5xl">App Templates</h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
-            Start building faster with production-ready templates. Pick one, customise it, and ship.
+            เลือกเทมเพลตเป็นจุดเริ่มต้น แล้วปรับให้เหมาะกับงาน แอปที่สร้างยังต้องผ่านการทดสอบและตรวจความพร้อมก่อนใช้งานจริง
           </p>
         </section>
 
@@ -141,8 +148,12 @@ export default function TemplatesPage() {
           </div>
         )}
 
+        {catalogIssue && <div role="alert" className="rounded-xl border border-amber-600 bg-amber-950/30 p-4 text-sm text-amber-100">
+          <p>{catalogIssue}</p><button type="button" onClick={() => { setLoading(true); setCatalogIssue(null); setReload(value => value + 1); }} className="dsg-button-secondary mt-3">ลองโหลดรายการใหม่</button>
+        </div>}
+
         {/* Results count */}
-        {!loading && (
+        {!loading && !catalogIssue && (
           <p className="text-sm text-slate-400">
             {filtered.length} template{filtered.length !== 1 ? 's' : ''}
             {activeCategory !== 'All' ? ` in ${activeCategory}` : ''}
@@ -150,7 +161,7 @@ export default function TemplatesPage() {
         )}
 
         {/* Grid */}
-        {!loading && filtered.length === 0 && (
+        {!loading && !catalogIssue && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-800 bg-slate-900 py-24 text-center">
             <Search className="mb-4 h-10 w-10 text-slate-600" />
             <p className="text-lg font-bold text-slate-300">No templates found</p>
@@ -164,7 +175,7 @@ export default function TemplatesPage() {
           </div>
         )}
 
-        {!loading && filtered.length > 0 && (
+        {!loading && !catalogIssue && filtered.length > 0 && (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((template) => {
               const isFree = template.price_satang === 0;
@@ -175,25 +186,25 @@ export default function TemplatesPage() {
                   className="flex flex-col rounded-3xl border border-slate-800 bg-slate-900 p-5 transition-colors hover:border-slate-700"
                 >
                   {/* Badges */}
-                  <div className="mb-4 flex items-start justify-between">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-700 bg-slate-800 text-slate-300">
+                  <div className="mb-4 flex items-start justify-between gap-2">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-700 bg-slate-800 text-slate-300">
                       <ShoppingCart className="h-5 w-5" />
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap justify-end gap-1.5">
                       {template.popular && (
-                        <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
-                          Popular
+                        <span className="shrink-0 whitespace-nowrap rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
+                          แนะนำ
                         </span>
                       )}
                       {template.category && (
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${CATEGORY_COLORS[template.category] ?? 'border-slate-500/40 bg-slate-500/10 text-slate-300'}`}>
+                        <span className={`shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${CATEGORY_COLORS[template.category] ?? 'border-slate-500/40 bg-slate-500/10 text-slate-300'}`}>
                           {template.category}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <h3 className="text-base font-black text-slate-100">{template.name}</h3>
+                  <h2 className="text-base font-black text-slate-100">{template.name}</h2>
                   <p className="mt-1 flex-1 text-sm leading-6 text-slate-400">{template.description}</p>
 
                   {/* Stack */}
@@ -212,7 +223,7 @@ export default function TemplatesPage() {
                         {formatPrice(template.price_satang)}
                       </span>
                       <span className="flex items-center gap-1 text-xs text-slate-400">
-                        <Star className="h-3.5 w-3.5 text-amber-400" />
+                        <Star aria-hidden="true" className="h-3.5 w-3.5 text-amber-400" /><span>ดาวในรายการ</span>
                         {formatStars(template.stars)}
                       </span>
                     </div>
@@ -233,12 +244,12 @@ export default function TemplatesPage() {
                         )}
                       </button>
                     ) : (
-                      <a
-                        href={`/dsg/app-builder?template=${template.slug}`}
+                      <Link
+                        href={`/dsg/app-builder?template=${encodeURIComponent(template.slug)}`}
                         className="inline-flex items-center gap-1.5 rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500"
                       >
                         Use template <ArrowRight className="h-3.5 w-3.5" />
-                      </a>
+                      </Link>
                     )}
                   </div>
                 </div>

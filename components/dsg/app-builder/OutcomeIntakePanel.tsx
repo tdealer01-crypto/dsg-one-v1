@@ -8,9 +8,9 @@ type OutcomeError = { ok: false; error: { code: string; message: string }; nextA
 
 export function OutcomeIntakePanel() {
   const bridge = useAppBuilderGoalBridge();
-  const [goal, setGoal] = useState('');
+  const [goal, setGoal] = useState(bridge?.templateDraft?.goal ?? '');
   const [targetUsers, setTargetUsers] = useState('operators, reviewers');
-  const [successOutcome, setSuccessOutcome] = useState('User can see a useful first workflow and the missing evidence before production.');
+  const [successOutcome, setSuccessOutcome] = useState(bridge?.templateDraft?.criteria.join('\n') ?? 'User can see a useful first workflow and the missing evidence before production.');
   const [availableData, setAvailableData] = useState('existing customer or workflow data');
   const [requiredIntegrations, setRequiredIntegrations] = useState('');
   const [riskLevel, setRiskLevel] = useState<'low' | 'medium' | 'high' | 'regulated'>('medium');

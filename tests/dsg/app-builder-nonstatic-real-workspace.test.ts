@@ -64,7 +64,8 @@ describe('App Builder truth: user goal and real jobs, not a frozen demo', () => 
   });
 
   it('sends successful outcome intent to console without manufacturing proof or execution', () => {
-    expect(page).toContain('<AppBuilderGoalProvider>');
+    expect(page).toContain('requestedTemplate={query.template}');
+    expect(page).toContain('key={JSON.stringify(query.template ?? null)}');
     expect(bridge).toContain('createContext<GoalBridge | null>');
     expect(intake).toContain("json.ok === true");
     expect(intake).toContain('bridge?.publish(json.intake)');
