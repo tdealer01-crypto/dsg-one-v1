@@ -1,183 +1,91 @@
 @import "tailwindcss";
 
+/* Shared tokens; components retain their own semantic state colours. */
 :root {
+  color-scheme: dark;
   --dsg-black: #020617;
-  --dsg-panel: #07111f;
-  --dsg-panel-2: #0a1628;
-  --dsg-sapphire: #009dff;
-  --dsg-sapphire-2: #37d8ff;
-  --dsg-gold: #f7c948;
-  --dsg-gold-2: #ffe8a3;
-  --dsg-red: #ff2d55;
-  --dsg-red-2: #ff6b7a;
-  --dsg-silver: #d8e7ff;
-  --dsg-silver-2: #f7fbff;
-  --dsg-muted: #8fb4d9;
-  --dsg-line: rgba(55, 216, 255, 0.32);
-  --dsg-glow-blue: 0 0 18px rgba(0, 157, 255, 0.42), 0 0 42px rgba(55, 216, 255, 0.18);
-  --dsg-glow-gold: 0 0 18px rgba(247, 201, 72, 0.38), 0 0 36px rgba(255, 232, 163, 0.14);
-  --dsg-glow-red: 0 0 18px rgba(255, 45, 85, 0.36), 0 0 32px rgba(255, 107, 122, 0.14);
+  --dsg-panel: #0f172a;
+  --dsg-panel-2: #172033;
+  --dsg-sapphire: #38bdf8;
+  --dsg-sapphire-2: #67e8f9;
+  --dsg-gold: #fbbf24;
+  --dsg-gold-2: #fde68a;
+  --dsg-red: #fb7185;
+  --dsg-red-2: #fda4af;
+  --dsg-silver: #e2e8f0;
+  --dsg-silver-2: #f8fafc;
+  --dsg-muted: #94a3b8;
+  --dsg-line: #334155;
+  /* Compatibility names: no unsolicited global glow or recolouring. */
+  --dsg-glow-blue: none;
+  --dsg-glow-gold: none;
+  --dsg-glow-red: none;
 }
-
 html {
   background: var(--dsg-black);
+  scroll-padding-top: 5rem;
+  -webkit-text-size-adjust: 100%;
 }
-
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(0, 157, 255, 0.22), transparent 28%),
-    radial-gradient(circle at 100% 12%, rgba(247, 201, 72, 0.16), transparent 26%),
-    radial-gradient(circle at 48% 110%, rgba(255, 45, 85, 0.14), transparent 32%),
-    linear-gradient(135deg, #01040c 0%, #061225 46%, #020617 100%);
+  background: var(--dsg-black);
   color: var(--dsg-silver);
-  text-rendering: geometricPrecision;
+  font-family: Inter, "Noto Sans Thai", "Leelawadee UI", system-ui, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
+::selection { background: #164e63; color: #ecfeff; }
+* { scrollbar-color: #475569 #0f172a; }
 
-body::before {
-  content: "";
-  pointer-events: none;
+button, a, input, textarea, select, summary {
+  -webkit-tap-highlight-color: transparent;
+  scroll-margin-block: 5rem 2rem;
+}
+button, a, summary {
+  touch-action: manipulation;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+button:focus-visible, a:focus-visible, summary:focus-visible,
+input:focus-visible, textarea:focus-visible, select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--dsg-sapphire-2);
+  outline-offset: 3px;
+}
+button:disabled { cursor: not-allowed; }
+input, textarea, select { font: inherit; }
+input::placeholder, textarea::placeholder { color: #94a3b8; opacity: 1; }
+
+.dsg-skip-link {
   position: fixed;
-  inset: 0;
-  z-index: 0;
-  background-image:
-    linear-gradient(rgba(55, 216, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(55, 216, 255, 0.04) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(circle at center, black, transparent 80%);
+  z-index: 100;
+  top: .75rem;
+  left: .75rem;
+  transform: translateY(-200%);
+  border-radius: .5rem;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: .75rem 1rem;
+  font-weight: 600;
 }
-
-body > * {
-  position: relative;
-  z-index: 1;
+.dsg-skip-link:focus { transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }
-
-::selection {
-  background: rgba(247, 201, 72, 0.35);
-  color: var(--dsg-silver-2);
+@media (forced-colors: active) {
+  button:focus-visible, a:focus-visible, summary:focus-visible,
+  input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline-color: Highlight;
+  }
 }
-
-* {
-  scrollbar-color: rgba(55, 216, 255, 0.55) rgba(2, 6, 23, 0.8);
-}
-
-/* Cyberpunk skin layer: keep existing UI positions, brighten the palette globally. */
-[class*="bg-[#09090a]"],
-[class*="bg-[#0c0c0d]"],
-[class*="bg-[#111113]"],
-[class*="bg-slate-950"],
-[class*="bg-slate-900"] {
-  background-color: rgba(7, 17, 31, 0.92) !important;
-  background-image:
-    linear-gradient(135deg, rgba(0, 157, 255, 0.14), rgba(2, 6, 23, 0.24) 48%, rgba(247, 201, 72, 0.06)),
-    linear-gradient(180deg, rgba(216, 231, 255, 0.045), transparent) !important;
-}
-
-[class*="border-[#c8c8c8]"],
-[class*="border-slate-800"],
-[class*="border-slate-700"] {
-  border-color: rgba(55, 216, 255, 0.34) !important;
-  box-shadow: inset 0 0 0 1px rgba(216, 231, 255, 0.035), 0 0 0 1px rgba(0, 157, 255, 0.08), var(--dsg-glow-blue);
-}
-
-[class*="border-[#d6a63a]"],
-[class*="border-amber"],
-[class*="border-indigo"] {
-  border-color: rgba(247, 201, 72, 0.55) !important;
-  box-shadow: var(--dsg-glow-gold);
-}
-
-[class*="border-[#b4232b]"],
-[class*="border-rose"],
-[class*="border-red"] {
-  border-color: rgba(255, 45, 85, 0.58) !important;
-  box-shadow: var(--dsg-glow-red);
-}
-
-[class*="text-[#d6a63a]"],
-[class*="text-[#f5d27a]"],
-[class*="text-amber"],
-[class*="text-indigo"] {
-  color: var(--dsg-gold-2) !important;
-  text-shadow: 0 0 10px rgba(247, 201, 72, 0.45);
-}
-
-[class*="text-[#c8c8c8]"],
-[class*="text-[#d9d9d9]"],
-[class*="text-slate-200"],
-[class*="text-slate-300"],
-[class*="text-slate-400"] {
-  color: var(--dsg-silver) !important;
-}
-
-[class*="text-[#8d8d8d]"],
-[class*="text-slate-500"],
-[class*="text-slate-600"] {
-  color: var(--dsg-muted) !important;
-}
-
-[class*="text-[#ffb4b8]"],
-[class*="text-rose"],
-[class*="text-red"] {
-  color: var(--dsg-red-2) !important;
-  text-shadow: 0 0 10px rgba(255, 45, 85, 0.38);
-}
-
-[class*="bg-[#d6a63a]"],
-[class*="bg-amber"],
-[class*="bg-indigo-600"] {
-  background-color: rgba(247, 201, 72, 0.18) !important;
-  background-image: linear-gradient(135deg, rgba(247, 201, 72, 0.95), rgba(0, 157, 255, 0.36)) !important;
-  color: #020617 !important;
-  box-shadow: var(--dsg-glow-gold);
-}
-
-[class*="bg-[#b4232b]"],
-[class*="bg-rose"],
-[class*="bg-red"] {
-  background-color: rgba(255, 45, 85, 0.18) !important;
-  background-image: linear-gradient(135deg, rgba(255, 45, 85, 0.18), rgba(0, 157, 255, 0.08)) !important;
-}
-
-button,
-a,
-input,
-textarea,
-select {
-  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
-}
-
-button:hover,
-a:hover {
-  filter: brightness(1.14) saturate(1.12);
-}
-
-input:focus,
-textarea:focus,
-select:focus {
-  border-color: rgba(247, 201, 72, 0.72) !important;
-  box-shadow: 0 0 0 1px rgba(247, 201, 72, 0.34), var(--dsg-glow-gold) !important;
-}
-
-/* Keep technical language readable and visually separated. */
-code,
-pre,
-.font-mono {
-  color: #9ee8ff !important;
-  text-shadow: 0 0 8px rgba(55, 216, 255, 0.28);
-}
-
-/* Chrome Custom Tabs / Android "Desktop site" can expose a wide CSS viewport
-   while the actual device still has a coarse touch pointer. Force an
-   accessible menu drawer instead of a tiny untappable desktop sidebar. */
+/* Keep Android's wide "Desktop site" mode usable with a coarse touch pointer. */
 @media (pointer: coarse) {
-  .dsg-sidebar-desktop {
-    display: none !important;
-  }
-  .dsg-sidebar-mobile-header {
-    display: flex !important;
-  }
-  .dsg-sidebar-mobile-overlay {
-    display: flex !important;
-  }
+  .dsg-sidebar-desktop { display: none !important; }
+  .dsg-sidebar-mobile-header { display: flex !important; }
+  .dsg-sidebar-mobile-overlay { display: flex !important; }
 }
+

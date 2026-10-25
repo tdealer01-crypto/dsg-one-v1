@@ -119,6 +119,7 @@ const publicPrinciples = [
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
+      <a className="dsg-skip-link" href="#main-content">ข้ามไปเนื้อหา</a>
       <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
           <Link href="/" className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-white">
@@ -126,7 +127,7 @@ export default function HomePage() {
             DSG ONE
           </Link>
 
-          <nav className="hidden items-center gap-2 md:flex">
+          <nav aria-label="เมนูหลัก" className="hidden items-center gap-2 [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center lg:flex">
             <Link href="/dsg/workroom" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-300 hover:bg-slate-800 hover:text-white">สั่งงาน</Link>
             <Link href="/dsg/workroom?tool=agent-v0" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-slate-800 hover:text-white">Agent v0 · Qwen</Link>
             <Link href="/dsg/workroom?tool=desktop" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-cyan-200">อุปกรณ์ Native</Link>
@@ -143,12 +144,21 @@ export default function HomePage() {
             </Link>
           </nav>
 
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex items-center gap-2 lg:hidden" onKeyDown={event => {
+              if (event.key === 'Escape') {
+                const menu = event.currentTarget.querySelector('details');
+                if (menu?.open) {
+                  menu.open = false;
+                  menu.querySelector('summary')?.focus();
+                }
+              }
+            }}>
             <details className="group relative">
               <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300">
                 เมนู
               </summary>
-              <nav aria-label="Mobile navigation" className="absolute right-0 top-12 z-50 flex w-64 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border border-slate-700 bg-slate-900 p-2 text-sm shadow-2xl">
+              <nav aria-label="Mobile navigation" onClick={event => event.currentTarget.closest('details')?.removeAttribute('open')}
+                className="absolute right-0 top-12 z-50 flex w-64 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border border-slate-700 bg-slate-900 p-2 text-sm shadow-2xl">
                 <Link href="/dsg/workroom" className="rounded-lg px-3 py-3 text-cyan-200 hover:bg-slate-800">สั่งงานผ่านแชท</Link>
                 <Link href="/dsg/workroom?tool=agent-v0" className="rounded-lg px-3 py-3 hover:bg-slate-800">Agent v0 · วางแผนงาน</Link>
                 <Link href="/dsg/workroom?tool=desktop" className="rounded-lg px-3 py-3 hover:bg-slate-800">สั่งงานอุปกรณ์ Native</Link>
@@ -167,14 +177,14 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950/30 to-slate-950 px-5 py-24 text-center sm:px-8 sm:py-32">
+      <section id="main-content" tabIndex={-1} className="relative overflow-hidden border-b border-slate-800 px-5 py-12 text-center sm:px-8 sm:py-20">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(34,211,238,0.12),transparent_42%)]" />
         <div className="relative mx-auto max-w-5xl">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">
             <ShieldCheck className="h-3.5 w-3.5" />
             Public DSG ONE landing
           </div>
-          <h1 className="mt-7 text-4xl font-black leading-tight tracking-tight sm:text-7xl">
+          <h1 className="mt-6 text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
             สั่ง AI ทำงาน
             <span className="mt-2 block text-cyan-300">เห็นผลที่ตรวจสอบได้</span>
           </h1>
@@ -201,13 +211,13 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <p className="mt-6 text-xs text-slate-500">
+          <p className="mt-5 text-sm text-slate-400">
             หน้าแรกเปิดดูได้โดยไม่ต้องเข้าสู่ระบบ งานจริงต้องมีบัญชี สิทธิ์ และ Provider ที่พร้อมใช้งาน
           </p>
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl space-y-20 px-5 py-16 sm:px-8">
+      <div className="mx-auto max-w-6xl space-y-14 px-5 py-12 sm:px-8">
         <section id="system-access" aria-labelledby="system-access-heading" className="scroll-mt-24">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-3xl">
@@ -229,9 +239,9 @@ export default function HomePage() {
                 href={entry.href}
                 target={entry.external ? '_blank' : undefined}
                 rel={entry.external ? 'noopener noreferrer' : undefined}
-                className="group flex h-full min-h-48 flex-col rounded-2xl border border-slate-700/80 bg-slate-900/80 p-5 transition hover:border-cyan-400/60 hover:bg-slate-800/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+                className="group flex h-full min-h-40 flex-col rounded-xl border border-slate-800 bg-slate-900/60 p-5 transition hover:border-slate-500 hover:bg-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
               >
-                <span className="self-start rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-[11px] font-semibold text-cyan-200">{entry.badge}</span>
+                <span className="self-start text-xs font-medium text-slate-400">{entry.badge}</span>
                 <div className="mt-4 flex items-center justify-between gap-3">
                   <h3 className="text-lg font-bold text-white">{entry.title}</h3>
                   <ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0 text-cyan-300 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -247,7 +257,6 @@ export default function HomePage() {
           </p>
         </section>
 
-        <PublicProductionSnapshot />
         <section id="pilot-verification" aria-labelledby="pilot-verification-heading" className="scroll-mt-24 rounded-3xl border border-cyan-400/30 bg-slate-900/90 p-7 sm:p-9">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-3xl">
@@ -274,14 +283,14 @@ export default function HomePage() {
         </section>
         <section id="how-it-works" className="scroll-mt-24">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="font-mono text-xs uppercase tracking-[0.22em] text-cyan-300">เริ่มใช้งาน 3 ขั้นตอน</p>
+            <p className="text-sm font-medium tracking-wide text-cyan-300">เริ่มใช้งาน 3 ขั้นตอน</p>
             <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">หนึ่งงาน ตั้งแต่สั่งจนเห็นผล</h2>
           </div>
           <div className="mt-9 grid gap-4 md:grid-cols-3">
             {steps.map((step) => (
               <article key={step.number} className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-2xl font-black text-slate-600">{step.number}</span>
+                  <span className="font-mono text-2xl font-black text-slate-400">{step.number}</span>
                   <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-2 text-cyan-200">
                     {step.number === '03' ? <CheckCircle2 className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
                   </span>
@@ -314,6 +323,8 @@ export default function HomePage() {
           </div>
         </section>
 
+        <PublicProductionSnapshot />
+
         <section aria-labelledby="public-architecture-heading" className="rounded-3xl border border-cyan-500/20 bg-slate-900/80 p-7 sm:p-9">
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div className="max-w-2xl">
@@ -322,7 +333,7 @@ export default function HomePage() {
               <p className="mt-3 text-sm leading-7 text-slate-300">A no-login, interactive architecture explainer covering Proposal, Proof, Authority, Execution and Evidence, with a dated 11 October 2026 AWS deployment evidence snapshot.</p>
               <p className="mt-2 text-xs leading-6 text-amber-200/80">AWS image activation #38140649005 and signed read-only canary #38140811436 PASS (11 Oct 2026). Real user OAuth → governed GitHub metadata read-only provider → independently checked Ed25519 evidence E2E PASS for that limited scope. Production MCP chain readback on 11 Oct: valid, 140 records. Cinema browser Connect/Execute, Quest/Unity and whole-system E2E remain NOT VERIFIED; Workroom store is UNAVAILABLE. This is a dated evidence checkpoint, not live telemetry.</p>
             </div>
-            <div className="flex shrink-0 flex-wrap gap-3">
+            <div className="flex w-full min-w-0 flex-col gap-3 md:w-64">
               <Link href="/architecture-3d.html" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 hover:bg-cyan-200">Open 3D model <ArrowUpRight className="h-4 w-4" /></Link>
               <Link href="/closure-dashboard.html" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-500/25 bg-amber-950/20 px-5 py-3 text-sm font-bold text-amber-100 hover:border-amber-300/50">Closure checklist <ArrowUpRight className="h-4 w-4" /></Link>
               <a href="https://dsg-3.gitbook.io/dsg-docs/dsg-docs/dsg-one-canonical-7-docs/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-200 hover:border-cyan-400/50">Public status docs <ArrowUpRight className="h-4 w-4" /></a>
@@ -335,7 +346,7 @@ export default function HomePage() {
             <div>
               <p className="font-mono text-xs uppercase tracking-[0.22em] text-cyan-300">Next step</p>
               <h2 className="mt-3 text-2xl font-black">Enter the protected DSG workspace.</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">Sign in once, then choose the governed workspace and open Verify, Build, Workroom, or the available runtime surfaces.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">เข้าสู่ระบบแล้วกลับไปทำงานเดิม เลือกพื้นที่ทำงานและเครื่องมือที่มีสิทธิ์ใช้งานได้ตามปกติ</p>
             </div>
             <Link href="/login?next=/dsg/access" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-indigo-500 px-5 py-3 text-sm font-black text-white hover:bg-indigo-400">
               Open Access
@@ -344,7 +355,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-800 pt-8 text-sm text-slate-500">
+        <section className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-800 pt-8 text-sm text-slate-400">
           <span>DSG ONE · Evidence-first AI governance</span>
           <Link href="/login?next=/dsg/access" className="inline-flex items-center gap-2 font-bold text-indigo-300 hover:text-indigo-200">
             Protected product access
@@ -355,3 +366,4 @@ export default function HomePage() {
     </main>
   );
 }
+

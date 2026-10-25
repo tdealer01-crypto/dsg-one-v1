@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Sparkles,
   LayoutTemplate,
@@ -95,7 +95,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
       <nav aria-label="DSG ONE sections" className="flex-1 overflow-y-auto py-2">
         {navSections.map((section) => (
           <div key={section.label}>
-            <p className="px-4 pb-1 pt-5 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+            <p className="px-4 pb-1 pt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">
               {section.label}
             </p>
             {section.items.map((item) => {
@@ -178,6 +178,13 @@ export default function DsgLayout({ children }: { children: React.ReactNode }) {
   // The routes still exist and are available through its advanced section.
   const chatFirst = pathname === '/dsg/workroom';
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navigationDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = navigationDialog.current;
+    if (!dialog) return;
+    if (mobileOpen && !dialog.open) dialog.showModal();
+    else if (!mobileOpen && dialog.open) dialog.close();
+  }, [mobileOpen]);
 
   return (
     <div className="flex h-dvh min-h-0 overflow-hidden bg-slate-950 text-slate-100">
@@ -187,14 +194,29 @@ export default function DsgLayout({ children }: { children: React.ReactNode }) {
       </div>}
 
       {/* mobile overlay */}
-      {!chatFirst && mobileOpen && (
-        <div className="dsg-sidebar-mobile-overlay fixed inset-0 z-50 flex md:hidden">
-          <Sidebar onClose={() => setMobileOpen(false)} />
-          <div
-            className="flex-1 bg-black/60 backdrop-blur-sm"
-            onClick={() => setMobileOpen(false)}
-          />
-        </div>
+      {!chatFirst && (
+        <dialog ref={navigationDialog} id="dsg-navigation-dialog" aria-label="เมนู DSG ONE" aria-modal="true"
+          onKeyDown={event => {
+            if (event.key !== 'Tab') return;
+            const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+              'a[href],button:not([disabled]),summary,[tabindex="0"]',
+            )).filter(element => element.getClientRects().length > 0);
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault(); last?.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault(); first?.focus();
+            }
+          }}
+          onClose={() => setMobileOpen(false)}
+          className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-transparent p-0 text-slate-100 backdrop:bg-black/60">
+          <div className="dsg-sidebar-mobile-overlay flex h-full w-full">
+            <Sidebar onClose={() => setMobileOpen(false)} />
+            <button type="button" aria-label="ปิดเมนู" className="min-w-11 flex-1 bg-transparent"
+              onClick={() => setMobileOpen(false)} />
+          </div>
+        </dialog>
       )}
 
       {/* main area */}
@@ -202,6 +224,7 @@ export default function DsgLayout({ children }: { children: React.ReactNode }) {
         {!chatFirst && <div className="dsg-sidebar-mobile-header flex h-14 shrink-0 items-center border-b border-slate-800 px-4 md:hidden">
           <button
             onClick={() => setMobileOpen(true)}
+            aria-haspopup="dialog" aria-controls="dsg-navigation-dialog" aria-expanded={mobileOpen}
             className="flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
             aria-label="Open menu"
           >
@@ -216,3 +239,4 @@ export default function DsgLayout({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
