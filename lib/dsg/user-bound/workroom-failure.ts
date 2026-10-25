@@ -11,6 +11,7 @@ const known: Record<string, string> = {
   DSG_BRAIN_BASE_URL_INVALID: 'DSG Agent v0 ยังเรียกโมเดลจริงไม่ได้ · ตรวจ Kaggle Worker ก่อน ไม่เปิด GPU เสียเงิน',
   CINEMA_ACTION_NOT_ALLOWED: 'คำสั่ง Browser ไม่ตรงสัญญา Cinema · ต้องแก้ Route/Payload ไม่ใช่อนุมัติซ้ำ',
   CINEMA_CONNECT_NOT_VERIFIED: 'Cinema ยังไม่ยืนยัน Shared Browser และ Agent ในเซสชันเดียวกัน · ไม่สั่งเปิดเว็บต่อ',
+  CINEMA_VERIFIER_POSTCONDITION_NOT_VERIFIED: 'Verifier ยังไม่ยืนยันหน้าเว็บตรงกับแผนและหลักฐาน · ตรวจหน้าเดิมก่อน ไม่สั่งเปิดเว็บหรืออนุมัติใหม่ซ้ำ',
   ROUTE_NOT_AVAILABLE_OR_AMBIGUOUS: 'Runtime ยังไม่พบ Route ที่ตรงงานแบบชัดเจน · ตรวจการเชื่อม Provider',
   EXACT_PROVIDER_RECEIPT_NOT_VERIFIED: 'Provider ยังไม่มีหลักฐานตรงกับคำสั่งที่อนุมัติ · ไม่สั่งซ้ำจนกว่าจะตรวจผล',
   EVIDENCE_CHAIN_NOT_VERIFIED: 'ตรวจสายหลักฐานไม่ผ่าน · ไม่ยืนยันว่าทำงานสำเร็จ',
@@ -27,3 +28,4 @@ export function describeWorkroomFailure(value: unknown): string {
   // Do not echo unbounded provider strings which may contain private data.
   return 'งานยังไม่ผ่านการตรวจ · เปิดรายละเอียดผล Provider/Evidence แล้วตรวจสาเหตุ ไม่ส่งคำสั่งซ้ำ';
 }
+

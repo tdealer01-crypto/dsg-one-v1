@@ -1,0 +1,27 @@
+{
+  "kind": "unsigned-focused-web-source-verification",
+  "recorded_at": "2026-10-25T23:54:29.407895+07:00",
+  "source_base_sha": "16e3a0ab7e88058a6c40b19eb987248e0cdbbc8e",
+  "runtime_related_pr": 840,
+  "source_files_sha256": {
+    "components/dsg-live-workroom.tsx": "134c0b420fa8766f7fd39baf437ccce2c59773acc17012b4d39de7cee9bae2bf",
+    "lib/dsg/user-bound/cinema-controller-contract.ts": "5a63bfdaede79e3c639b7ef1ce45ff24d1adf3cdcf1a0f06dfc3ddb2de8dbaf3",
+    "lib/dsg/user-bound/workroom-failure.ts": "50e9c7f19117d506267f946aa9637ac9eff95832d3d00deeb2c5262427db7a06",
+    "tests/dsg/cinema-controller-contract.test.ts": "edc0d49fe0fab8ecea2e137fe353406659009236ab17695a374935574f93ecf8"
+  },
+  "vitest": {
+    "passed": 18,
+    "files": 3,
+    "exit_code": 0
+  },
+  "strict_typescript": {
+    "exit_code": 0,
+    "scope": "changed Workroom component, helper, tests and actual imported dependencies only",
+    "command": "npx --no-install tsc -p tsconfig.focus.json"
+  },
+  "scope": "connector-fetched source subset with temporary validation dependencies; package scripts and dependencies in the repository remain unchanged",
+  "required_full_repo_checks": "PENDING: lint, dsg:typecheck, build:termux and required smoke scripts",
+  "live_browser_compatibility": "Current read-only Cinema result shape observed through authenticated route; no navigation or UI candidate deployed",
+  "production_e2e": "NOT_VERIFIED",
+  "one_consent_autonomy": "Runtime PR840 source-only; existing per-request signed approvals remain in the website"
+}
