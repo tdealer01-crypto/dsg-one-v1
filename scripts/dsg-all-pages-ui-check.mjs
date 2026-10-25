@@ -77,8 +77,8 @@ try {
 
   for (const width of [320, 390, 1440]) {
     const context = await contextFor(width, width < 600);
-    const page = await context.newPage();
     for (const route of routes) {
+      const page = await context.newPage();
       const pageErrors = [];
       const onError = error => pageErrors.push(error.message.slice(0, 220));
       page.on('pageerror', onError);
@@ -86,6 +86,8 @@ try {
         const response = await page.goto(base.origin + route, { waitUntil: 'networkidle' });
         check('Page responds', !!response && response.status() < 400, { route, width, status: response?.status() });
         if (route === '/dsg/workroom') await page.getByRole('region', { name: 'แชท DSG ONE', exact: true }).waitFor();
+        // Let React finish its queued hydration before axe inserts test nodes.
+        await page.evaluate(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); await new Promise(resolve => requestIdleCallback(resolve, { timeout: 2000 })); });
         const geometry = await page.evaluate(() => {
           const content = document.querySelector('.dsg-app-content');
           return { rootWidth: document.documentElement.clientWidth, rootScroll: document.documentElement.scrollWidth,
@@ -96,15 +98,17 @@ try {
         check('Page reflows without horizontal page scrolling', geometry.rootScroll <= geometry.rootWidth + 1 && (!geometry.contentWidth || geometry.contentScroll <= geometry.contentWidth + 1), { route, width, geometry });
         check('One visible main landmark', geometry.mainCount === 1, { route, width, count: geometry.mainCount });
         check('One visible primary heading', geometry.h1Count === 1, { route, width, count: geometry.h1Count });
-        check('No unhandled client error', pageErrors.length === 0, { route, width, errors: pageErrors });
         if (width !== 320) {
           await page.addScriptTag({ content: axeSource });
           const audit = await page.evaluate(async () => window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] } }));
           check('Automated accessibility rules', audit.violations.length === 0, { route, width, violations: audit.violations.map(violation => ({ id: violation.id, impact: violation.impact, nodes: violation.nodes.map(node => ({ target: node.target, summary: node.failureSummary?.slice(0, 260) })) })) });
         }
         if (width === 390 && ['/dsg/history', '/dsg/workroom', '/dsg/app-builder', '/enterprise/security'].includes(route)) await page.screenshot({ path: path.join(output, route.slice(1).replaceAll('/', '-') + '-390.png') });
+        await page.evaluate(() => new Promise(resolve => requestIdleCallback(resolve, { timeout: 2000 })));
+        check('No unhandled client error', pageErrors.length === 0, { route, width, errors: pageErrors });
       } catch (error) { check('Page can be inspected', false, { route, width, error: String(error).slice(0, 300) }); }
       page.off('pageerror', onError);
+      await page.close();
     }
     await context.close();
   }
