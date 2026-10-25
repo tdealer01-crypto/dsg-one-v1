@@ -1,6 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { DsgCopy } from '@/components/app-language-copy-bridge';
+
+
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { DsgOperatorChat } from '@/components/dsg-operator-chat';
 import { DsgLiveWorkroom } from '@/components/dsg-live-workroom';
 import { AgentCommandCenter } from '@/components/agent-command-center';
@@ -19,14 +24,22 @@ type SessionPayload = {
   error?: string;
 };
 
-export default function DsgWorkroomPage() {
+function DsgWorkroomContent() {
+  const requestedTool = useSearchParams().get('tool');
   const [session, setSession] = useState<SessionPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyWorkspace, setBusyWorkspace] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [advancedOpen, setAdvancedOpen] = useState(() =>
-    typeof window !== 'undefined' && isToolDeepLink(new URLSearchParams(window.location.search).get('tool'))
-  );
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // Read the requested destination after hydration, and on client navigation.
+  // A server render cannot read window.location; using it as the initial state
+  // left the Auth0 return destination collapsed on the real user journey.
+  useEffect(() => {
+    if (!isToolDeepLink(requestedTool)) return;
+    const timer = window.setTimeout(() => setAdvancedOpen(true), 0);
+    return () => window.clearTimeout(timer);
+  }, [requestedTool]);
 
   const load = useCallback(async () => {
     try {
@@ -118,7 +131,7 @@ export default function DsgWorkroomPage() {
   }, [selected, advancedOpen]);
 
   return (
-    <main className="min-h-full bg-slate-950 px-2 py-3 text-slate-100 sm:px-6 sm:py-6">
+    <main className="dsg-page min-h-full bg-slate-950 px-2 py-3 text-slate-100 sm:px-6 sm:py-6">
       <div className="mx-auto max-w-4xl">
         {selected && (
           <section aria-label="เริ่มใช้งาน DSG ONE" className="mb-3 rounded-2xl border border-indigo-500/30 bg-slate-900 p-3 sm:p-4">
@@ -129,7 +142,7 @@ export default function DsgWorkroomPage() {
                 className="min-h-11 rounded-xl border border-indigo-500 px-3 py-3 font-semibold text-indigo-100">วางแผนด้วย DSG Agent v0 (Qwen)</button>
               <a href="#dsg-jobs" onClick={() => document.getElementById('dsg-jobs')?.setAttribute('open', '')}
                 className="min-h-11 rounded-xl border border-slate-700 px-3 py-3 text-slate-200">2. ติดตามงาน</a>
-              <a href="/dsg/approvals" className="min-h-11 rounded-xl border border-slate-700 px-3 py-3 text-slate-200">3. อนุมัติเมื่อจำเป็น</a>
+              <Link href="/dsg/approvals" className="min-h-11 rounded-xl border border-slate-700 px-3 py-3 text-slate-200">3. อนุมัติเมื่อจำเป็น</Link>
               <a href="/control/" className="min-h-11 rounded-xl border border-slate-700 px-3 py-3 text-slate-200">เครื่องที่เชื่อมต่อ</a>
             </nav>
           </section>
@@ -138,7 +151,7 @@ export default function DsgWorkroomPage() {
           <DsgOperatorChat key={selected.workspace_id} />
         ) : (
           <section className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
-            <h1 className="text-xl font-bold">DSG ONE</h1>
+            <h1 className="dsg-page-title text-xl font-bold">DSG ONE</h1>
             <p role="status" className="mt-3 text-sm text-slate-300">
               {loading || busyWorkspace ? 'กำลังเปิดพื้นที่สนทนา…' : message || 'เลือกพื้นที่สำหรับเริ่มสนทนา'}
             </p>
@@ -164,7 +177,7 @@ export default function DsgWorkroomPage() {
         {selected && (
           <details id="dsg-advanced-tools" open={advancedOpen} className="mt-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
             onToggle={event => setAdvancedOpen(event.currentTarget.open)}>
-            <summary className="cursor-pointer text-sm text-slate-400">Agent v0 · ควบคุมเว็บและอุปกรณ์ · เครื่องมือเพิ่มเติม</summary>
+            <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-slate-300">Agent v0 · ควบคุมเว็บและอุปกรณ์ · เครื่องมือเพิ่มเติม</summary>
             {advancedOpen && (
               <div className="mt-4 space-y-5">
                 <p className="text-sm text-slate-400">
@@ -174,11 +187,11 @@ export default function DsgWorkroomPage() {
                 <AgentCommandCenter />
                 <PublicProductionSnapshot compact />
                 <nav aria-label="เครื่องมือขั้นสูง" className="flex flex-wrap gap-3 text-sm text-indigo-200">
-                  <a href="/dsg/workroom?tool=agent-v0#live-controls">Agent v0 · Qwen Planner</a>
-                  <a href="/dsg/app-builder">สร้างแอป</a>
-                  <a href="/dsg/approvals">คำขออนุมัติ</a>
+                  <Link href="/dsg/workroom?tool=agent-v0#live-controls">Agent v0 · Qwen Planner</Link>
+                  <Link href="/dsg/app-builder"><DsgCopy value="สร้างแอป" /></Link>
+                  <Link href="/dsg/approvals">คำขออนุมัติ</Link>
                   <a href="/control/">เครื่องที่เชื่อมต่อ</a>
-                  <a href="/dsg/workroom?tool=browser#live-controls">ควบคุมเว็บ</a>
+                  <Link href="/dsg/workroom?tool=browser#live-controls">ควบคุมเว็บ</Link>
                   <a href="https://aws.dsg.pics/app" target="_blank" rel="noopener noreferrer">ตรวจหลักฐาน (ขั้นสูง) ↗</a>
                 </nav>
               </div>
@@ -188,4 +201,10 @@ export default function DsgWorkroomPage() {
       </div>
     </main>
   );
+}
+
+export default function DsgWorkroomPage() {
+  return <Suspense fallback={<main className="dsg-page"><p role="status">กำลังเปิดพื้นที่ทำงาน…</p></main>}>
+    <DsgWorkroomContent />
+  </Suspense>;
 }

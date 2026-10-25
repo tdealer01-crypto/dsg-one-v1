@@ -469,9 +469,9 @@ export default function ApprovalClient() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
+    <main className="dsg-page min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
       <section className="mx-auto max-w-3xl space-y-5 rounded-2xl border border-slate-700 bg-slate-900 p-5">
-        <h1 className="text-2xl font-bold">DSG ONE · เจ้าของยืนยันงาน</h1>
+        <h1 className="dsg-page-title text-2xl font-bold">DSG ONE · เจ้าของยืนยันงาน</h1>
         <p className="text-sm text-slate-300">ตรวจคำสั่งที่ร้องขอ แล้วให้เจ้าของยืนยันผ่าน Auth0 เพียงครั้งในขั้นตอนนี้ ระบบจะตรวจ MFA เมื่อจำเป็น โดยไม่ต้องจัดการ Token หรือ Approval ID เอง</p>
         <p role="status" aria-live="polite" className="rounded-lg border border-slate-700 p-3 text-sm">{status}</p>
         {authFailure && (

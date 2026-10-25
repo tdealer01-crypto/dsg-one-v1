@@ -19,10 +19,10 @@ const controls = [
 
 export default function EnterpriseSecurityPage() {
   return (
-    <main className="min-h-screen bg-[#090b0f] px-5 py-8 text-slate-100 md:px-10">
+    <main className="dsg-page min-h-screen bg-[#090b0f] px-5 py-8 text-slate-100 md:px-10">
       <section className="mx-auto max-w-5xl rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
         <p className="font-mono text-xs uppercase tracking-[0.24em] text-cyan-200">Enterprise Security</p>
-        <h1 className="mt-3 font-serif text-4xl font-black tracking-tight md:text-6xl">Security Overview</h1>
+        <h1 className="dsg-page-title mt-3 font-serif text-4xl font-black tracking-tight md:text-6xl">Security Overview</h1>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300">
           Status: review draft. This page states the security control targets for marketplace review. It does not claim SOC 2, ISO, penetration-test, or compliance approval without external evidence.
         </p>

@@ -177,7 +177,7 @@ export function AgentsView() {
         <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-200"><ExternalLink className="h-4 w-4 text-indigo-400" /> Local Browser Proof</div>
         <p className="mb-4 text-sm text-slate-500">กดเปิด route ใน browser เครื่องผู้ใช้เพื่อเก็บหลักฐานด้วยตา/สกรีนช็อตก่อน. นี่ไม่ใช่ remote browser automation.</p>
         <div className="flex flex-col gap-2 md:flex-row">
-          <input value={browserUrl} onChange={(event) => setBrowserUrl(event.target.value)} placeholder="/product-ready หรือ https://..." className="min-w-0 flex-1 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500/40" />
+          <input aria-label="ที่อยู่เว็บที่ต้องการเปิด" value={browserUrl} onChange={(event) => setBrowserUrl(event.target.value)} placeholder="/product-ready หรือ https://..." className="min-w-0 flex-1 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500/40" />
           <button onClick={openLocalBrowser} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500"><Play className="h-4 w-4" /> เปิดดู</button>
           <button onClick={() => void copyBrowserProofTask()} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800"><Clipboard className="h-4 w-4" /> {copied === 'browser-task' ? 'คัดลอกแล้ว' : 'Copy task'}</button>
         </div>
@@ -185,7 +185,7 @@ export function AgentsView() {
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหา service เช่น browser, PR, runtime, Vercel..." className="w-full rounded-lg border border-slate-800 bg-slate-900 pl-10 pr-4 py-2 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-indigo-500/40" />
+        <input aria-label="ค้นหาบริการ Agent" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหา service เช่น browser, PR, runtime, Vercel..." className="w-full rounded-lg border border-slate-800 bg-slate-900 pl-10 pr-4 py-2 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-indigo-500/40" />
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">

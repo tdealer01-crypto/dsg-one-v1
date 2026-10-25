@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, Clock, DollarSign, ShoppingBag, Loader2, BarChart2 } from 'lucide-react';
 import {
@@ -91,29 +93,33 @@ export default function MyPayoutsPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
+      <main className="dsg-page flex min-h-screen items-center justify-center bg-slate-950">
+        <div><h1 className="dsg-page-title">รายได้จากเทมเพลต</h1><p role="status" className="mt-3 flex items-center gap-2 text-sm text-slate-300"><Loader2 aria-hidden="true" className="h-5 w-5 animate-spin" />กำลังอ่านข้อมูล…</p></div>
       </main>
     );
   }
 
   if (error) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
-        <p>{error === 'DSG_AUTH_REQUIRED' ? 'กรุณาเข้าสู่ระบบ' : `เกิดข้อผิดพลาด: ${error}`}</p>
+      <main className="dsg-page flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
+        <section className="dsg-state-panel"><h1 className="dsg-page-title">รายได้จากเทมเพลต</h1>
+          <p role="alert">{error === 'DSG_AUTH_REQUIRED' ? 'กรุณาเข้าสู่ระบบเพื่อดูรายการของบัญชีนี้' : 'ยังอ่านข้อมูลไม่ได้ กรุณาลองโหลดใหม่'}</p>
+          <div className="dsg-action-row"><button type="button" onClick={() => window.location.reload()} className="dsg-button-secondary">ลองโหลดใหม่</button><Link href="/dsg/workroom" className="dsg-button-primary">เปิดพื้นที่ทำงาน</Link></div>
+          <details className="mt-4 text-sm"><summary>รหัสปัญหา</summary><p className="mt-2 break-all">{error}</p></details>
+        </section>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+    <main className="dsg-page min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
       <div className="mx-auto max-w-5xl space-y-8">
         {/* Header */}
         <section className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-6 md:p-8">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">
             <TrendingUp className="h-3.5 w-3.5" /> Creator Earnings
           </div>
-          <h1 className="text-3xl font-black tracking-tight md:text-4xl">รายได้ของฉัน</h1>
+          <h1 className="dsg-page-title text-3xl font-black tracking-tight md:text-4xl">รายได้ของฉัน</h1>
           <p className="mt-2 text-sm text-slate-300">ภาพรวมยอดขายและรายได้จาก templates ที่วางขาย</p>
         </section>
 
@@ -151,7 +157,7 @@ export default function MyPayoutsPage() {
               },
             ].map(({ icon: Icon, label, value, color, border }) => (
               <div key={label} className={`rounded-2xl border ${border} bg-slate-900 p-5`}>
-                <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400">
                   <Icon className={`h-4 w-4 ${color}`} />
                   {label}
                 </div>
@@ -187,12 +193,12 @@ export default function MyPayoutsPage() {
             <h2 className="text-sm font-bold text-slate-200">ประวัติการขายล่าสุด</h2>
           </div>
           {sales.length === 0 ? (
-            <div className="py-16 text-center text-sm text-slate-500">ยังไม่มียอดขาย</div>
+            <div className="py-16 text-center text-sm text-slate-400">ยังไม่มียอดขาย</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-800 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-800 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                     <th className="px-5 py-3">วันที่</th>
                     <th className="px-5 py-3">ราคา</th>
                     <th className="px-5 py-3">รายได้ (80%)</th>

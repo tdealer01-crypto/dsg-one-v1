@@ -47,7 +47,7 @@ describe('DSG ONE natural-language chat-first workroom', () => {
     expect(workroom).toContain('<DsgOperatorChat key={selected.workspace_id} />');
     expect(workroom).toContain('advancedOpen && (');
     expect(workroom).toContain('<DsgLiveWorkroom key={selected.workspace_id} />');
-    expect(layout).toContain("const chatFirst = pathname === '/dsg/workroom'");
-    expect(layout).toContain('{!chatFirst && <div className="dsg-sidebar-desktop');
+    expect(layout).toContain('return children;');
+    expect(readFileSync(join(root, 'app/layout.tsx'), 'utf8')).toContain('<DsgApplicationShell>{children}</DsgApplicationShell>');
   });
 });

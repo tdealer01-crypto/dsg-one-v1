@@ -256,16 +256,16 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
   const nextAction = !goal.trim()
     ? 'กรอกเป้าหมายของแอปก่อน — ยังไม่มี PRD หรือ Job'
     : !createdJobUrl
-      ? 'กด Create governed job เพื่อบันทึกงานนี้ใน Workspace จริง'
+      ? 'กดบันทึกงานจากเป้าหมายนี้ เพื่อเก็บงานในพื้นที่ทำงาน'
       : !prd
-        ? 'กด Generate PRD จากเป้าหมายนี้ และตรวจสถานะ Job ที่บันทึก'
+        ? 'กดสร้างรายละเอียดแอป แล้วตรวจเนื้อหาจากเป้าหมายที่บันทึก'
         : !plan
-          ? 'กด Plan + Observer เพื่อสร้างแผนสำหรับ PRD ปัจจุบัน'
+          ? 'กดสร้างและตรวจแผนจากรายละเอียดแอปปัจจุบัน'
           : !handoff
-            ? 'ตรวจ Approval Gate และ Handoff ก่อนใช้ Runtime'
+            ? 'กดตรวจเงื่อนไขการส่งต่องาน ก่อนใช้ Runtime'
             : runtimeGate
               ? 'ตรวจผล Runtime Gate และ Evidence ใน Job Timeline; ห้ามอ้างว่า Deploy แล้วหากยังไม่มี Proof'
-              : 'ตรวจ Handoff แล้วกด Start Runtime Gate; ยังไม่ใช่การ Execute';
+              : 'กดตรวจความพร้อม Runtime แล้วเปิดผลของงาน; ขั้นนี้ยังไม่ได้สั่ง Execute';
 
   function applyStarter(app: (typeof starterApps)[number]) {
     setGoal(app.goal);
@@ -348,7 +348,7 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
         body: JSON.stringify({
           goal: trimmedGoal,
           successCriteria: criteriaList,
-          targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'supabase-postgres', auth: requiresAuth ? 'custom' : 'none', deploy: 'vercel' },
+          targetStack: { frontend: 'nextjs', backend: 'next-api', database: 'supabase-postgres', auth: requiresAuth ? 'custom' : 'none', deploy: 'none' },
           constraints,
           userNotes: 'Self-service builder job. App-builder UX reference: command, live preview, monitor, and evidence panel in one workspace.',
         }),
@@ -566,9 +566,20 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
             ))}
           </div>
 
-          <textarea value={goal} onChange={(event) => updateGoal(event.target.value)} className="mt-5 min-h-32 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-100 outline-none focus:border-indigo-500" placeholder="Describe the app you want DSG to build…" />
-          <textarea value={criteria} onChange={(event) => updateCriteria(event.target.value)} className="mt-3 min-h-24 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-100 outline-none focus:border-indigo-500" placeholder="Success criteria, one per line…" />
+          <label htmlFor="builder-goal" className="mt-5 block text-sm font-medium text-slate-200">เป้าหมายของแอป</label>
+          <textarea id="builder-goal" value={goal} onChange={(event) => updateGoal(event.target.value)} className="mt-2 min-h-32 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-100 outline-none focus:border-indigo-500" placeholder="Describe the app you want DSG to build…" />
+          <label htmlFor="builder-criteria" className="mt-4 block text-sm font-medium text-slate-200">ผลลัพธ์ที่ใช้ตรวจงาน</label>
+          <textarea id="builder-criteria" value={criteria} onChange={(event) => updateCriteria(event.target.value)} className="mt-2 min-h-24 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-100 outline-none focus:border-indigo-500" placeholder="Success criteria, one per line…" />
 
+          <div className="dsg-action-row">
+            {runtimeGate && createdJobUrl ? <a href={createdJobUrl} className="dsg-button-primary">ดูผลและหลักฐานของงาน</a> :
+              <button type="button" className="dsg-button-primary" disabled={!goal.trim() || loadingJob || loadingPrd || loadingPlan || loadingHandoff || loadingRuntimeGate || (!!plan && !handoff && !observer)}
+                onClick={() => { if (!createdJobUrl) void createGovernedJob(); else if (!prd) void generatePrd(); else if (!plan) void generatePlan(); else if (!handoff) void createHandoff(); else void startRuntimeGate(); }}>
+                {loadingJob || loadingPrd || loadingPlan || loadingHandoff || loadingRuntimeGate ? 'กำลังดำเนินการ…' : !createdJobUrl ? 'บันทึกงานจากเป้าหมายนี้' : !prd ? 'สร้างรายละเอียดแอป' : !plan ? 'สร้างและตรวจแผน' : !handoff ? 'ตรวจเงื่อนไขการส่งต่องาน' : 'ตรวจความพร้อม Runtime'}
+              </button>}
+          </div>
+          <details className="mt-4 rounded-xl border border-slate-700 p-3">
+            <summary className="cursor-pointer text-sm font-medium text-slate-300">ควบคุมแต่ละขั้น · Brain Loop และเครื่องมือเพิ่มเติม</summary>
           <div className="mt-4 flex flex-col gap-3 md:flex-row md:flex-wrap">
             <button onClick={() => void runAgentLoop('planning')} disabled={loadingAgentLoop} className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60">{loadingAgentLoop ? 'Thinking…' : 'Run Brain Loop'}</button>
             <button onClick={() => void createGovernedJob()} disabled={loadingJob} className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60">{loadingJob ? 'Creating job…' : 'Create governed job'}</button>
@@ -579,7 +590,9 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
             <button onClick={() => setPreviewMode('tools')} className="rounded-2xl border border-amber-400/40 bg-amber-500/10 px-5 py-3 text-sm font-black text-amber-100 hover:bg-amber-500/20">Governed Tools</button>
           </div>
 
-          <div className={`mt-4 rounded-2xl border p-3 text-xs font-mono ${statusTone(status)}`}>
+          </details>
+
+          <div role="status" aria-atomic="true" className={`mt-4 rounded-2xl border p-3 text-xs font-mono ${statusTone(status)}`}>
             <p>{status}</p>
             {createdJobUrl ? <a href={createdJobUrl} className="mt-2 inline-flex rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 font-bold text-emerald-100 hover:bg-emerald-500/20">Open job timeline: {createdJobUrl}</a> : null}
           </div>
@@ -690,20 +703,20 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
                     <p className="mt-2 text-xs leading-5 opacity-85">Risk: {agentLoop.risk?.state || 'unknown'} · productionReadyClaim=false</p>
                   </div>
                   <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Context pack</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Context pack</p>
                     <p className="mt-2 break-all text-xs text-slate-300">{agentLoop.contextPack?.contextHash || 'No context pack hash'}</p>
                     <p className="mt-2 text-xs text-slate-400">Gate: {agentLoop.contextPack?.gateStatus || 'unavailable'}</p>
                   </div>
                   <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Next actions</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Next actions</p>
                     <div className="mt-3 space-y-2">
                       {(agentLoop.nextActions || []).map((action) => <p key={action} className="rounded-xl bg-slate-900 p-2 text-xs text-slate-300">{action}</p>)}
                     </div>
                   </div>
                   <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Memory used</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Memory used</p>
                     <div className="mt-3 space-y-2">
-                      {(agentLoop.memories || []).length ? (agentLoop.memories || []).map((memory) => <p key={memory.id} className="rounded-xl bg-slate-900 p-2 text-xs leading-5 text-slate-300">[{memory.kind}/{memory.trust}] {memory.summary}</p>) : <p className="text-xs text-slate-500">No allowed memory returned yet.</p>}
+                      {(agentLoop.memories || []).length ? (agentLoop.memories || []).map((memory) => <p key={memory.id} className="rounded-xl bg-slate-900 p-2 text-xs leading-5 text-slate-300">[{memory.kind}/{memory.trust}] {memory.summary}</p>) : <p className="text-xs text-slate-400">No allowed memory returned yet.</p>}
                     </div>
                   </div>
                 </>
@@ -717,7 +730,7 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
         </section>
 
         <section className="rounded-3xl border border-slate-800 bg-slate-900 p-5">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">User next action · current goal</p>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-400">User next action · current goal</p>
           <p role="status" className="mt-4 rounded-2xl border border-cyan-400/20 bg-slate-950 p-4 text-sm leading-6 text-cyan-100">{nextAction}</p>
           <p className="mt-3 text-xs text-slate-400">สถานะ: {status} · ไม่มีการอ้าง Runtime/Deploy สำเร็จหากยังไม่มีหลักฐานจริง</p>
           {createdJobUrl ? <a href={createdJobUrl} className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-indigo-600 px-4 text-sm text-white">เปิด Job Timeline ที่บันทึกจริง</a> : null}

@@ -27,11 +27,31 @@
     @media (max-width:680px){.wrap{width:min(100% - 34px,600px)}.topbar{height:66px}.nav{gap:11px}.nav a:not(.external){display:none}.nav .external{font-size:10px;padding:9px 11px}.hero{padding-top:57px;padding-bottom:27px;min-height:auto}h1{font-size:clamp(48px,12vw,64px)}.lead{font-size:15px}.visual{height:410px;margin:0 -11px}.visual:before{inset:15px 0 12px}.vtitle{top:31px;left:22px}.vtitle strong{font-size:13px}.vcorner{top:36px;right:21px}.canvas-wrap{inset:9px 0 21px}.visual-controls{right:18px;bottom:38px}.vhelp{left:20px;bottom:43px}.visual .coordinates{bottom:23px;left:20px}.visual .footmark{display:none}.explorer{padding:22px 0 79px}.section-head{display:block}.section-head p{margin-top:13px}.domain-list{display:flex;overflow-x:auto;padding-bottom:7px;scroll-snap-type:x proximity}.domain-btn{min-width:115px;scroll-snap-align:start;min-height:77px}.detail-box{padding:24px;min-height:285px}.detail-box h3{font-size:24px}.flow-grid{grid-template-columns:1fr}.flow-card{min-height:132px;padding:23px}.flow-num{margin-bottom:15px}.how{padding-bottom:70px}.rules{padding-bottom:80px}.rules-grid{grid-template-columns:1fr}.rule{min-height:unset;padding:23px}.proof{padding-bottom:70px}.proof-panel{grid-template-columns:1fr;padding:26px 21px}.proof .stamp{border-left:none;border-top:1px solid #30535e;padding:18px 0 0}.next{padding-bottom:66px}.foot{align-items:flex-start;flex-direction:column}.foot .links{flex-wrap:wrap}.grain{display:none}}
     @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
   </style>
+<style data-dsg-reference-ui>
+/* Shared ergonomics for the existing standalone DSG reference tools. */
+html { scroll-padding-block-start: 5rem; -webkit-text-size-adjust: 100%; }
+body { font-family: system-ui, "Noto Sans Thai", sans-serif; line-height: 1.6; }
+main { min-width: 0; overflow-wrap: anywhere; }
+main :where(section, article, header, aside, div) { min-width: 0; }
+button, select, input:not([type="checkbox"]):not([type="radio"]), summary { min-height: 44px; }
+button, input, textarea, select { max-width: 100%; font: inherit; }
+button, a, summary { touch-action: manipulation; }
+button { min-width: 44px; }
+pre { max-width: 100%; overflow: auto; }
+nav a { display: inline-flex; min-height: 44px; align-items: center; }
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible { outline: 2px solid #67e8f9; outline-offset: 3px; }
+.dsg-reference-nav { display: flex; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid #334155; padding: .5rem 1rem; background: #020617; color: #e2e8f0; font-size: .875rem; }
+.dsg-reference-nav a { color: inherit; text-decoration: none; }
+.dsg-skip-link { position: fixed; z-index: 100; top: .5rem; left: .5rem; transform: translateY(-200%); border-radius: .5rem; padding: .75rem 1rem; background: #f8fafc; color: #0f172a; }
+.dsg-skip-link:focus { transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+</style>
 </head>
 <body>
+<a class="dsg-skip-link" href="#main-content">ข้ามไปเนื้อหาหลัก</a>
 <div class="grain" aria-hidden="true"></div>
 <header class="topbar wrap" id="top"><a class="logo" href="https://dsg.pics/" aria-label="DSG ONE home"><span class="logo-mark">D</span><span>DSG <em>ONE</em></span></a><nav class="nav" aria-label="Main navigation"><a href="#architecture-section">Architecture</a><a href="#process">Workflow</a><a href="#decisions">Authority</a><a href="#evidence">Evidence</a><a class="external" href="https://dsg.pics/" target="_blank" rel="noopener noreferrer">Main website ↗</a></nav></header>
-<main>
+<main id="main-content">
 <section class="hero wrap" aria-labelledby="hero-title"><div class="copy"><div class="eyebrow">THE GOVERNED AI CONTROL PLANE</div><h1 id="hero-title">Intelligence moves.<br><span>Authority stays.</span></h1><p class="lead">A decision architecture that separates what AI proposes from what systems may actually execute. Explore the five trust domains behind DSG ONE.</p><div class="hero-actions"><a class="btn btn-primary" href="#architecture-section">Explore the architecture <span aria-hidden="true">↗</span></a><a class="btn btn-outline" href="https://dsg-3.gitbook.io/dsg-docs/control-plane/" target="_blank" rel="noopener noreferrer">Read the engineering brief ↗</a></div><div class="hero-micro"><span class="dot" aria-hidden="true"></span>Architectural model · Interactive 3D · No login required</div></div>
 <div class="visual" aria-label="Interactive 3D diagram of five DSG trust domains"><div class="vtitle"><span class="kicker">SYSTEM / TOPOLOGY_01</span><strong>Five trust domains. One authority.</strong></div><div class="vcorner">DSG // N2N</div><div class="canvas-wrap"><canvas id="architecture" aria-label="Rotate or tap the interactive 3D architecture. A text-based selection is available below." role="img"></canvas></div><div class="vhelp">DRAG TO ORBIT · TAP TO INSPECT</div><div class="visual-controls"><button id="resetView" class="icon-btn" type="button" aria-label="Reset 3D view" title="Reset view">↺</button><button id="toggleMotion" class="icon-btn" type="button" aria-label="Pause diagram animation" aria-pressed="false" title="Pause animation">Ⅱ</button></div><div class="coordinates">CAM / ORBIT_PERSPECTIVE</div><div class="footmark">FIG 01 / DSG_ONE</div></div></section>
 <div class="wrap"><div class="divider"></div></div>

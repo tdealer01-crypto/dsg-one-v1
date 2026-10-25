@@ -92,14 +92,14 @@ export default function TemplatesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+    <main className="dsg-page min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
       <div className="mx-auto max-w-7xl space-y-8">
         {/* Header */}
         <section className="rounded-3xl border border-indigo-500/20 bg-indigo-500/10 p-6 shadow-2xl shadow-indigo-950/30 md:p-8">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-400/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-indigo-200">
             <Zap className="h-3.5 w-3.5" /> App Templates
           </div>
-          <h1 className="text-3xl font-black tracking-tight md:text-5xl">App Templates</h1>
+          <h1 className="dsg-page-title text-3xl font-black tracking-tight md:text-5xl">App Templates</h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
             Start building faster with production-ready templates. Pick one, customise it, and ship.
           </p>
@@ -109,12 +109,12 @@ export default function TemplatesPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
+            <input aria-label="Search templates"
               type="text"
               placeholder="Search templates…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-2xl border border-slate-800 bg-slate-900 py-2.5 pl-10 pr-4 text-sm text-slate-100 outline-none focus:border-indigo-500 placeholder:text-slate-500"
+              className="w-full rounded-2xl border border-slate-800 bg-slate-900 py-2.5 pl-10 pr-4 text-sm text-slate-100 outline-none focus:border-indigo-500 placeholder:text-slate-400"
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -143,7 +143,7 @@ export default function TemplatesPage() {
 
         {/* Results count */}
         {!loading && (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-400">
             {filtered.length} template{filtered.length !== 1 ? 's' : ''}
             {activeCategory !== 'All' ? ` in ${activeCategory}` : ''}
           </p>
@@ -154,7 +154,7 @@ export default function TemplatesPage() {
           <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-800 bg-slate-900 py-24 text-center">
             <Search className="mb-4 h-10 w-10 text-slate-600" />
             <p className="text-lg font-bold text-slate-300">No templates found</p>
-            <p className="mt-1 text-sm text-slate-500">Try a different search term or category.</p>
+            <p className="mt-1 text-sm text-slate-400">Try a different search term or category.</p>
             <button
               onClick={() => { setSearch(''); setActiveCategory('All'); }}
               className="mt-6 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-500"
@@ -211,7 +211,7 @@ export default function TemplatesPage() {
                       <span className={`text-sm font-bold ${isFree ? 'text-emerald-400' : 'text-amber-300'}`}>
                         {formatPrice(template.price_satang)}
                       </span>
-                      <span className="flex items-center gap-1 text-xs text-slate-500">
+                      <span className="flex items-center gap-1 text-xs text-slate-400">
                         <Star className="h-3.5 w-3.5 text-amber-400" />
                         {formatStars(template.stars)}
                       </span>

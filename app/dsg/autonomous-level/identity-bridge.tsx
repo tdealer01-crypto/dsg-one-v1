@@ -222,8 +222,8 @@ export default function DsgIdentityBridge() {
       <div role="status" aria-live="polite" className="mt-4 rounded-xl border border-slate-700 bg-slate-950 p-4">
         <p className="font-mono text-xs text-indigo-200">{status}</p>
         <p className="mt-2 text-sm text-slate-300">{message}</p>
-        <p className="mt-3 break-all font-mono text-xs text-slate-500">DSG actor: {actorId || 'NOT_VERIFIED'}</p>
-        <p className="mt-1 break-all font-mono text-xs text-slate-500">Auth0 subject: {auth0Sub || 'NOT_LINKED'}</p>
+        <p className="mt-3 break-all font-mono text-xs text-slate-400">DSG actor: {actorId || 'NOT_VERIFIED'}</p>
+        <p className="mt-1 break-all font-mono text-xs text-slate-400">Auth0 subject: {auth0Sub || 'NOT_LINKED'}</p>
       </div>
       <button onClick={() => void connect()} disabled={busy || !authReady}
         className="mt-4 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-700">

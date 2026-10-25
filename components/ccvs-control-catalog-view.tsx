@@ -121,7 +121,7 @@ function ControlCard({
           >
             {fam.label}
           </span>
-          <span className="rounded border border-slate-800 bg-slate-950/60 px-2 py-0.5 font-mono text-xs text-slate-500">
+          <span className="rounded border border-slate-800 bg-slate-950/60 px-2 py-0.5 font-mono text-xs text-slate-400">
             {control.evidence_type}
           </span>
         </div>
@@ -140,7 +140,7 @@ function ControlCard({
         <h3 className="font-semibold text-slate-100">{control.name}</h3>
         <p className="mt-1.5 text-sm leading-6 text-slate-400">{control.description}</p>
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500">
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-400">
           <span className="flex items-center gap-1.5">
             <Users className="h-3.5 w-3.5" />
             {control.owner}
@@ -166,7 +166,7 @@ function ControlCard({
       {/* expand toggle */}
       <button
         onClick={onToggle}
-        className="flex items-center justify-between rounded-b-xl border-t border-slate-800 px-5 py-3 text-xs font-medium text-slate-500 transition hover:bg-slate-800/40 hover:text-slate-300"
+        className="flex items-center justify-between rounded-b-xl border-t border-slate-800 px-5 py-3 text-xs font-medium text-slate-400 transition hover:bg-slate-800/40 hover:text-slate-300"
       >
         <span>Acceptance criteria</span>
         {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -227,12 +227,12 @@ export function CcvsControlCatalogView() {
     <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
       {/* header */}
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-100">
+        <h1 className="dsg-page-title flex items-center gap-2 text-2xl font-bold text-slate-100">
           <ShieldCheck className="h-6 w-6 text-indigo-400" />
           CCVS Control Catalog
         </h1>
-        <p className="mt-1 text-slate-500">{catalog.description}</p>
-        <p className="mt-1 text-xs text-slate-600">
+        <p className="mt-1 text-slate-400">{catalog.description}</p>
+        <p className="mt-1 text-xs text-slate-400">
           v{catalog.schema_version} · updated {catalog.last_updated}
         </p>
       </div>
@@ -247,7 +247,7 @@ export function CcvsControlCatalogView() {
         ] as const).map(({ label, value, Icon, color }) => (
           <div key={label} className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">{label}</span>
+              <span className="text-xs font-medium text-slate-400">{label}</span>
               <Icon className={`h-4 w-4 ${color}`} />
             </div>
             <div className={`mt-2 text-3xl font-black ${color}`}>{value}</div>
@@ -271,17 +271,17 @@ export function CcvsControlCatalogView() {
       {/* filters */}
       <div className="space-y-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-          <input
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input aria-label="ค้นหากฎการทำงาน"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="ค้นหา control เช่น CTRL-002, testing, ISO42001…"
-            className="w-full rounded-lg border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-indigo-500/50"
+            className="w-full rounded-lg border border-slate-800 bg-slate-900 py-2 pl-10 pr-4 text-sm text-slate-200 outline-none placeholder:text-slate-400 focus:border-indigo-500/50"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-slate-500">Family:</span>
+          <span className="text-xs font-medium text-slate-400">Family:</span>
           {(['all', ...ALL_FAMILIES] as const).map((f) => (
             <button
               key={f}
@@ -298,7 +298,7 @@ export function CcvsControlCatalogView() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-slate-500">Status:</span>
+          <span className="text-xs font-medium text-slate-400">Status:</span>
           {(['all', ...ALL_STATUSES] as const).map((s) => (
             <button
               key={s}
@@ -314,14 +314,14 @@ export function CcvsControlCatalogView() {
           ))}
         </div>
 
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-slate-400">
           แสดง {filtered.length} จาก {controls.length} controls
         </p>
       </div>
 
       {/* control grid */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 px-6 py-12 text-center text-slate-500">
+        <div className="rounded-xl border border-slate-800 bg-slate-900 px-6 py-12 text-center text-slate-400">
           ไม่พบ control ที่ตรงกับเงื่อนไขที่เลือก
         </div>
       ) : (
@@ -349,7 +349,7 @@ export function CcvsControlCatalogView() {
               className="rounded-lg border border-slate-800/70 bg-slate-950/60 px-4 py-3"
             >
               <span className="font-mono text-xs font-bold text-indigo-300">{key}</span>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{val}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">{val}</p>
             </div>
           ))}
         </div>

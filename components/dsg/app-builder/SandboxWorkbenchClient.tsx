@@ -1,5 +1,8 @@
 'use client';
 
+import { DsgCopy } from '@/components/app-language-copy-bridge';
+
+
 import { useState } from 'react';
 
 type SandboxFileWrite = { path: string; mode?: string; gate?: string; bytes?: number };
@@ -115,14 +118,14 @@ export function SandboxWorkbenchClient() {
           ))}
         </div>
 
-        <label className="mt-5 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Job ID / App ID</label>
-        <input value={jobId} onChange={(event) => setJobId(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-indigo-500" />
+        <label htmlFor="sandbox-job" className="mt-5 block text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Job ID / App ID</label>
+        <input value={jobId} id="sandbox-job" onChange={(event) => setJobId(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-indigo-500" />
 
-        <label className="mt-5 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Goal</label>
-        <textarea value={goal} onChange={(event) => setGoal(event.target.value)} className="mt-2 min-h-32 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-white outline-none focus:border-indigo-500" />
+        <label htmlFor="sandbox-goal" className="mt-5 block text-xs font-bold uppercase tracking-[0.18em] text-slate-400"><DsgCopy value="Goal" /></label>
+        <textarea value={goal} id="sandbox-goal" onChange={(event) => setGoal(event.target.value)} className="mt-2 min-h-32 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-white outline-none focus:border-indigo-500" />
 
-        <label className="mt-5 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Allowed commands requested</label>
-        <textarea value={commands} onChange={(event) => setCommands(event.target.value)} className="mt-2 min-h-24 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 font-mono text-xs leading-6 text-white outline-none focus:border-indigo-500" />
+        <label htmlFor="sandbox-commands" className="mt-5 block text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Allowed commands requested</label>
+        <textarea value={commands} id="sandbox-commands" onChange={(event) => setCommands(event.target.value)} className="mt-2 min-h-24 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 font-mono text-xs leading-6 text-white outline-none focus:border-indigo-500" />
 
         <div className="mt-5 flex flex-col gap-3 md:flex-row md:flex-wrap">
           <button onClick={() => void runSandboxPlan()} disabled={busy} className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60">
@@ -156,31 +159,31 @@ export function SandboxWorkbenchClient() {
               </div>
 
               <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">File writes</p>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">File writes</p>
                 <div className="mt-3 space-y-2">
                   {files.map((file) => (
                     <div key={file.path} className="rounded-xl bg-slate-900 p-3 text-xs text-slate-300">
                       <p className="break-all font-mono">{file.path}</p>
-                      <p className="mt-1 text-slate-500">{file.bytes ? `${file.bytes} bytes` : `${file.mode || 'write'} · ${file.gate || 'planned'}`}</p>
+                      <p className="mt-1 text-slate-400">{file.bytes ? `${file.bytes} bytes` : `${file.mode || 'write'} · ${file.gate || 'planned'}`}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Commands</p>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Commands</p>
                 <div className="mt-3 space-y-2">
                   {(visible.commands || []).map((command) => (
                     <div key={command.command} className="rounded-xl bg-slate-900 p-3 text-xs text-slate-300">
                       <p className="font-mono">{command.command}</p>
-                      <p className="mt-1 text-slate-500">{command.gate} · {command.execution}</p>
+                      <p className="mt-1 text-slate-400">{command.gate} · {command.execution}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Next actions</p>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Next actions</p>
                 <div className="mt-3 space-y-2">
                   {(visible.nextActions || []).map((action) => <p key={action} className="rounded-xl bg-slate-900 p-2 text-xs text-slate-300">{action}</p>)}
                   {visible.prUrl ? <p className="rounded-xl bg-slate-900 p-2 text-xs text-slate-300">Open draft PR, run checks, review diff, then merge only after evidence passes.</p> : null}

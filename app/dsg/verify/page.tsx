@@ -91,17 +91,17 @@ export default function VerifyOneActionPage() {
   const failures = proof?.runtimeGate?.failures ?? [];
 
   return (
-    <main className="min-h-screen bg-[#080b10] px-5 py-10 text-slate-100 sm:px-8">
+    <main className="dsg-page min-h-screen bg-[#080b10] px-5 py-10 text-slate-100 sm:px-8">
       <div className="mx-auto max-w-4xl">
         <p className="font-mono text-xs uppercase tracking-[0.28em] text-cyan-300">DSG First Value</p>
-        <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Verify one AI action</h1>
+        <h1 className="dsg-page-title mt-3 text-4xl font-black tracking-tight sm:text-6xl">Verify one AI action</h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
           Describe what you want an AI agent to do. DSG builds the governed flow, evaluates the runtime gate, and returns a proof hash plus the exact next action. A blocked decision is shown as blocked; it is never converted into a success claim.
         </p>
 
         <section className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <label className="block text-sm font-semibold text-slate-200">Email for lifecycle receipt</label>
-          <input
+          <label htmlFor="verify-email" className="block text-sm font-semibold text-slate-200">Email for lifecycle receipt</label>
+          <input id="verify-email"
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -109,8 +109,8 @@ export default function VerifyOneActionPage() {
             className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none focus:border-cyan-300/60"
           />
 
-          <label className="mt-5 block text-sm font-semibold text-slate-200">AI action / goal</label>
-          <textarea
+          <label htmlFor="verify-goal" className="mt-5 block text-sm font-semibold text-slate-200">AI action / goal</label>
+          <textarea id="verify-goal"
             value={goal}
             onChange={(event) => setGoal(event.target.value)}
             rows={5}
