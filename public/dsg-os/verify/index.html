@@ -8,7 +8,25 @@ button{margin-top:18px;background:#2b7093;color:white;border:0;padding:12px 16px
 pre{white-space:pre-wrap;overflow-wrap:anywhere}p,small{color:#b6c1d0}#status[data-state=verified]{color:#89d185}
 #status[data-state=blocked]{color:#ef9a9a}#status[data-state=untrusted]{color:#e5c07b}
 a{color:#9cdcfe}
-</style><link rel="stylesheet" href="/dsg-reference-ui.css">
+</style><style data-dsg-reference-ui>
+/* Shared ergonomics for the existing standalone DSG reference tools. */
+html { scroll-padding-block-start: 5rem; -webkit-text-size-adjust: 100%; }
+body { font-family: system-ui, "Noto Sans Thai", sans-serif; line-height: 1.6; }
+main { min-width: 0; overflow-wrap: anywhere; }
+main :where(section, article, header, aside, div) { min-width: 0; }
+button, select, input:not([type="checkbox"]):not([type="radio"]), summary { min-height: 44px; }
+button, input, textarea, select { max-width: 100%; font: inherit; }
+button, a, summary { touch-action: manipulation; }
+button { min-width: 44px; }
+pre { max-width: 100%; overflow: auto; }
+nav a { display: inline-flex; min-height: 44px; align-items: center; }
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible { outline: 2px solid #67e8f9; outline-offset: 3px; }
+.dsg-reference-nav { display: flex; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid #334155; padding: .5rem 1rem; background: #020617; color: #e2e8f0; font-size: .875rem; }
+.dsg-reference-nav a { color: inherit; text-decoration: none; }
+.dsg-skip-link { position: fixed; z-index: 100; top: .5rem; left: .5rem; transform: translateY(-200%); border-radius: .5rem; padding: .75rem 1rem; background: #f8fafc; color: #0f172a; }
+.dsg-skip-link:focus { transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+</style>
 </head><body>
 <a class="dsg-skip-link" href="#main-content">ข้ามไปเนื้อหาหลัก</a>
 <nav class="dsg-reference-nav" aria-label="เมนู DSG ONE"><a href="/">DSG ONE</a><a href="/dsg/workroom">พื้นที่ทำงาน</a><a href="/dsg-os">Adapter และหลักฐาน</a></nav>
