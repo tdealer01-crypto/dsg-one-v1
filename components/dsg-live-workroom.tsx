@@ -7,6 +7,8 @@ import { DsgKaggleGpuStatus } from '@/components/dsg-kaggle-gpu-status';
 import { DsgCinemaOauthViewer } from '@/components/dsg-cinema-oauth-viewer';
 import { cinemaAgentToolContracts, cinemaVerifierKind, cinemaVerifierReadPayload } from '@/lib/dsg/user-bound/cinema-controller-contract';
 import { nativeShellOutcome } from '@/lib/dsg/user-bound/native-shell-outcome';
+import { isVerifiedCinemaConnectResult, mayReuseRecentCinemaConnection } from '@/lib/dsg/user-bound/cinema-session-reuse';
+import { describeWorkroomFailure } from '@/lib/dsg/user-bound/workroom-failure';
 import {
   asRecord, catalogRoutes, composeWorkroomRoutes, publicWorkroomReceipt,
   uniqueWorkroomRoute, workroomReceiptMatches,
@@ -36,6 +38,7 @@ export function DsgLiveWorkroom() {
   const [status, setStatus] = useState('กำลังตรวจเซสชันสำหรับเครื่องมือ');
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  const cinemaConnectedVerifiedAt = useRef(0);
   const subject = useRef<string | null>(null);
   const [routes, setRoutes] = useState<WorkroomRoute[]>([]);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
@@ -112,12 +115,7 @@ export function DsgLiveWorkroom() {
     setBusy(true);
     try { await work(); }
     catch (error) {
-      const reason = error instanceof Error ? error.message : 'REQUEST_FAILED';
-      setStatus(reason.includes('DSG_BRAIN_BASE_URL_INVALID')
-        ? 'DSG Agent v0 ยังเรียกโมเดลไม่ได้: Brain Endpoint ของ AWS ไม่พร้อม · ต้องเชื่อม Kaggle Worker รุ่นที่ตรวจสอบแล้วก่อน ไม่มีการเรียกโมเดลจำลองหรือ GPU เสียเงิน'
-        : reason === 'HUMAN_APPROVAL_NOT_READY' || reason === 'APPROVAL_PENDING'
-        ? 'ยังรอการอนุมัติในหน้าเจ้าของ เมื่ออนุมัติแล้วกลับมาแท็บนี้หรือกดตรวจการอนุมัติ'
-        : `ยังทำงานไม่สำเร็จ: ${reason} — ตรวจเซสชันหรือสถานะ provider ก่อนลองใหม่`);
+      setStatus(describeWorkroomFailure(error));
     } finally { busyRef.current = false; setBusy(false); }
   }
 
@@ -156,6 +154,11 @@ export function DsgLiveWorkroom() {
     setReceipt(publicWorkroomReceipt(data.receipt));
     setVerifiedAction(label);
     const result = asRecord(data.receipt?.result)!;
+    if (request.route_id === 'route.cinema-remote.connect') {
+      // This timestamp is ephemeral. We never persist approval permits or
+      // assume a provider is connected without its independent status proof.
+      cinemaConnectedVerifiedAt.current = isVerifiedCinemaConnectResult(result) ? Date.now() : 0;
+    }
     if (typeof request.payload.action === 'string') {
       history.current = [...history.current, {
         action: request.payload.action,
@@ -310,9 +313,10 @@ export function DsgLiveWorkroom() {
   const isAvailable = (cap: string, target: string) => routes.some(route => route.capability === cap && route.target_node === target);
 
   useEffect(() => {
-    if (!pending || !ready || pending.steps.length !== 1 ||
-        !pending.steps[0].approvalRequestId ||
-        pending.steps[0].request.route_id !== 'route.desktop-native.shell-exec') return;
+    // Reconcile any existing approval when the user returns from Auth0/owner
+    // review, including Cinema. Never create an additional approval here.
+    // Without a durable execution lease, we do not replay work after reload.
+    if (!pending || !ready || !pending.steps.some(step => step.approvalRequestId)) return;
     const onReturn = () => {
       if (!document.hidden && !busyRef.current) {
         // A single claim attempt on return; the backend must prove APPROVED.
@@ -326,7 +330,7 @@ export function DsgLiveWorkroom() {
       window.removeEventListener('focus', onReturn);
       document.removeEventListener('visibilitychange', onReturn);
     };
-    // Listener is scoped to the pending exact request and authenticated session.
+    // Listener is scoped to already-created exact requests and authenticated session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending, ready]);
 
@@ -404,16 +408,18 @@ export function DsgLiveWorkroom() {
     try { destination = new URL(targetUrl); }
     catch { throw new Error('PUBLIC_BROWSER_URL_REQUIRED'); }
     if (destination.protocol !== 'https:' || destination.username || destination.password) throw new Error('PUBLIC_BROWSER_URL_REQUIRED');
-    await runSteps([
-      {
+    const steps: PlannedStep[] = [];
+    if (!mayReuseRecentCinemaConnection(cinemaConnectedVerifiedAt.current, Date.now())) {
+      steps.push({
         capability: 'browser.remote.connect',
         target: browserTarget,
         label: 'เชื่อม Remote Browser',
         makePayload: planId => ({ action: 'browser.remote.connect', arguments: {
           plan_id: planId, agent_identity: agent().agent_id, step_id: 'connect', ttl_seconds: 600,
         } }),
-      },
-      {
+      });
+    }
+    steps.push({
         capability: 'browser.remote.execute',
         target: browserTarget,
         label: 'เปิดหน้าเว็บและอ่านผล',
@@ -424,8 +430,8 @@ export function DsgLiveWorkroom() {
             { step_id: 'inspect', action: { kind: 'browser.extract', controller: 'agent_verifier', parameters: {} } },
           ],
         } }),
-      },
-    ], 'เชื่อม Browser เปิดเว็บ และอ่านผลในแผนเดียว');
+      });
+    await runSteps(steps, 'เปิดเว็บและอ่านผลตามสิทธิ์ที่ตรวจแล้ว');
   }
 
   return (
