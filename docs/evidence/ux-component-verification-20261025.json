@@ -106,7 +106,7 @@
   "recorded_at": "2026-10-26T00:37:07.820466+07:00",
   "changed_files_sha256": {
     "app/globals.css": "1e8dbee91e937053c8dc78a86764aeea203e773c0d2a6093f2e0fcf4bd2de5c0",
-    "app/page.tsx": "729b99cca17a589b59a7945603bf858b331b27a1f5d14e699770532264506663",
+    "app/page.tsx": "c4e232525aee1f68e3e0c0e327daf8e8d3c9f44453b4ca7df5647a186d754fde",
     "app/login/page.tsx": "73434c67388ab25c12aab15f1571f69af275b07f68f45a9af98e57794a629c74",
     "app/dsg/layout.tsx": "1984ac8d104dfe6dbf8773f619616d95caae98073ab5340c9d4b4cfef94a2296",
     "components/dsg-live-workroom.tsx": "ac461b53cd5bfda6f8a70cef0905bffea37d7bc2298dd47982a98bd232c9decd",
@@ -114,8 +114,8 @@
     "tests/dsg/native-device-summary.test.ts": "e6acb87cb02eec4bc478ee7d1361a641fb79bc9cf6d5f5e69e62d1f9eede5a55"
   },
   "vitest": {
-    "files": 4,
-    "passed": 21,
+    "files": 5,
+    "passed": 25,
     "exit_code": 0
   },
   "strict_typescript": {
@@ -137,5 +137,6 @@
     "observed_page": "AWS Startups; no navigation",
     "source_repair": "https://github.com/tdealer01-crypto/DSG-Private-Production-Runtime/pull/842",
     "production_repair_verified": false
-  }
+  },
+  "ci_repair": "Kept native details opening element and existing homepage tests; moved optional Escape enhancement to its containing element. Existing4 homepage tests and22 real local keyboard/UI checks pass."
 }

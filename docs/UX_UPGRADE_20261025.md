@@ -63,8 +63,10 @@ Real post-review Owner MFA, a detached bounded worker, real provider postconditi
 
 - 22 rendered-browser checks passed; zero unexpected browser exceptions.
 - axe found zero WCAG-tagged violations in five checked states: mobile/desktop home, mobile login, open navigation drawer, and Native panel with no authenticated identity. This is limited automated evidence.
-- 21 existing/new focused Vitest tests passed; strict component/dependency TypeScript passed.
+- 25 existing/new focused Vitest tests passed; strict component/dependency TypeScript passed.
 - Original public/admin links and all three tool panels' original operations/inputs match the baseline.
 - The first browser pass found real 768px overflow; a later pass found native-dialog focus reaching the document body. Both were fixed and the full local checks reran successfully.
 - Found and removed the stale hardcoded Android/Termux device description. Device details now render only from a successful Native status receipt with matching outer/inner device IDs and a real registry binding, after caller receipt/evidence checks. Unknown status remains unknown; no platform or online flag is invented. This is display validation, not proof of multi-account device isolation.
 - Evidence: `docs/evidence/ux-component-verification-20261025.json`. Full exact-head CI and deployed UI verification remain separate until recorded.
+
+CI follow-up: an existing homepage test required the native `<details className="group relative">` opening tag. Retained that native element and moved optional Escape handling to its containing element. All four original homepage tests and the 22 rendered keyboard/UI checks pass; no test was weakened or deleted.

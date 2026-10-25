@@ -144,13 +144,16 @@ export default function HomePage() {
             </Link>
           </nav>
 
-          <div className="flex items-center gap-2 lg:hidden">
-            <details className="group relative" onKeyDown={event => {
+          <div className="flex items-center gap-2 lg:hidden" onKeyDown={event => {
               if (event.key === 'Escape') {
-                event.currentTarget.open = false;
-                event.currentTarget.querySelector('summary')?.focus();
+                const menu = event.currentTarget.querySelector('details');
+                if (menu?.open) {
+                  menu.open = false;
+                  menu.querySelector('summary')?.focus();
+                }
               }
             }}>
+            <details className="group relative">
               <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300">
                 เมนู
               </summary>
