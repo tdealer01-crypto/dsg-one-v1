@@ -27,6 +27,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - name: Verify template selection against actual outcome intake
+        run: npm test -- tests/dsg/template-goal-handoff.test.ts
       - name: Install isolated UI test tools
         run: |
           npm install --prefix "$RUNNER_TEMP/dsg-ui-tools" --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.64.1 axe-core@4.14.0
