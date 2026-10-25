@@ -30,12 +30,27 @@ export default function DsgWorkroomPage() {
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch('/api/dsg/access/session', {
+      let response = await fetch('/api/dsg/access/session', {
         credentials: 'include', cache: 'no-store',
       });
       if (response.status === 401) {
-        // Keep the exact destination (including ?tool=browser or ?tool=desktop)
-        // through site sign-in; the login page only accepts local next paths.
+        // An expired access cookie is not proof that the user has signed out.
+        // Try the existing HttpOnly refresh cookie once, server-side, before
+        // asking the user to type a password again. Never expose a token in JS.
+        const renewal = await fetch('/api/auth/refresh', {
+          method: 'POST', credentials: 'include', cache: 'no-store',
+        });
+        if (renewal.ok) {
+          response = await fetch('/api/dsg/access/session', {
+            credentials: 'include', cache: 'no-store',
+          });
+        } else if (renewal.status !== 401) {
+          throw new Error('ระบบยืนยันตัวตนไม่พร้อมต่ออายุเซสชัน กดลองอีกครั้งโดยไม่ต้องออกจากระบบ');
+        }
+      }
+      if (response.status === 401) {
+        // The refresh credential is absent or invalid: genuine sign-in is needed.
+        // Preserve the requested tool and return to the same task after login.
         const returnTo = window.location.pathname + window.location.search;
         window.location.assign('/login?next=' + encodeURIComponent(returnTo));
         return;
