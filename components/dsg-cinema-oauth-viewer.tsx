@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { getDsgBrowserSession } from '@/lib/dsg/user-bound/browser-session';
+import { resolveCinemaViewerUrl } from '@/lib/dsg/user-bound/cinema-viewer-session';
 
 const CINEMA_ORIGIN = 'https://aws.dsg.pics';
-const VIEWER = /^\/remote-browser\/self-hosted\/view\/[A-Za-z0-9_-]{20,128}$/;
 type Reply = { ok?: boolean; linked?: boolean; connected?: boolean; provider?: string;
   browser_session_id?: string; embed_url?: string; account?: { plan?: string };
   detail?: string | { error?: string }; error?: string };
@@ -15,6 +15,10 @@ export function describeCinemaAccountIssue(reason: string): string {
       return 'เข้าสู่ระบบ DSG ONE แล้ว แต่ยังไม่ผูกบัญชี Cinema Free เดิม — ยืนยันบัญชีเดิมครั้งเดียวด้านล่าง ไม่ต้องล็อกอิน Google ซ้ำ';
     case 'SAME_ACCOUNT_BROWSER_VIEWER_NOT_READY':
       return 'Shared Browser ของบัญชีนี้ยังไม่พร้อม โปรดตรวจ Remote ON และบัญชีที่ผูกอยู่ก่อน ไม่สร้างโปรไฟล์ใหม่';
+    case 'CINEMA_VIEWER_SESSION_MISMATCH':
+      return 'Viewer กับ Agent อยู่คนละเซสชัน จึงยังไม่เปิดหน้าต่างเข้าสู่ระบบ ต้องแก้การผูก Cinema ของบัญชีนี้ให้ตรงกันก่อน';
+    case 'BROWSER_POPUP_BLOCKED':
+      return 'เบราว์เซอร์บล็อกหน้าต่าง Viewer โปรดอนุญาตป๊อปอัปสำหรับ DSG ONE แล้วกดเปิดอีกครั้ง';
     case 'AUTH0_REAUTH_REQUIRED':
     case 'AUTH0_TOKEN_UNAVAILABLE':
       return 'DSG Auth0 session ไม่มี token ที่ใช้ได้ ต้องเข้าสู่ระบบใหม่จาก Workroom เพียงครั้งเดียว';
@@ -54,14 +58,33 @@ async function callCinema(path: '/status' | '/link' | '/viewer', oldFreeKey?: st
   return body;
 }
 
-export function DsgCinemaOauthViewer({ ready }: { ready: boolean }) {
+export function DsgCinemaOauthViewer({ ready, readGovernedStatus, onWorkingChange }: {
+  ready: boolean;
+  readGovernedStatus: () => Promise<unknown>;
+  onWorkingChange: (working: boolean) => void;
+}) {
   const [working, setWorking] = useState(false);
+  const workingRef = useRef(false);
   const [linked, setLinked] = useState(false);
   const [message, setMessage] = useState('');
   const [existingKey, setExistingKey] = useState('');
 
-  async function checkLink() {
+  function begin() {
+    if (!ready || workingRef.current) return false;
+    workingRef.current = true;
     setWorking(true);
+    onWorkingChange(true);
+    return true;
+  }
+
+  function finish() {
+    workingRef.current = false;
+    setWorking(false);
+    onWorkingChange(false);
+  }
+
+  async function checkLink() {
+    if (!begin()) return;
     try {
       const status = await callCinema('/status');
       const verifiedFreeLink = status.linked === true && status.account?.plan === 'free';
@@ -73,15 +96,14 @@ export function DsgCinemaOauthViewer({ ready }: { ready: boolean }) {
       setLinked(false);
       setMessage(describeCinemaAccountIssue(error instanceof Error ? error.message : 'ACCOUNT_LINK_UNVERIFIED'));
     } finally {
-      setWorking(false);
+      finish();
     }
   }
 
   async function linkOnce() {
     const proof = existingKey.trim();
-    if (!proof) return;
+    if (!proof || !begin()) return;
     setExistingKey('');
-    setWorking(true);
     try {
       const result = await callCinema('/link', proof);
       setLinked(result.linked === true);
@@ -91,31 +113,32 @@ export function DsgCinemaOauthViewer({ ready }: { ready: boolean }) {
     } catch (error) {
       setMessage(describeCinemaAccountIssue(error instanceof Error ? error.message : 'ACCOUNT_LINK_FAILED'));
     } finally {
-      setWorking(false);
+      finish();
     }
   }
 
   async function openViewer() {
-    if (!linked || working) return;
+    if (!begin()) return;
     // Open during the click before awaited network calls to avoid popup blocking.
-    const tab = window.open('about:blank', '_blank');
-    if (tab) tab.opener = null;
-    setWorking(true);
+    let tab: Window | null = null;
     try {
-      const result = await callCinema('/viewer');
-      if (result.connected !== true || result.provider !== 'self_hosted_playwright' ||
-          !result.browser_session_id || !result.embed_url || !VIEWER.test(result.embed_url)) {
-        throw new Error('SAME_ACCOUNT_BROWSER_VIEWER_NOT_READY');
-      }
+      try { tab = window.open('about:blank', '_blank'); }
+      catch { throw new Error('BROWSER_POPUP_BLOCKED'); }
       if (!tab) throw new Error('BROWSER_POPUP_BLOCKED');
-      // Only the exact AWS same-origin human viewer path is permitted.
-      tab.location.replace(CINEMA_ORIGIN + result.embed_url);
-      setMessage('เปิด Viewer ของบัญชี Free แล้ว · Agent ยังต้องได้รับ Signed Approval');
+      tab.opener = null;
+      const viewerUrl = await resolveCinemaViewerUrl({
+        readGovernedStatus,
+        readAccountStatus: () => callCinema('/status'),
+        readViewer: () => callCinema('/viewer'),
+      });
+      setLinked(true);
+      tab.location.replace(viewerUrl);
+      setMessage('เปิด Viewer ที่ตรงกับเซสชัน Agent แล้ว · เข้าสู่ระบบเว็บในหน้าต่างนั้น แล้วกลับมาสั่งงานต่อ');
     } catch (error) {
       tab?.close();
       setMessage(describeCinemaAccountIssue(error instanceof Error ? error.message : 'HUMAN_VIEWER_UNAVAILABLE'));
     } finally {
-      setWorking(false);
+      finish();
     }
   }
 
@@ -131,13 +154,13 @@ export function DsgCinemaOauthViewer({ ready }: { ready: boolean }) {
           className="rounded-lg border border-slate-600 px-3 py-2 disabled:opacity-40">
           ตรวจบัญชี Free
         </button>
-        <button disabled={!ready || working || !linked} type="button" onClick={() => void openViewer()}
+        <button disabled={!ready || working} type="button" onClick={() => void openViewer()}
           className="rounded-lg bg-indigo-700 px-3 py-2 disabled:opacity-40">
           เปิด Shared Browser ของฉัน
         </button>
       </div>
       <p role="status" className="mt-2 break-words text-xs text-slate-300">
-        {message || 'ตรวจบัญชีที่ผูกกับ Auth0 ก่อนเปิด Human Viewer'}
+        {message || 'กดเปิด Shared Browser ได้เลย ระบบจะตรวจบัญชีและเซสชัน Agent ให้ในครั้งเดียว'}
       </p>
       {!linked && <details className="mt-3 border-t border-slate-700 pt-3">
         <summary className="cursor-pointer text-sm">พิสูจน์บัญชี Cinema Free เดิมครั้งแรก (ขั้นสูง)</summary>

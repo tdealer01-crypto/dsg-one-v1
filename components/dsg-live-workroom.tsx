@@ -514,7 +514,10 @@ export function DsgLiveWorkroom() {
         {tab === 'browser' && <>
           <p className="text-sm text-slate-300">ใช้ Cinema บน AWS เดิม การเชื่อมและการควบคุมต้องผ่านคำขออนุมัติที่ผูกกับแผน</p>
           <p className="text-xs text-slate-400">Human Viewer: ต้องยืนยันบัญชี Cinema เดิม · Agent Executor: ควบคุมตามแผนที่อนุมัติ · Agent Verifier: อ่านหน้าเว็บ/ภาพหน้าจอเท่านั้น ทั้งสามบทบาทใช้โปรไฟล์ Browser เดียวกันเมื่อการผูกเซสชันผ่านการตรวจสอบ</p>
-          <DsgCinemaOauthViewer ready={ready} />
+          <DsgCinemaOauthViewer ready={ready && !busy && !pending}
+            onWorkingChange={working => { busyRef.current = working; setBusy(working); }}
+            readGovernedStatus={() => run('browser.remote.status', browserTarget,
+              () => ({ action: 'browser.remote.status', arguments: {} }), 'ตรวจเซสชันร่วมของ Viewer และ Agent')} />
           {catalogLoaded && !isAvailable('browser.remote.status', browserTarget) && <p className="text-amber-200">runtime ยังไม่เปิดเส้นทาง Browser — ตรวจ deployment ก่อนเชื่อม</p>}
           <div className="flex flex-wrap gap-2">
             <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('browser.remote.status', browserTarget, () => ({ action: 'browser.remote.status', arguments: {} }), 'อ่านสถานะ Browser'); })}>ตรวจสถานะ Browser</button>
