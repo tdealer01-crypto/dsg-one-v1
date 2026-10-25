@@ -45,6 +45,7 @@ describe('Workroom site-session refresh entry guard', () => {
     expect(workroom).toContain("fetch('/api/auth/refresh'");
     expect(refresh).toContain("request.cookies.get('sb-refresh-token')");
     expect(refresh).toContain('httpOnly: true');
-    expect(userTools).toContain('requireVerifiedDsgActor');
+    expect(userTools).toContain('resolveVerifiedDsgActor');
+    expect(userTools).toContain('assertDsgPermission');
   });
 });
