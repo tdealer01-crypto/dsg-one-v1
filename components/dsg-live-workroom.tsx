@@ -372,6 +372,12 @@ export function DsgLiveWorkroom() {
   }
 
   async function browserConnect() {
+    // A second tap during the same verified connection is not a new user task.
+    // Do not create a duplicate owner approval for an already-connected browser.
+    if (mayReuseRecentCinemaConnection(cinemaConnectedVerifiedAt.current, Date.now())) {
+      setStatus('Cinema เชื่อมต่อแล้วในเซสชันที่ตรวจไว้ · สั่งงานได้โดยใช้ Signed Approval ของคำสั่งนั้น ไม่ต้องขอ Connect ซ้ำ');
+      return;
+    }
     await run('browser.remote.connect', browserTarget, planId => ({ action: 'browser.remote.connect', arguments: {
       plan_id: planId, agent_identity: agent().agent_id, step_id: 'connect', ttl_seconds: 600,
     } }), 'เชื่อม Remote Browser');
