@@ -130,14 +130,21 @@ export function DsgLiveWorkroom() {
     } finally { busyRef.current = false; setBusy(false); }
   }
 
-  async function login() {
-    await act(async () => {
-      setStatus('กำลังเปิด Auth0 แล้วจะกลับมาหน้า Workroom');
+  async function beginLoginRedirect() {
+    setStatus('กำลังเปิด Auth0 แล้วจะกลับมาหน้า Workroom');
+    try {
       await getDsgBrowserSession().loginWithRedirect({
         authorizationParams: { redirect_uri: DSG_AUTH0_CALLBACK },
         appState: { returnTo: window.location.pathname + window.location.search },
       });
-    });
+    } catch (error) {
+      setStatus(describeWorkroomFailure(error));
+      throw error;
+    }
+  }
+
+  async function login() {
+    await act(beginLoginRedirect);
   }
 
   async function loadCatalog() {
@@ -514,7 +521,8 @@ export function DsgLiveWorkroom() {
         {tab === 'browser' && <>
           <p className="text-sm text-slate-300">ใช้ Cinema บน AWS เดิม การเชื่อมและการควบคุมต้องผ่านคำขออนุมัติที่ผูกกับแผน</p>
           <p className="text-xs text-slate-400">Human Viewer: ต้องยืนยันบัญชี Cinema เดิม · Agent Executor: ควบคุมตามแผนที่อนุมัติ · Agent Verifier: อ่านหน้าเว็บ/ภาพหน้าจอเท่านั้น ทั้งสามบทบาทใช้โปรไฟล์ Browser เดียวกันเมื่อการผูกเซสชันผ่านการตรวจสอบ</p>
-          <DsgCinemaOauthViewer ready={ready && !busy && !pending}
+          <DsgCinemaOauthViewer ready={ready} unavailable={initializing || busy || Boolean(pending)}
+            onSignIn={beginLoginRedirect}
             onWorkingChange={working => { busyRef.current = working; setBusy(working); }}
             readGovernedStatus={() => run('browser.remote.status', browserTarget,
               () => ({ action: 'browser.remote.status', arguments: {} }), 'ตรวจเซสชันร่วมของ Viewer และ Agent')} />

@@ -58,8 +58,10 @@ async function callCinema(path: '/status' | '/link' | '/viewer', oldFreeKey?: st
   return body;
 }
 
-export function DsgCinemaOauthViewer({ ready, readGovernedStatus, onWorkingChange }: {
+export function DsgCinemaOauthViewer({ ready, unavailable = false, onSignIn, readGovernedStatus, onWorkingChange }: {
   ready: boolean;
+  unavailable?: boolean;
+  onSignIn: () => Promise<void>;
   readGovernedStatus: () => Promise<unknown>;
   onWorkingChange: (working: boolean) => void;
 }) {
@@ -69,8 +71,8 @@ export function DsgCinemaOauthViewer({ ready, readGovernedStatus, onWorkingChang
   const [message, setMessage] = useState('');
   const [existingKey, setExistingKey] = useState('');
 
-  function begin() {
-    if (!ready || workingRef.current) return false;
+  function begin(requireSession = true) {
+    if (unavailable || (requireSession && !ready) || workingRef.current) return false;
     workingRef.current = true;
     setWorking(true);
     onWorkingChange(true);
@@ -118,10 +120,15 @@ export function DsgCinemaOauthViewer({ ready, readGovernedStatus, onWorkingChang
   }
 
   async function openViewer() {
-    if (!begin()) return;
+    if (!begin(false)) return;
     // Open during the click before awaited network calls to avoid popup blocking.
     let tab: Window | null = null;
     try {
+      if (!ready) {
+        setMessage('กำลังเปิดหน้าลงชื่อเข้าใช้เครื่องมือ เมื่อกลับมาแล้วเปิด Shared Browser ต่อได้จากปุ่มนี้');
+        await onSignIn();
+        return;
+      }
       try { tab = window.open('about:blank', '_blank'); }
       catch { throw new Error('BROWSER_POPUP_BLOCKED'); }
       if (!tab) throw new Error('BROWSER_POPUP_BLOCKED');
@@ -150,17 +157,19 @@ export function DsgCinemaOauthViewer({ ready, readGovernedStatus, onWorkingChang
         การเข้าถึงของ Agent ยังคงต้องผ่าน Plan และ Approval
       </p>
       <div className="flex flex-wrap gap-2">
-        <button disabled={!ready || working} type="button" onClick={() => void checkLink()}
+        <button disabled={!ready || unavailable || working} type="button" onClick={() => void checkLink()}
           className="rounded-lg border border-slate-600 px-3 py-2 disabled:opacity-40">
           ตรวจบัญชี Free
         </button>
-        <button disabled={!ready || working} type="button" onClick={() => void openViewer()}
+        <button disabled={unavailable || working} type="button" onClick={() => void openViewer()}
           className="rounded-lg bg-indigo-700 px-3 py-2 disabled:opacity-40">
-          เปิด Shared Browser ของฉัน
+          {ready ? 'เปิด Shared Browser ของฉัน' : 'เข้าสู่ระบบเพื่อเปิด Shared Browser'}
         </button>
       </div>
       <p role="status" className="mt-2 break-words text-xs text-slate-300">
-        {message || 'กดเปิด Shared Browser ได้เลย ระบบจะตรวจบัญชีและเซสชัน Agent ให้ในครั้งเดียว'}
+        {message || (ready
+          ? 'กดเปิด Shared Browser ได้เลย ระบบจะตรวจบัญชีและเซสชัน Agent ให้ในครั้งเดียว'
+          : 'เข้าสู่ระบบเครื่องมือผ่านปุ่มนี้ แล้วกลับมาเปิด Viewer ของบัญชีเดิม')}
       </p>
       {!linked && <details className="mt-3 border-t border-slate-700 pt-3">
         <summary className="cursor-pointer text-sm">พิสูจน์บัญชี Cinema Free เดิมครั้งแรก (ขั้นสูง)</summary>
@@ -171,7 +180,7 @@ export function DsgCinemaOauthViewer({ ready, readGovernedStatus, onWorkingChang
         <input id="cinema-old-free-key" type="password" autoComplete="off"
           value={existingKey} onChange={event => setExistingKey(event.target.value)}
           className="mt-1 w-full rounded-lg bg-slate-900 p-3 text-sm" />
-        <button disabled={!ready || working || !existingKey.trim()} type="button"
+        <button disabled={!ready || unavailable || working || !existingKey.trim()} type="button"
           onClick={() => void linkOnce()}
           className="mt-2 rounded-lg border border-slate-600 px-3 py-2 disabled:opacity-40">
           ยืนยันบัญชี Free เดิม
