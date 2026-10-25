@@ -42,6 +42,18 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // The Workroom is a client-only shell. It fetches membership, workspace and
+  // every agent tool via independently authenticated server endpoints.
+  // Its existing POST /api/auth/refresh can securely rotate an expired
+  // access cookie, but only if the shell can mount first. Do NOT extend this
+  // exception to approvals, enterprise pages, or protected APIs.
+  if ((pathname === '/dsg/workroom' || pathname === '/dsg/workroom/') &&
+      request.cookies.get('sb-refresh-token')?.value) {
+    const response = NextResponse.next();
+    response.headers.set('Cache-Control', 'private, no-store');
+    return response;
+  }
+
   const url = request.nextUrl.clone();
   url.pathname = '/login';
   // Preserve the user's protected destination (including ?tool=browser) through sign-in.
