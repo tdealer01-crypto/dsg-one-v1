@@ -5,7 +5,7 @@ import { getDsgBrowserSession, DSG_AUTH0_CALLBACK } from '@/lib/dsg/user-bound/b
 import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
 import { DsgKaggleGpuStatus } from '@/components/dsg-kaggle-gpu-status';
 import { DsgCinemaOauthViewer } from '@/components/dsg-cinema-oauth-viewer';
-import { cinemaAgentToolContracts, cinemaVerifierKind, cinemaVerifierReadPayload } from '@/lib/dsg/user-bound/cinema-controller-contract';
+import { cinemaAgentToolContracts, cinemaNavigationSteps, cinemaVerifierKind, cinemaVerifierObservation, cinemaVerifierReadPayload } from '@/lib/dsg/user-bound/cinema-controller-contract';
 import { nativeShellOutcome } from '@/lib/dsg/user-bound/native-shell-outcome';
 import { isVerifiedCinemaConnectResult, mayReuseRecentCinemaConnection } from '@/lib/dsg/user-bound/cinema-session-reuse';
 import { describeWorkroomFailure } from '@/lib/dsg/user-bound/workroom-failure';
@@ -21,6 +21,12 @@ type PendingStep = { request: WorkroomExecution; approvalRequestId?: string; lab
 type Pending = { label: string; steps: PendingStep[] };
 type Action = { capability: string; target: string; arguments: JsonRecord; label: string };
 type PlannedStep = { capability: string; target: string; makePayload: (planId: string) => JsonRecord; label: string };
+type FlowPhase = 'goal' | 'plan' | 'approval' | 'execute' | 'verify' | 'evidence' | 'needs-check';
+const flowStages: { phase: FlowPhase; label: string }[] = [
+  { phase: 'goal', label: 'เป้าหมาย' }, { phase: 'plan', label: 'แผน' },
+  { phase: 'approval', label: 'อนุมัติเมื่อจำเป็น' }, { phase: 'execute', label: 'ทำงาน' },
+  { phase: 'verify', label: 'ตรวจผล' }, { phase: 'evidence', label: 'หลักฐาน' },
+];
 const button = 'min-h-11 rounded-xl border border-slate-600 px-4 py-2 text-sm font-semibold disabled:opacity-40 hover:border-indigo-400';
 const field = 'w-full rounded-xl border border-slate-600 bg-slate-950 p-3 text-sm text-white';
 const browserTarget = 'node.cinema-remote';
@@ -51,6 +57,8 @@ export function DsgLiveWorkroom() {
   const [proposal, setProposal] = useState<Action | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [receipt, setReceipt] = useState<unknown>(null);
+  const [flowPhase, setFlowPhase] = useState<FlowPhase>('goal');
+  const [observedPage, setObservedPage] = useState<{ url: string; title: string } | null>(null);
   const history = useRef<JsonRecord[]>([]);
   const [url, setUrl] = useState('https://dsg.pics');
   const [path, setPath] = useState('');
@@ -115,6 +123,7 @@ export function DsgLiveWorkroom() {
     setBusy(true);
     try { await work(); }
     catch (error) {
+      setFlowPhase('needs-check');
       setStatus(describeWorkroomFailure(error));
     } finally { busyRef.current = false; setBusy(false); }
   }
@@ -146,14 +155,24 @@ export function DsgLiveWorkroom() {
   }
 
   async function execute(request: WorkroomExecution, label: string, approvalId?: string) {
+    setFlowPhase('execute');
     setStatus(`กำลัง${label} โปรดรอผลจาก provider`);
     const data = await tool('spacetime_execute', { ...request, ...(approvalId ? { approval_id: approvalId } : {}) });
+    setFlowPhase('verify');
     if (!await workroomReceiptMatches(data.receipt, request, approvalId)) throw new Error('EXACT_PROVIDER_RECEIPT_NOT_VERIFIED');
     const chain = await tool('spacetime_verify_evidence', {});
     if (!chain.evidenceVerified || chain.receipt?.valid !== true) throw new Error('EVIDENCE_CHAIN_NOT_VERIFIED');
-    setReceipt(publicWorkroomReceipt(data.receipt));
-    setVerifiedAction(label);
     const result = asRecord(data.receipt?.result)!;
+    const browserArguments = asRecord(request.payload.arguments);
+    if (request.route_id === 'route.cinema-remote.read' && Array.isArray(browserArguments?.steps) &&
+        browserArguments.steps.some(step => asRecord(asRecord(step)?.action)?.kind === 'browser.extract')) {
+      const observation = cinemaVerifierObservation(result, request.plan_id, request.plan_hash);
+      if (!observation) throw new Error('CINEMA_VERIFIER_POSTCONDITION_NOT_VERIFIED');
+      setObservedPage(observation);
+    }
+    setReceipt(publicWorkroomReceipt(data.receipt));
+    setFlowPhase('evidence');
+    setVerifiedAction(label);
     if (request.route_id === 'route.cinema-remote.connect') {
       // This timestamp is ephemeral. We never persist approval permits or
       // assume a provider is connected without its independent status proof.
@@ -173,6 +192,7 @@ export function DsgLiveWorkroom() {
       // Provider evidence proves dispatch, not command exit success.
       const outcome = nativeShellOutcome(result);
       setShellOutcome(outcome.state);
+      if (outcome.state !== 'succeeded') setFlowPhase('needs-check');
       setShellProcessId(outcome.state === 'running' ? outcome.processId : null);
       if (outcome.state === 'succeeded') setStatus('คำสั่งทำงานเสร็จ (exit code 0) และตรวจหลักฐานแล้ว');
       else if (outcome.state === 'failed') setStatus('คำสั่งสิ้นสุดด้วย exit code ' + outcome.exitCode + ' · ดูผลด้านล่าง');
@@ -185,6 +205,7 @@ export function DsgLiveWorkroom() {
   }
 
   async function preparePlan(steps: PlannedStep[], label: string) {
+    setFlowPhase('plan');
     const available = catalogLoaded ? routes : await loadCatalog();
     const planId = 'web-' + crypto.randomUUID();
     const selected = steps.map((step) => {
@@ -222,6 +243,7 @@ export function DsgLiveWorkroom() {
     if (pending) throw new Error('FINISH_OR_CANCEL_PENDING_REQUEST_FIRST');
     setVerifiedAction(null);
     setReceipt(null);
+    setObservedPage(null);
     const planned = await preparePlan(steps, label);
     const withApprovals: PendingStep[] = [];
     for (const step of planned) {
@@ -235,6 +257,7 @@ export function DsgLiveWorkroom() {
       }
     }
     if (withApprovals.some(step => step.approvalRequestId)) {
+      setFlowPhase('approval');
       setPending({ label, steps: withApprovals });
       setStatus(withApprovals.length > 1
         ? 'รออนุมัติตามรายการด้านล่าง เมื่อครบแล้วกลับมาเพื่อทำงานต่อ'
@@ -253,6 +276,7 @@ export function DsgLiveWorkroom() {
   async function resume() {
     if (!pending) return;
     const current = pending;
+    setFlowPhase('approval');
     const permits = new Map<string, string>();
     for (const step of current.steps) {
       if (!step.approvalRequestId) continue;
@@ -278,6 +302,7 @@ export function DsgLiveWorkroom() {
     const result = await execute(planned[0].request, 'ตรวจผลคำสั่ง');
     const outcome = nativeShellOutcome(result, expectedProcessId);
     setShellOutcome(outcome.state);
+    setFlowPhase(outcome.state === 'succeeded' ? 'evidence' : 'needs-check');
     if (outcome.state === 'succeeded') {
       setShellProcessId(null);
       setStatus('คำสั่งเสร็จสำเร็จ (exit code 0) · ตรวจผลผ่าน Native Provider และ Evidence แล้ว');
@@ -410,39 +435,22 @@ export function DsgLiveWorkroom() {
   }
 
   async function browserNavigate(targetUrl: string = url) {
-    let destination: URL;
-    try { destination = new URL(targetUrl); }
-    catch { throw new Error('PUBLIC_BROWSER_URL_REQUIRED'); }
-    if (destination.protocol !== 'https:' || destination.username || destination.password) throw new Error('PUBLIC_BROWSER_URL_REQUIRED');
-    const steps: PlannedStep[] = [];
-    if (!mayReuseRecentCinemaConnection(cinemaConnectedVerifiedAt.current, Date.now())) {
-      steps.push({
-        capability: 'browser.remote.connect',
-        target: browserTarget,
-        label: 'เชื่อม Remote Browser',
-        makePayload: planId => ({ action: 'browser.remote.connect', arguments: {
-          plan_id: planId, agent_identity: agent().agent_id, step_id: 'connect', ttl_seconds: 600,
-        } }),
-      });
-    }
-    steps.push({
-        capability: 'browser.remote.execute',
-        target: browserTarget,
-        label: 'เปิดหน้าเว็บและอ่านผล',
-        makePayload: planId => ({ action: 'browser.remote.run', arguments: {
-          plan_id: planId, agent_identity: agent().agent_id, stop_on_success: false,
-          steps: [
-            { step_id: 'navigate', action: { kind: 'browser.navigate', controller: 'agent_executor', parameters: { url: destination.href } } },
-            { step_id: 'inspect', action: { kind: 'browser.extract', controller: 'agent_verifier', parameters: {} } },
-          ],
-        } }),
-      });
+    const steps: PlannedStep[] = cinemaNavigationSteps(targetUrl, agent().agent_id,
+      !mayReuseRecentCinemaConnection(cinemaConnectedVerifiedAt.current, Date.now()));
     await runSteps(steps, 'เปิดเว็บและอ่านผลตามสิทธิ์ที่ตรวจแล้ว');
   }
 
   return (
     <section id="live-controls" className="scroll-mt-20 rounded-3xl border border-indigo-400/30 bg-slate-900 p-5 md:p-6" aria-label="เครื่องมือ Workroom">
       <h2 className="text-2xl font-bold">DSG Agent v0 · ควบคุมเว็บและอุปกรณ์</h2>
+      <ol aria-label="ลำดับงานเดียวกันสำหรับ Agent Browser และ Native" className="my-4 grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
+        {flowStages.map((stage, index) => <li key={stage.phase}
+          aria-current={flowPhase === stage.phase ? 'step' : undefined}
+          className={`rounded-lg border p-2 ${flowPhase === stage.phase ? 'border-indigo-300 text-indigo-100' : 'border-slate-700 text-slate-400'}`}>
+          {index + 1}. {stage.label}
+        </li>)}
+      </ol>
+      {flowPhase === 'needs-check' && <p className="mb-3 text-sm text-amber-200">ต้องตรวจผลหรือแก้สาเหตุตามข้อความด้านล่างก่อนทำต่อ · ไม่ส่งคำสั่งเดิมซ้ำอัตโนมัติ</p>}
       <p className="mt-2 text-sm text-slate-300">เลือกงาน → ตรวจสิทธิ์ → อนุมัติเฉพาะเมื่อจำเป็น → ดูผลและหลักฐานจริง</p>
       <p role="status" aria-live="polite" className="mt-4 break-words rounded-xl bg-slate-950 p-4 text-sm text-indigo-100">{status}</p>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -524,8 +532,8 @@ export function DsgLiveWorkroom() {
         </>}
       </div>
       {pending && <section className="mt-5 rounded-xl border border-amber-400/50 p-4" aria-label="งานรออนุมัติ">
-        <h3 className="font-bold text-amber-100">ขั้นตอนที่ 2/3 · รอเจ้าของอนุมัติงาน</h3>
-        <p className="mt-2 text-sm text-slate-300">เปิดคำขอ 1 ครั้ง ตรวจแล้วกดอนุมัติ จากนั้นกลับมาแท็บนี้ ระบบจะตรวจและทำต่อสำหรับ Native Shell อัตโนมัติเมื่อเซสชันยังอยู่ (ภายใน 10 นาที)</p>
+        <h3 className="font-bold text-amber-100">รอเจ้าของอนุมัติคำขอที่แสดง</h3>
+        <p className="mt-2 text-sm text-slate-300">ตรวจคำขอด้านล่างแล้วอนุมัติตามขอบเขต จากนั้นกลับมาแท็บนี้ ระบบจะตรวจคำขอเดิมและทำขั้นตอนต่อเรียงตามแผนเมื่อเซสชันยังอยู่ (ภายใน 10 นาที)</p>
         <details className="mt-3 rounded-lg border border-slate-700 p-3"><summary className="cursor-pointer text-sm">รายละเอียดเทคนิคของคำขอ</summary><pre className="mt-2 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(publicWorkroomReceipt(pending.steps.map(step => ({
           label: step.label,
           approval_request_id: step.approvalRequestId,
@@ -541,10 +549,13 @@ export function DsgLiveWorkroom() {
           <button className={button} disabled={busy} onClick={() => { setPending(null); setStatus('หยุดรอในหน้านี้ คำขอที่ยังไม่อนุมัติจะหมดอายุเอง'); }}>หยุดรอ</button>
         </div>
       </section>}
-      {receipt != null && <section className="mt-5 rounded-xl border border-emerald-600/50 p-4" aria-label="ผลการทำงานที่ตรวจหลักฐานแล้ว"><h3 className="font-bold text-emerald-200">ขั้นตอนที่ 3/3 · {verifiedAction || 'งานล่าสุด'} — ตรวจหลักฐานแล้ว</h3><details className="mt-3">
+      {receipt != null && <section className="mt-5 rounded-xl border border-emerald-600/50 p-4" aria-label="ผลการทำงานที่ตรวจหลักฐานแล้ว"><h3 className="font-bold text-emerald-200">ผลขั้นตอน · {verifiedAction || 'งานล่าสุด'} — ตรวจหลักฐานของขั้นตอนนี้แล้ว</h3>
+        {observedPage && <p className="mt-2 break-words text-sm text-slate-200">หน้าเว็บที่ Verifier อ่านจริง: {observedPage.title || observedPage.url}<br /><span className="text-slate-400">{observedPage.url}</span></p>}
+        <details className="mt-3">
         <summary className="cursor-pointer font-semibold">ดูผล Provider และ Evidence (ขั้นสูง)</summary>
         <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-300">{JSON.stringify(receipt, null, 2)}</pre>
       </details></section>}
     </section>
   );
 }
+
