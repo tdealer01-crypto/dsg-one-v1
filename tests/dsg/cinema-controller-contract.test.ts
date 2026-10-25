@@ -28,6 +28,16 @@ describe('DSG Cinema multi-controller Agent menu', () => {
     expect(() => steps[0].makePayload('')).toThrow('CINEMA_PLAN_OR_AGENT_REQUIRED');
   });
 
+  it('binds the exact HTTPS target origin before approval without granting a wildcard or another site', () => {
+    const steps = cinemaNavigationSteps('https://example.test:8443/work?view=task#result', 'owner-agent', false);
+    expect(steps[0].makePayload('plan-origin')).toMatchObject({ arguments: {
+      steps: [{ action: { parameters: {
+        url: 'https://example.test:8443/work?view=task#result',
+        browser_allowed_origins: 'https://example.test:8443',
+      } } }],
+    } });
+  });
+
   it('refuses unbound agents and credential-bearing or non-HTTPS navigation before compose', () => {
     for (const target of ['not-a-url', 'http://example.test', 'https://user:password@example.test']) {
       expect(() => cinemaNavigationSteps(target, 'owner-agent', true)).toThrow('PUBLIC_BROWSER_URL_REQUIRED');

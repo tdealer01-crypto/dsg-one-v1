@@ -63,7 +63,9 @@ export function cinemaNavigationSteps(targetUrl: string, agentIdentity: string, 
       return { action: 'browser.remote.run', arguments: {
         plan_id: planId, agent_identity: agentIdentity, stop_on_success: false,
         steps: [{ step_id: 'navigate', action: {
-          kind: 'browser.navigate', controller: 'agent_executor', parameters: { url: destination.href },
+          kind: 'browser.navigate', controller: 'agent_executor', parameters: {
+            url: destination.href, browser_allowed_origins: destination.origin,
+          },
         } }],
       } };
     },
