@@ -3,11 +3,8 @@
 import Link from 'next/link';
 import { useState, useSyncExternalStore } from 'react';
 import { ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { safeNextPath } from '@/lib/dsg/client/safe-next-path';
 
-function safeNextPath(value: string | null): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/dsg/access';
-  return value;
-}
 
 const subscribeNever = () => () => {};
 
