@@ -48,8 +48,23 @@ export async function POST(req: Request) {
   }
   let raw: string;
   try {
-    raw = await req.text();
-    if (Buffer.byteLength(raw, 'utf8') > MAX_BYTES) return respond(413, { ok: false, error: 'AGENT_V0_MEMORY_TOO_LARGE' });
+    const reader = req.body?.getReader();
+    if (!reader) return respond(400, { ok: false, error: 'AGENT_V0_MEMORY_BODY_INVALID' });
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      for (;;) {
+        const part = await reader.read();
+        if (part.done) break;
+        size += part.value.byteLength;
+        if (size > MAX_BYTES) return respond(413, { ok: false, error: 'AGENT_V0_MEMORY_TOO_LARGE' });
+        chunks.push(part.value);
+      }
+    } finally {
+      await reader.cancel().catch(() => undefined);
+      reader.releaseLock();
+    }
+    raw = new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks));
   } catch {
     return respond(400, { ok: false, error: 'AGENT_V0_MEMORY_BODY_INVALID' });
   }
