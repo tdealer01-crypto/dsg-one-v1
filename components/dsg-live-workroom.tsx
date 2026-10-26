@@ -572,7 +572,7 @@ export function DsgLiveWorkroom() {
             <summary className="cursor-pointer font-semibold">Core Spin · Physics · Repair · Brain · Framework · Memory</summary>
             <p className="mt-2 text-slate-400">ผลตรวจเป็นการลงทะเบียน Route และ Health ที่รายงานเท่านั้น ไม่ใช่หลักฐานว่าโมเดล, GPU, Provider หรือ Memory E2E ผ่าน</p>
             <button type="button" className={`${button} mt-3`} disabled={busy || !ready}
-              onClick={() => void act(checkAgentComponents)}>ตรวจทุกฟังก์ชันจาก Runtime จริง</button>
+              onClick={() => void act(checkAgentComponents)}>ตรวจ Route และ Framework (ไม่ใช่ E2E)</button>
             <ul className="mt-3 space-y-2">
               <li className="rounded-lg border border-slate-800 p-3">
                 <strong>Microsoft Agent Framework</strong>
