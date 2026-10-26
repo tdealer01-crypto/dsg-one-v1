@@ -315,6 +315,13 @@ export function DsgLiveWorkroom() {
     return runSteps([{ capability, target, makePayload, label }], label);
   }
 
+  // A newly created, exact-plan approval should be visible immediately on
+  // mobile and keyboard navigation, not hidden beneath the advanced tools.
+  // Focus only; this never claims approval, executes or generates another permit.
+  useEffect(() => {
+    if (pending) document.getElementById('dsg-pending-approval')?.focus();
+  }, [pending]);
+
   async function resume() {
     if (!pending) return;
     const current = pending;
@@ -614,13 +621,13 @@ export function DsgLiveWorkroom() {
           <p className="text-xs text-slate-400">Human Viewer: ต้องยืนยันบัญชี Cinema เดิม · Agent Executor: ควบคุมตามแผนที่อนุมัติ · Agent Verifier: อ่านหน้าเว็บ/ภาพหน้าจอเท่านั้น ทั้งสามบทบาทใช้โปรไฟล์ Browser เดียวกันเมื่อการผูกเซสชันผ่านการตรวจสอบ</p>
           <DsgCinemaOauthViewer ready={ready} unavailable={initializing || busy || Boolean(pending)}
             onSignIn={beginLoginRedirect}
+            onRequestConnect={() => act(browserConnect)}
             onWorkingChange={working => { busyRef.current = working; setBusy(working); }}
             readGovernedStatus={() => run('browser.remote.status', browserTarget,
               () => ({ action: 'browser.remote.status', arguments: {} }), 'ตรวจเซสชันร่วมของ Viewer และ Agent')} />
           {catalogLoaded && !isAvailable('browser.remote.status', browserTarget) && <p className="text-amber-200">runtime ยังไม่เปิดเส้นทาง Browser — ตรวจ deployment ก่อนเชื่อม</p>}
           <div className="flex flex-wrap gap-2">
             <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('browser.remote.status', browserTarget, () => ({ action: 'browser.remote.status', arguments: {} }), 'อ่านสถานะ Browser'); })}>ตรวจสถานะ Browser</button>
-            <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(browserConnect)}>ขอเชื่อม Browser</button>
             <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await browserVerifier('browser.extract'); })}>Agent Verifier · อ่านหน้าเว็บ</button>
             <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await browserVerifier('browser.screenshot'); })}>Agent Verifier · ภาพหน้าจอ</button>
             <a href="https://aws.dsg.pics/app" target="_blank" rel="noopener noreferrer" className={button}>Evidence &amp; Conformance ↗ (ไม่ใช่ Cinema Viewer)</a>
@@ -659,7 +666,7 @@ export function DsgLiveWorkroom() {
           )}
         </>}
       </div>
-      {pending && <section className="mt-5 rounded-xl border border-amber-400/50 p-4" aria-label="งานรออนุมัติ">
+      {pending && <section id="dsg-pending-approval" tabIndex={-1} className="mt-5 scroll-mt-20 rounded-xl border border-amber-400/50 p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-300" aria-label="งานรออนุมัติ">
         <h3 className="font-bold text-amber-100">รอเจ้าของอนุมัติคำขอที่แสดง</h3>
         <p className="mt-2 text-sm text-slate-300">ตรวจคำขอด้านล่างแล้วอนุมัติตามขอบเขต จากนั้นกลับมาแท็บนี้ ระบบจะตรวจคำขอเดิมและทำขั้นตอนต่อเรียงตามแผนเมื่อเซสชันยังอยู่ (ภายใน 10 นาที)</p>
         <details className="mt-3 rounded-lg border border-slate-700 p-3"><summary className="cursor-pointer text-sm">รายละเอียดเทคนิคของคำขอ</summary><pre className="mt-2 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(publicWorkroomReceipt(pending.steps.map(step => ({
