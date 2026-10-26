@@ -577,9 +577,9 @@ export function DsgLiveWorkroom() {
               <li className="rounded-lg border border-slate-800 p-3">
                 <strong>Microsoft Agent Framework</strong>
                 <span className="ml-2 text-amber-200">{frameworkProbe === 'reported-ready'
-                  ? `Engine + Checkpoint Probe ผ่าน v${frameworkVersion}`
+                  ? `Engine + In-memory Checkpoint ผ่าน v${frameworkVersion}`
                   : frameworkProbe === 'not-checked' ? 'ยังไม่ตรวจ' : 'ยังยืนยัน Health ไม่ได้'}</span>
-                <p className="mt-1 text-xs text-slate-400">กระบวนการ Framework พร้อมไม่เท่ากับ Core Spin งานจริงผ่าน</p>
+                <p className="mt-1 text-xs text-slate-400">ทดสอบ Workflow และ Checkpoint ในหน่วยความจำเท่านั้น ยังไม่พิสูจน์ Supabase Durable Checkpoint หรือ Provider E2E</p>
               </li>
               {capabilityReports.map(item => <li key={item.id} className="rounded-lg border border-slate-800 p-3">
                 <strong>{item.label}</strong>
