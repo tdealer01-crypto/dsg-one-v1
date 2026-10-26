@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getDsgBrowserSession, DSG_AUTH0_CALLBACK } from '@/lib/dsg/user-bound/browser-session';
 import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
 import { DsgKaggleGpuStatus } from '@/components/dsg-kaggle-gpu-status';
+import { shouldRequestKaggleWake } from '@/lib/dsg/user-bound/kaggle-on-demand';
 import { DsgCinemaOauthViewer } from '@/components/dsg-cinema-oauth-viewer';
 import { cinemaAgentToolContracts, cinemaNavigationSteps, cinemaVerifierKind, cinemaVerifierObservation, cinemaVerifierReadPayload } from '@/lib/dsg/user-bound/cinema-controller-contract';
 import { nativeShellOutcome } from '@/lib/dsg/user-bound/native-shell-outcome';
@@ -54,6 +55,8 @@ export function DsgLiveWorkroom() {
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'desktop' ? 'desktop' : 'agent'
   );
   const [goal, setGoal] = useState('');
+  const [kaggleLaunchRevision, setKaggleLaunchRevision] = useState(0);
+  const awaitingKaggleForGoal = useRef<string | null>(null);
   const [chat, setChat] = useState<ChatTurn[]>([]);
   const [proposal, setProposal] = useState<Action | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -382,15 +385,52 @@ export function DsgLiveWorkroom() {
       { name: 'device.shell.exec', target: desktopTarget, description: 'เรียกคำสั่งบน DSG Desktop Native หลังมีแผนและการอนุมัติ', required: ['command'], optional: [], risk: 'high' },
     ].filter(contract => available.some(route => route.capability === contract.name && route.target_node === contract.target));
     if (!contracts.length) throw new Error('NO_LIVE_TOOL_CONTRACTS_FOR_AGENT');
-    setChat(items => [...items, { role: 'user', text: message }]);
+    // Retain an awaiting goal without adding a duplicate user message on retry.
+    if (awaitingKaggleForGoal.current !== message) {
+      setChat(items => [...items, { role: 'user', text: message }]);
+    }
     setProposal(null);
     setStatus('กำลังส่งเป้าหมายให้ DSG Agent v0');
-    const result = await run('action.plan', 'node.agent.dsg-v0', () => ({
-      goal: message,
-      tools: contracts.map(({ target: _target, ...contract }) => contract),
-      verified_history: history.current,
-      step: Math.min(history.current.length, 25), request_key: 'chat-' + crypto.randomUUID(),
-    }), 'วางแผนด้วย Agent v0');
+    let result: JsonRecord | null;
+    try {
+      result = await run('action.plan', 'node.agent.dsg-v0', () => ({
+        goal: message,
+        tools: contracts.map(({ target: _target, ...contract }) => contract),
+        verified_history: history.current,
+        step: Math.min(history.current.length, 25), request_key: 'chat-' + crypto.randomUUID(),
+      }), 'วางแผนด้วย Agent v0');
+    } catch (error) {
+      // One authenticated owner-only wake attempt on a missing Brain binding.
+      // Never wake on provider denial, MFA, policy or inference errors.
+      if (!shouldRequestKaggleWake(error)) throw error;
+      setFlowPhase('needs-check');
+      setStatus('Brain ยังไม่พร้อม กำลังตรวจสิทธิ์เจ้าของเพื่อขอเปิด Kaggle ฟรี');
+      const accessToken = await getDsgBrowserSession().getTokenSilently();
+      if (!accessToken) throw new Error('AUTH0_TOKEN_UNAVAILABLE');
+      const response = await fetch('/api/dsg/agent-v0/launch', {
+        method: 'POST', credentials: 'include', cache: 'no-store',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'start_free_gpu', accessToken }),
+      });
+      const raw = await response.json().catch(() => null);
+      const outcome = asRecord(raw);
+      const code = typeof outcome?.error === 'string' && /^[A-Z0-9_]{3,100}$/.test(outcome.error)
+        ? outcome.error : 'KAGGLE_OWNER_DISPATCH_UNAVAILABLE';
+      if (response.status === 202 && outcome?.ok === true && outcome.status === 'OWNER_DISPATCH_ACCEPTED') {
+        awaitingKaggleForGoal.current = message;
+        setKaggleLaunchRevision(current => current + 1);
+        setStatus('ส่งคำขอเปิด Kaggle แล้ว · ยังไม่ได้ผลจาก Qwen หรือหลักฐานว่า Worker พร้อมใช้ เก็บเป้าหมายไว้ให้กดวางแผนซ้ำหลังตรวจสถานะ');
+        setChat(items => [...items, { role: 'assistant', text: 'กำลังเตรียม Kaggle Brain สำหรับแผนนี้ (ยังไม่สำเร็จ) ตรวจสถานะ GPU ด้านบน เมื่อพร้อมให้กดวางแผนด้วย Agent v0 อีกครั้ง' }]);
+        return;
+      }
+      if (response.status === 409 && code === 'KAGGLE_LAUNCH_ALREADY_IN_PROGRESS') {
+        awaitingKaggleForGoal.current = message;
+        setKaggleLaunchRevision(current => current + 1);
+        setStatus('มีคำขอเปิด Kaggle อยู่แล้ว · ไม่ส่งคำขอเปิดซ้ำ รอหลักฐาน Worker แล้วค่อยวางแผนอีกครั้ง');
+        return;
+      }
+      throw new Error(code);
+    }
     if (!result) return;
     if (result.authority !== 'proposal-only' || result.brain_mode !== 'local_qwen3_planner' ||
         typeof result.model !== 'string' || !result.model.startsWith('DSG-Agent-v0')) throw new Error('AGENT_V0_MODEL_NOT_VERIFIED');
@@ -403,6 +443,7 @@ export function DsgLiveWorkroom() {
     } else if (result.status === 'COMPLETED' && typeof asRecord(result.final_result)?.text === 'string') {
       setChat(items => [...items, { role: 'assistant', text: String(asRecord(result.final_result)!.text) }]);
     } else throw new Error('AGENT_V0_PROPOSAL_NOT_SUPPORTED');
+    awaitingKaggleForGoal.current = null;
     setGoal('');
   }
 
@@ -499,7 +540,7 @@ export function DsgLiveWorkroom() {
           <button type="button" className={button} onClick={() => selectTool('browser')}>
             Shared Browser / Multi-Controller · เปิดเครื่องมือที่ใช้ร่วมกับ Agent
           </button>
-          <DsgKaggleGpuStatus />
+          <DsgKaggleGpuStatus key={kaggleLaunchRevision} />
           <div role="log" aria-label="บทสนทนา Agent v0" aria-live="polite" className="max-h-80 space-y-3 overflow-y-auto">
             {chat.map((turn, index) => <p key={index} className={`whitespace-pre-wrap rounded-xl p-3 text-sm ${turn.role === 'user' ? 'bg-indigo-900/60' : 'bg-slate-950'}`}><strong>{turn.role === 'user' ? 'คุณ' : 'Agent v0'}: </strong>{turn.text}</p>)}
             <div ref={transcript} />
