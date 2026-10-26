@@ -61,6 +61,8 @@ export function DsgLiveWorkroom() {
   const [autoExecute, setAutoExecute] = useState(true);
   const verifiedExecutionCount = useRef(0);
   const agentStopRequested = useRef(false);
+  const activeAgentGoal = useRef<string | null>(null);
+  const [continueAfterApproval, setContinueAfterApproval] = useState(false);
   const [kaggleLaunchRevision, setKaggleLaunchRevision] = useState(0);
   const awaitingKaggleForGoal = useRef<string | null>(null);
   const [chat, setChat] = useState<ChatTurn[]>([]);
@@ -373,6 +375,11 @@ export function DsgLiveWorkroom() {
     for (const step of current.steps) {
       await execute(step.request, step.label, step.approvalRequestId ? permits.get(step.approvalRequestId) : undefined);
     }
+    // The original goal resumes after React applies pending=null and the
+    // current one-shot approved action has fully returned real evidence.
+    if (activeAgentGoal.current && !agentStopRequested.current) {
+      setContinueAfterApproval(true);
+    }
   }
 
   async function checkShellProcess() {
@@ -443,9 +450,19 @@ export function DsgLiveWorkroom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending, ready]);
 
-  async function sendGoal() {
-    const message = goal.trim();
+  useEffect(() => {
+    if (!continueAfterApproval || pending || !ready || busy) return;
+    const message = activeAgentGoal.current;
+    setContinueAfterApproval(false);
+    if (message) void act(() => sendGoal(message));
+    // Resume only after the exact request passed approval and evidence.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [continueAfterApproval, pending, ready, busy]);
+
+  async function sendGoal(continueMessage?: string) {
+    const message = (continueMessage ?? goal).trim();
     if (!message || message.length > 4000) return;
+    const resumingSameGoal = activeAgentGoal.current === message && continueMessage === message;
     const available = catalogLoaded ? routes : await loadCatalog();
     const contracts = [
       { name: 'browser.remote.status', target: browserTarget, description: 'อ่านสถานะการเชื่อมต่อ Remote Browser', required: [], optional: [], risk: 'read' },
@@ -458,10 +475,11 @@ export function DsgLiveWorkroom() {
     ].filter(contract => available.some(route => route.capability === contract.name && route.target_node === contract.target));
     if (!contracts.length) throw new Error('NO_LIVE_TOOL_CONTRACTS_FOR_AGENT');
     // Retain an awaiting goal without adding a duplicate user message on retry.
-    if (awaitingKaggleForGoal.current !== message) {
+    if (!resumingSameGoal && awaitingKaggleForGoal.current !== message) {
       setChat(items => [...items, { role: 'user', text: message }]);
       await saveAgentTurn('user', message);
     }
+    activeAgentGoal.current = autoExecute ? message : null;
     setProposal(null);
     setStatus('กำลังส่งเป้าหมายให้ DSG Agent v0');
     // One user goal may take several verified tool actions. Qwen never
@@ -472,6 +490,7 @@ export function DsgLiveWorkroom() {
     let repeated = 0;
     for (let stepIndex = 0; stepIndex < 25; stepIndex += 1) {
       if (agentStopRequested.current) {
+        activeAgentGoal.current = null;
         setStatus('หยุดงานตามที่ร้องขอ · ไม่มีการส่งขั้นถัดไป และไม่ย้อนคำสั่งที่ทำไปแล้ว');
         return;
       }
@@ -526,6 +545,7 @@ export function DsgLiveWorkroom() {
         await saveAgentTurn('assistant', finalText);
         setStatus('Agent รายงานว่างานจบแล้ว · ตรวจหลักฐานของแต่ละขั้นจากด้านล่าง');
         awaitingKaggleForGoal.current = null;
+        activeAgentGoal.current = null;
         setGoal('');
         return;
       }
@@ -540,6 +560,7 @@ export function DsgLiveWorkroom() {
         arguments: nextArguments, label: contract.description,
       };
       if (!autoExecute) {
+        activeAgentGoal.current = null;
         setProposal(proposed);
         setChat(items => [...items, { role: 'assistant', text: `Agent เสนอให้${contract.description} ตรวจรายละเอียดก่อนกดทำตามแผน` }]);
         awaitingKaggleForGoal.current = null;
@@ -553,6 +574,7 @@ export function DsgLiveWorkroom() {
       const before = verifiedExecutionCount.current;
       setStatus(`กำลังดำเนินงานขั้นที่ ${stepIndex + 1} ผ่าน Spacetime: ${proposed.label}`);
       if (agentStopRequested.current) {
+        activeAgentGoal.current = null;
         setStatus('หยุดก่อนสั่งขั้นถัดไปตามคำขอ · ยังไม่ได้รัน action ที่เสนอ');
         return;
       }
@@ -705,6 +727,8 @@ export function DsgLiveWorkroom() {
               <button type="submit" className={`${button} bg-indigo-700`} disabled={!ready || busy || !goal.trim() || Boolean(pending)}>{busy ? 'Agent กำลังทำงาน…' : autoExecute ? 'เริ่มงานด้วย Agent v0' : 'วางแผนด้วย Agent v0'}</button>
               {busy && <button type="button" className={button} onClick={() => {
                 agentStopRequested.current = true;
+                activeAgentGoal.current = null;
+                setContinueAfterApproval(false);
                 setStatus('กำลังหยุดก่อนขั้นถัดไป · คำสั่งที่ส่งให้ Provider แล้วต้องตรวจผลก่อน');
               }}>หยุดหลังขั้นปัจจุบัน</button>}
             </div>
@@ -783,7 +807,12 @@ export function DsgLiveWorkroom() {
               target="_blank" rel="noreferrer" className={`${button} bg-indigo-700`}>อนุมัติงาน {index + 1} ↗</a>
           ))}
           <button className={button} disabled={busy || !ready} onClick={() => void act(resume)}>ตรวจการอนุมัติและทำงานต่อ</button>
-          <button className={button} disabled={busy} onClick={() => { setPending(null); setStatus('หยุดรอในหน้านี้ คำขอที่ยังไม่อนุมัติจะหมดอายุเอง'); }}>หยุดรอ</button>
+          <button className={button} disabled={busy} onClick={() => {
+            activeAgentGoal.current = null;
+            setContinueAfterApproval(false);
+            setPending(null);
+            setStatus('หยุดรอในหน้านี้ คำขอที่ยังไม่อนุมัติจะหมดอายุเอง');
+          }}>หยุดรอ</button>
         </div>
       </section>}
       {receipt != null && <section className="mt-5 rounded-xl border border-emerald-600/50 p-4" aria-label="ผลการทำงานที่ตรวจหลักฐานแล้ว"><h3 className="font-bold text-emerald-200">ผลขั้นตอน · {verifiedAction || 'งานล่าสุด'} — ตรวจหลักฐานของขั้นตอนนี้แล้ว</h3>
