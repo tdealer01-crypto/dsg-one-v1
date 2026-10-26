@@ -64,6 +64,7 @@ export function DsgLiveWorkroom() {
   const [kaggleLaunchRevision, setKaggleLaunchRevision] = useState(0);
   const awaitingKaggleForGoal = useRef<string | null>(null);
   const [chat, setChat] = useState<ChatTurn[]>([]);
+  const [conversationMemory, setConversationMemory] = useState<'loading' | 'available' | 'unavailable'>('loading');
   const [proposal, setProposal] = useState<Action | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [receipt, setReceipt] = useState<unknown>(null);
@@ -99,6 +100,45 @@ export function DsgLiveWorkroom() {
     })();
     return () => { live = false; };
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    let live = true;
+    void (async () => {
+      try {
+        const response = await fetch('/api/dsg/agent-v0/conversation', { cache: 'no-store', credentials: 'include' });
+        const raw = asRecord(await response.json());
+        const data = asRecord(raw?.data);
+        if (!response.ok || raw?.ok !== true || !Array.isArray(data?.messages)) throw new Error('AGENT_V0_MEMORY_READ_UNAVAILABLE');
+        const turns: ChatTurn[] = (data.messages as unknown[])
+          .map(item => asRecord(item))
+          .filter((item): item is JsonRecord => Boolean(item))
+          .filter(item => (item.role === 'user' || item.role === 'assistant') && typeof item.text === 'string')
+          .slice(-40)
+          .map(item => ({ role: item.role as ChatTurn['role'], text: String(item.text) }));
+        if (!live) return;
+        setChat(existing => existing.length ? existing : turns);
+        setConversationMemory('available');
+      } catch {
+        if (live) setConversationMemory('unavailable');
+      }
+    })();
+    return () => { live = false; };
+  }, [ready]);
+
+  async function saveAgentTurn(role: ChatTurn['role'], text: string) {
+    try {
+      const response = await fetch('/api/dsg/agent-v0/conversation', {
+        method: 'POST', credentials: 'include', cache: 'no-store',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ role, text }),
+      });
+      const result = asRecord(await response.json());
+      setConversationMemory(response.status === 201 && result?.ok === true ? 'available' : 'unavailable');
+    } catch {
+      setConversationMemory('unavailable');
+    }
+  }
 
   useEffect(() => { transcript.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [chat]);
 
@@ -420,6 +460,7 @@ export function DsgLiveWorkroom() {
     // Retain an awaiting goal without adding a duplicate user message on retry.
     if (awaitingKaggleForGoal.current !== message) {
       setChat(items => [...items, { role: 'user', text: message }]);
+      await saveAgentTurn('user', message);
     }
     setProposal(null);
     setStatus('กำลังส่งเป้าหมายให้ DSG Agent v0');
@@ -480,7 +521,9 @@ export function DsgLiveWorkroom() {
         throw new Error('AGENT_V0_MODEL_NOT_VERIFIED');
       }
       if (result.status === 'COMPLETED' && typeof asRecord(result.final_result)?.text === 'string') {
-        setChat(items => [...items, { role: 'assistant', text: String(asRecord(result.final_result)!.text) }]);
+        const finalText = String(asRecord(result.final_result)!.text);
+        setChat(items => [...items, { role: 'assistant', text: finalText }]);
+        await saveAgentTurn('assistant', finalText);
         setStatus('Agent รายงานว่างานจบแล้ว · ตรวจหลักฐานของแต่ละขั้นจากด้านล่าง');
         awaitingKaggleForGoal.current = null;
         setGoal('');
@@ -616,6 +659,10 @@ export function DsgLiveWorkroom() {
           <button type="button" className={button} onClick={() => selectTool('browser')}>
             Shared Browser / Multi-Controller · เปิดเครื่องมือที่ใช้ร่วมกับ Agent
           </button>
+          <p role="status" className={`text-xs ${conversationMemory === 'available' ? 'text-sky-300' : 'text-amber-200'}`}>
+            {conversationMemory === 'available' ? 'ความจำบทสนทนา: อ่านและบันทึกผ่าน DSG Memory เดิมตามบัญชีและ Workspace'
+              : conversationMemory === 'loading' ? 'กำลังตรวจความจำบทสนทนา' : 'ความจำบทสนทนาไม่พร้อม · ข้อความในหน้านี้อาจไม่คงอยู่หลังรีเฟรช'}
+          </p>
           <DsgKaggleGpuStatus key={kaggleLaunchRevision} />
           <details className="rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm">
             <summary className="cursor-pointer font-semibold">Core Spin · Physics · Repair · Brain · Framework · Memory</summary>
