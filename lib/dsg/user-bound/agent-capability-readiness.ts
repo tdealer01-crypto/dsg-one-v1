@@ -25,8 +25,11 @@ export function agentCapabilityReadiness(routes: WorkroomRoute[]): AgentFeatureR
     return { id, label, registered: Boolean(found), routeId: found?.route_id ?? null, detail };
   };
   return [
-    report('core-spin', 'Core Spin', 'action.plan', 'node.agent.dsg-v0',
-      'Route ใช้ node.core-spin เป็นผู้ส่งงาน; ไม่ใช่หลักฐานว่าจบ Core Spin job'),
+    { ...report('core-spin', 'Core Spin', 'action.plan', 'node.agent.dsg-v0',
+      'ตรวจเส้นทางจาก Core Spin; ไม่ใช่หลักฐานว่าจบ Core Spin job'),
+      registered: routes.some(item => item.source_node === 'node.core-spin' &&
+        item.capability === 'action.plan' && item.target_node === 'node.agent.dsg-v0'),
+    },
     report('brain', 'Agent v0 · Qwen Brain', 'action.plan', 'node.agent.dsg-v0',
       'การลงทะเบียนไม่รับประกันว่า Kaggle GPU หรือโมเดลพร้อม infer'),
     report('physics-strategy', 'Physics / Ising Strategy', 'dsg.one.mcp.physics.ising.strategy', 'node.dsg-one-v1',
