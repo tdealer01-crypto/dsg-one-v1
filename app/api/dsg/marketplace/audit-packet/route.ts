@@ -5,8 +5,32 @@ import { validateApiKeyFromHeaders, recordApiKeyUsage } from '@/lib/dsg/mcp/vali
 export const dynamic = 'force-dynamic';
 
 function resolveCanonicalBase(reqUrl: URL): string {
-  if (!process.env.APP_URL) return reqUrl.origin;
-  return new URL(process.env.APP_URL).origin;
+  // The public origin is distinct from an internal APP_URL behind the AWS proxy.
+  // Its image-level configuration must not come from untrusted request headers.
+  const canonicalSetting = process.env.DSG_CANONICAL_APP_URL;
+  const configured = canonicalSetting || process.env.APP_URL;
+  const production = process.env.NODE_ENV === 'production';
+  if (!configured) {
+    if (production) throw new Error('CANONICAL_APP_ORIGIN_REQUIRED');
+    return reqUrl.origin;
+  }
+
+  const canonical = new URL(configured);
+  if (!['https:', 'http:'].includes(canonical.protocol)
+      || canonical.username || canonical.password
+      || ((production || canonicalSetting)
+        && (canonical.pathname !== '/' || canonical.search || canonical.hash))) {
+    throw new Error('CANONICAL_APP_ORIGIN_INVALID');
+  }
+
+  const hostname = canonical.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+  const local = hostname === 'localhost' || hostname.endsWith('.localhost')
+    || /^127(?:\.\d{1,3}){3}$/.test(hostname) || hostname === '0.0.0.0'
+    || hostname === '::' || hostname === '::1' || /^::(?:ffff:)?7f[0-9a-f]{2}:/.test(hostname);
+  if (production && (canonical.protocol !== 'https:' || local)) {
+    throw new Error('CANONICAL_APP_ORIGIN_NOT_PUBLIC_HTTPS');
+  }
+  return canonical.origin;
 }
 
 export async function GET(req: Request) {
@@ -33,13 +57,12 @@ export async function GET(req: Request) {
 
   try {
     canonicalBase = resolveCanonicalBase(url);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'APP_URL is not a valid URL.';
+  } catch {
     return NextResponse.json(
       {
         ok: false,
-        error: { code: 'INVALID_APP_URL_CONFIG', message },
-        nextAction: 'Set APP_URL to a valid absolute URL or unset APP_URL so the audit packet can use the request origin.',
+        error: { code: 'INVALID_APP_URL_CONFIG', message: 'Canonical app origin configuration is invalid.' },
+        nextAction: 'Set DSG_CANONICAL_APP_URL to the trusted public HTTPS origin; APP_URL is a legacy fallback. Request-origin fallback is development-only.',
       },
       { status: 500 },
     );
@@ -51,13 +74,12 @@ export async function GET(req: Request) {
     let requestedOrigin: string;
     try {
       requestedOrigin = new URL(requestedBaseUrl).origin;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'INVALID_BASE_URL';
+    } catch {
       return NextResponse.json(
         {
           ok: false,
-          error: { code: 'INVALID_BASE_URL', message },
-          nextAction: 'Remove the baseUrl query parameter or set it to the canonical APP_URL origin.',
+          error: { code: 'INVALID_BASE_URL', message: 'baseUrl must be a valid absolute URL.' },
+          nextAction: 'Remove the baseUrl query parameter or set it to the configured canonical origin.',
         },
         { status: 400 },
       );
@@ -70,7 +92,7 @@ export async function GET(req: Request) {
           error: { code: 'BASE_URL_MISMATCH', message: 'baseUrl query parameter does not match the canonical base URL.' },
           canonicalBase,
           requestedBaseUrl: requestedOrigin,
-          nextAction: 'Use the canonical APP_URL/request origin for audit packets; arbitrary baseUrl overrides are blocked.',
+          nextAction: 'Use the configured canonical origin for audit packets; arbitrary baseUrl overrides are blocked.',
         },
         { status: 400 },
       );

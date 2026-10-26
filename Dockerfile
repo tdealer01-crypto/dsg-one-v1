@@ -40,6 +40,7 @@ RUN npm run build
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV DSG_CANONICAL_APP_URL=https://dsg.pics
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=8080
 ARG DSG_BUILD_SOURCE_SHA
