@@ -28,6 +28,9 @@ const jobs = Array.from({ length: 14 }, (_, index) => ({
 }));
 const fixtureSession = { ok: true, selected: { workspace_id: 'ui-fixture-workspace', role: 'OWNER' }, memberships: [{ workspace_id: 'ui-fixture-workspace', role: 'OWNER' }] };
 let readMode = 'ready';
+let catalogMode = 'ready';
+const builderWrites = [];
+const catalog = [{id:'ui-fixture-template',slug:'ui-fixture-starter',name:'UI Fixture Starter',description:'Authentication and workspace records',category:'E-commerce',stack:['Next.js'],stars:0,popular:true,price_satang:0,seller_id:null}];
 const requests = [];
 const checks = [];
 const issues = [];
@@ -47,7 +50,9 @@ async function fixture(route) {
   if (!url.pathname.startsWith('/api/')) return route.continue();
   requests.push({ path: url.pathname, method: request.method(), fixture: true });
   const respond = (json, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(json) });
+  if (request.method() === 'POST' && url.pathname === '/api/dsg/app-builder/jobs') builderWrites.push(JSON.parse(request.postData() || '{}'));
   if (request.method() !== 'GET') return respond({ ok: false, error: { code: 'UI_FIXTURE_WRITE_DISABLED' } }, 403);
+  if (url.pathname === '/api/dsg/templates') return respond(catalogMode === 'ready' ? {ok:true,data:catalog} : {ok:false}, catalogMode === 'ready' ? 200 : 503);
   if (url.pathname === '/api/dsg/access/session') return respond(fixtureSession);
   if (url.pathname === '/api/dsg/agent-chat') return respond({ ok: true, data: { messages: [], modelConnection: { openai: false, gemini: false } } });
   if (url.pathname === '/api/dsg/jobs') {
@@ -55,7 +60,7 @@ async function fixture(route) {
     return respond(readMode === 'malformed' ? { ok: true, data: { jobs: [{}] } } : { ok: true, data: { jobs: readMode === 'empty' ? [] : jobs } });
   }
   if (url.pathname.startsWith('/api/dsg/jobs/')) return respond({ ok: true, data: { job: jobs[0], events: [{ type: 'UI_FIXTURE_EVENT' }], evidenceItems: [], evidenceManifests: [], completionReports: [], replayProofs: [] } });
-  if (url.pathname === '/api/dsg/app-builder/jobs') return respond({ ok: true, data: { jobs: [] } });
+  if (url.pathname === '/api/dsg/app-builder/jobs') return respond({ ok: true, data: [] });
   return respond({ ok: false, error: { code: 'UI_FIXTURE_SERVICE_UNAVAILABLE', message: 'Local UI fixture: service unavailable' } }, 403);
 }
 
@@ -150,6 +155,30 @@ try {
   await mobile.getByRole('button', { name: 'รีเฟรชรายการ', exact: true }).click();
   await mobile.getByRole('heading', { name: 'ยังไม่มีงานในพื้นที่นี้', exact: true }).waitFor();
   check('Empty successful read has an actionable next step', await mobile.getByRole('link', { name: 'เปิดพื้นที่ทำงาน', exact: true }).isVisible());
+  await mobile.goto(base.origin + '/dsg/templates', { waitUntil: 'networkidle' });
+  await mobile.getByRole('link', { name: 'Use template', exact: true }).click();
+  await mobile.waitForURL(base.origin + '/dsg/app-builder?template=ui-fixture-starter');
+  await mobile.locator('#builder-goal').waitFor();
+  check('Selected template reaches both editable goal forms',
+    (await mobile.locator('#builder-goal').inputValue()).includes('UI Fixture Starter') &&
+    (await mobile.getByLabel('อยากสร้างแอปอะไร', { exact: true }).inputValue()).includes('UI Fixture Starter'));
+  const writeResponse = mobile.waitForResponse(response => response.url().endsWith('/api/dsg/app-builder/jobs') && response.request().method() === 'POST');
+  await mobile.getByRole('button', { name: 'บันทึกงานจากเป้าหมายนี้', exact: true }).click();
+  await writeResponse;
+  const submitted = builderWrites.at(-1);
+  check('Template goal reaches the same governed job request without forged authority',
+    submitted?.goal?.includes('UI Fixture Starter') && submitted.targetStack?.deploy === 'none' && !('approval_id' in submitted) && !('intake' in submitted));
+  await mobile.goto(base.origin + '/dsg/app-builder?template=missing-fixture', { waitUntil: 'networkidle' });
+  await mobile.locator('main').getByRole('alert').waitFor();
+  check('Missing template cannot silently become a blank or different selected job', await mobile.locator('#builder-goal').count() === 0);
+  catalogMode = 'failed';
+  await mobile.goto(base.origin + '/dsg/templates', { waitUntil: 'networkidle' });
+  await mobile.locator('main').getByRole('alert').waitFor();
+  check('Catalog read failure is not reported as an empty successful search', await mobile.getByText('No templates found', { exact: true }).count() === 0);
+  catalogMode = 'ready';
+  await mobile.getByRole('button', { name: 'ลองโหลดรายการใหม่', exact: true }).click();
+  await mobile.getByRole('link', { name: 'Use template', exact: true }).waitFor();
+  check('Catalog retry recovers the real loaded list', await mobile.getByRole('heading', { name: 'UI Fixture Starter', exact: true }).count() === 1);
   await mobileContext.close();
 
   const coarseContext = await contextFor(1280, true);

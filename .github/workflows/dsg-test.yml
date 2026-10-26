@@ -34,6 +34,9 @@ jobs:
       - name: Owner Auth0 approval regression tests
         run: npx vitest run tests/dsg/approval-client-stepup.test.ts tests/dsg/approval-middleware-callback.test.ts tests/dsg/auth0-approver-mfa-readonly-route.test.ts tests/dsg/user-bound-auth0-spacetime-bridge.test.ts
 
+      - name: Safe login continuation and Cinema/Native deep-link regression
+        run: npx vitest run tests/dsg/login-safe-next-path.test.ts
+
       - name: DSG operator navigation regression tests
         run: npx vitest run tests/dsg/sidebar-touch-navigation.test.ts tests/dsg/operator-chat-first.test.ts
 

@@ -743,11 +743,12 @@ export function AppBuilderConsoleClient({ initialGoal = '', initialCriteria = ''
 // A new user-accepted outcome remounts the editing console with fresh input.
 // No effect-based state copying or stale PRD/Plan/approval artifacts survives.
 export function AppBuilderConsoleWorkspace() {
-  const accepted = useAppBuilderGoalBridge()?.submitted;
+  const bridge = useAppBuilderGoalBridge();
+  const accepted = bridge?.submitted;
   return <AppBuilderConsoleClient
     key={accepted?.revision ?? 0}
-    initialGoal={accepted?.goal ?? ''}
-    initialCriteria={accepted?.criteria.join('\n') ?? ''}
+    initialGoal={accepted?.goal ?? bridge?.templateDraft?.goal ?? ''}
+    initialCriteria={accepted?.criteria.join('\n') ?? bridge?.templateDraft?.criteria.join('\n') ?? ''}
     acceptedIntake={accepted?.intake}
   />;
 }

@@ -8,9 +8,9 @@ type OutcomeError = { ok: false; error: { code: string; message: string }; nextA
 
 export function OutcomeIntakePanel() {
   const bridge = useAppBuilderGoalBridge();
-  const [goal, setGoal] = useState('');
+  const [goal, setGoal] = useState(bridge?.templateDraft?.goal ?? '');
   const [targetUsers, setTargetUsers] = useState('operators, reviewers');
-  const [successOutcome, setSuccessOutcome] = useState('User can see a useful first workflow and the missing evidence before production.');
+  const [successOutcome, setSuccessOutcome] = useState(bridge?.templateDraft?.criteria.join('\n') ?? 'User can see a useful first workflow and the missing evidence before production.');
   const [availableData, setAvailableData] = useState('existing customer or workflow data');
   const [requiredIntegrations, setRequiredIntegrations] = useState('');
   const [riskLevel, setRiskLevel] = useState<'low' | 'medium' | 'high' | 'regulated'>('medium');
@@ -59,9 +59,9 @@ export function OutcomeIntakePanel() {
         </button>
       </div>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <label className="block text-sm font-bold text-slate-200 lg:col-span-2">อยากสร้างแอปอะไร
-          <textarea value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="เช่น สร้าง CRM ทีมเล็กที่บันทึกลูกค้า งาน และสถานะดีล" className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-black/30 p-3 text-sm text-white outline-none focus:border-[#f2ca50]/60" />
-        </label>
+        <div className="lg:col-span-2"><label htmlFor="outcome-goal" className="block text-sm font-bold text-slate-200">อยากสร้างแอปอะไร</label>
+          <textarea id="outcome-goal" name="goal" value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="เช่น สร้าง CRM ทีมเล็กที่บันทึกลูกค้า งาน และสถานะดีล" className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-black/30 p-3 text-sm text-white outline-none focus:border-[#f2ca50]/60" />
+        </div>
         <label className="block text-sm font-bold text-slate-200">ใครใช้
           <input value={targetUsers} onChange={(event) => setTargetUsers(event.target.value)} className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 p-3 text-sm text-white outline-none focus:border-[#f2ca50]/60" />
         </label>

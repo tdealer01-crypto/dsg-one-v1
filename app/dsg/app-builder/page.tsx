@@ -1,5 +1,5 @@
 import { AppBuilderConsoleWorkspace } from '@/components/dsg/app-builder/AppBuilderConsoleClient';
-import { AppBuilderGoalProvider } from '@/components/dsg/app-builder/AppBuilderGoalBridge';
+import { AppBuilderGoalProvider, SelectedTemplateNotice } from '@/components/dsg/app-builder/AppBuilderGoalBridge';
 import { AppBuilderProofPanel, type ProofPanelItem } from '@/components/dsg/app-builder/AppBuilderProofPanel';
 import { OutcomeIntakePanel } from '@/components/dsg/app-builder/OutcomeIntakePanel';
 import { DSG_APP_TEMPLATES, DSG_MARKET_TEMPLATES } from '@/lib/dsg/app-builder/templates/template-registry';
@@ -119,9 +119,10 @@ const builderStages = [
   { stage: 'Ship', text: 'ส่งต่อ runtime gate พร้อมหลักฐานและ next action' },
 ];
 
-export default function DsgAppBuilderPage() {
+export default async function DsgAppBuilderPage({ searchParams }: { searchParams: Promise<{ template?: string | string[] }> }) {
+  const query = await searchParams;
   return (
-    <AppBuilderGoalProvider>
+    <AppBuilderGoalProvider key={JSON.stringify(query.template ?? null)} requestedTemplate={query.template}>
     <main className="dsg-page min-h-screen overflow-hidden bg-[#090b0f] text-[#eef3f8]">
 
       <div className="relative z-10 mx-auto max-w-7xl px-5 py-6 sm:px-8 lg:px-10">
@@ -139,6 +140,7 @@ export default function DsgAppBuilderPage() {
         </header>
 
         <div className="mt-6">
+          <SelectedTemplateNotice />
           <OutcomeIntakePanel />
         </div>
 
