@@ -16,7 +16,7 @@ function render(ready: boolean, unavailable = false) {
   }));
   const entry = html.match(/<button\b([^>]*)>([^<]*Shared Browser[^<]*)<\/button>/);
   expect(entry).not.toBeNull();
-  const connect = html.match(/<button\\b([^>]*)>ขอเชื่อม Browser · อนุมัติเมื่อจำเป็น<\\/button>/);
+  const connect = html.match(/<button\b([^>]*)>ขอเชื่อม Browser · อนุมัติเมื่อจำเป็น<\/button>/);
   expect(connect).not.toBeNull();
   return { attributes: entry![1], connectAttributes: connect![1], label: entry![2], html, onSignIn, onRequestConnect, readGovernedStatus };
 }
@@ -38,9 +38,9 @@ describe('Viewer entry before tool authentication', () => {
 
   it('exposes Connect through the existing approval flow only after login, without side effects during rendering', () => {
     const signedOut = render(false);
-    expect(signedOut.connectAttributes).toMatch(/\\sdisabled(?:\\s|=|$)/);
+    expect(signedOut.connectAttributes).toMatch(/\sdisabled(?:\s|=|$)/);
     const signedIn = render(true);
-    expect(signedIn.connectAttributes).not.toMatch(/\\sdisabled(?:\\s|=|$)/);
+    expect(signedIn.connectAttributes).not.toMatch(/\sdisabled(?:\s|=|$)/);
     expect(signedIn.html).toContain('เซสชันเดียวกับ Agent');
     expect(signedIn.onRequestConnect).not.toHaveBeenCalled();
   });
