@@ -1,0 +1,35 @@
+{
+  "kind": "actual-frontend-viewer-entry-regression",
+  "observed_on": "2026-10-26",
+  "site": "https://dsg.pics/dsg/workroom?tool=browser",
+  "observed_source": "168c59dbad7f66e5dcb553ee551620af0e2409c1",
+  "frontend_browser": {
+    "scope": "Existing DSG website session; UI verification only, not a Cinema execution provider",
+    "status": "เข้าสู่ระบบเครื่องมือครั้งเดียวเพื่อใช้ Agent v0 และรีโมต",
+    "viewer_button": "เปิด Shared Browser ของฉัน",
+    "visible": true,
+    "enabled": false,
+    "click_attempt": "FAILED",
+    "click_diagnostic": { "matchCount": 1, "visibleCount": 1, "disabled": true },
+    "misleading_message": "กดเปิด Shared Browser ได้เลย ระบบจะตรวจบัญชีและเซสชัน Agent ให้ในครั้งเดียว",
+    "existing_tool_signin_click": "Reached actual Auth0 sign-in page",
+    "credential_values_entered": false,
+    "auth_method_selected": false
+  },
+  "canonical_cinema": {
+    "latest_read": 415,
+    "observed_page": "https://dsg.pics/login",
+    "evidence_hash": "f2d36a28c67c0575453770e241162129a968d18f7d078870274e19fa1e169f21",
+    "authenticated_workroom": "NOT_VERIFIED"
+  },
+  "repair": "Primary Viewer entry starts the same existing Auth0 sign-in when the tool session is absent; busy/pending/init stays distinct and locked; existing session/account/provider comparison remains",
+  "local_validation": {
+    "old_rendered_missing_session_case": "FAILED as reproduced",
+    "focused_tests_passed": 39,
+    "rendered_viewer_checks_passed": 6,
+    "existing_ui_checks_passed": 22,
+    "strict_component_typescript": "PASS",
+    "scope": "Explicit local fixtures, not actual authentication or whole-task proof"
+  },
+  "remaining": ["exact-head CI", "immutable web deployment", "actual repaired primary-button click", "real-account sign-in", "independent Cinema postcondition", "completed business goal"]
+}

@@ -170,7 +170,7 @@ export function LiveAgentChat() {
       {error ? <div className="mt-3 rounded-xl border border-[#D9363E] bg-[#D9363E]/15 p-3 text-sm text-[#ffb4b8]">{error}</div> : null}
 
       <div className="mt-3 flex gap-2">
-        <input
+        <input aria-label="ข้อความถึง Agent"
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => { if (event.key === 'Enter') send(); }}

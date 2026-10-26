@@ -185,6 +185,25 @@ describe('executeGovernedProposal', () => {
       })
       .mockResolvedValueOnce({
         verdict: 'APPROVED',
+        approval: {
+          approval_request_id: 'approval-1',
+          plan_id: 'plan-1',
+          plan_hash: 'e'.repeat(64),
+          route_id: 'route.cinema-remote.connect',
+          agent_id: 'dsg-core-spin',
+          payload: {
+            action: 'browser.remote.connect',
+            arguments: {
+              plan_id: 'plan-1',
+              agent_identity: 'dsg-core-spin',
+              step_id: 'inspect',
+              ttl_seconds: 600,
+            },
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        verdict: 'APPROVED',
         approval_id: 'signed-approval-token',
         approval: {
           approval_request_id: 'approval-1',
@@ -192,6 +211,15 @@ describe('executeGovernedProposal', () => {
           plan_hash: 'e'.repeat(64),
           route_id: 'route.cinema-remote.connect',
           agent_id: 'dsg-core-spin',
+          payload: {
+            action: 'browser.remote.connect',
+            arguments: {
+              plan_id: 'plan-1',
+              agent_identity: 'dsg-core-spin',
+              step_id: 'inspect',
+              ttl_seconds: 600,
+            },
+          },
         },
       })
       .mockResolvedValueOnce({
@@ -218,6 +246,17 @@ describe('executeGovernedProposal', () => {
     });
 
     expect(result.state).toBe('COMPLETED');
+    expect(callSpacetimeTool.mock.calls.map(([name]) => name)).toEqual([
+      'spacetime_discover',
+      'spacetime_get_approval',
+      'spacetime_claim_approval',
+      'spacetime_execute',
+      'spacetime_verify_evidence',
+    ]);
+    expect(callSpacetimeTool).not.toHaveBeenCalledWith(
+      'spacetime_resolve_approval',
+      expect.anything(),
+    );
     const executeCall = callSpacetimeTool.mock.calls.find(
       ([name]) => name === 'spacetime_execute',
     );
@@ -228,6 +267,53 @@ describe('executeGovernedProposal', () => {
     expect(callSpacetimeTool.mock.calls.map(([name]) => name)).not.toContain(
       'spacetime_compose',
     );
+  });
+
+  it('keeps an unapproved request waiting without attempting a claim', async () => {
+    callSpacetimeTool
+      .mockResolvedValueOnce({
+        routes: [{
+          route_id: 'route.cinema-remote.connect',
+          source_node: 'node.agent',
+          target_node: 'node.cinema-remote',
+          capability: 'browser.remote.connect',
+          approval_required: true,
+          signed_approval_required: true,
+          bind_payload: true,
+        }],
+      })
+      .mockResolvedValueOnce({
+        verdict: 'PENDING',
+        approval: {
+          approval_request_id: 'approval-pending',
+          status: 'PENDING',
+        },
+      });
+
+    const result = await executeGovernedProposal({
+      ...baseProposal,
+      capability: 'browser.remote.connect',
+      payload: {
+        action: 'browser.remote.connect',
+        arguments: {
+          plan_id: 'plan-1',
+          agent_identity: 'dsg-core-spin',
+          step_id: 'inspect',
+          ttl_seconds: 600,
+        },
+      },
+      approvalRequestId: 'approval-pending',
+      approvalDecision: 'APPROVE',
+    });
+
+    expect(result).toMatchObject({
+      state: 'WAITING_APPROVAL',
+      approvalRequestId: 'approval-pending',
+    });
+    expect(callSpacetimeTool.mock.calls.map(([name]) => name)).toEqual([
+      'spacetime_discover',
+      'spacetime_get_approval',
+    ]);
   });
 
   it('blocks an incomplete world context before route discovery', async () => {

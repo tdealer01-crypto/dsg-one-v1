@@ -49,11 +49,24 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/automation_spacetime ./automation_spacetime
+# Package the autonomous execution skill into the final immutable AWS image.
+COPY --from=builder /app/skills/dsg-autonomous-execution/SKILL.md ./skills/dsg-autonomous-execution/SKILL.md
+RUN grep -Fxq "name: dsg-autonomous-execution" ./skills/dsg-autonomous-execution/SKILL.md
 COPY --from=builder /app/scripts/dsg-one-container-entrypoint.sh /usr/local/bin/dsg-one-container-entrypoint
+# Restricted server-side bridge: secret values never enter Docker inspect env.
+COPY --from=builder /app/scripts/dsg-kaggle-ssm-bridge.py ./scripts/dsg-kaggle-ssm-bridge.py
+# Run isolated dummy-only tests at image build time; remove from runtime layer.
+COPY --from=builder /app/tests/test_dsg_kaggle_ssm_bridge.py ./tests/test_dsg_kaggle_ssm_bridge.py
 
-RUN apk add --no-cache ca-certificates python3 py3-pip \
+# Install only Alpine's patched zlib (CVE-2026-85091), fail closed if unavailable.
+# The minimum package constraint is validated by apk during the Docker build.
+RUN apk add --no-cache 'zlib>=1.3.2-r1' ca-certificates python3 py3-pip \
     && python3 -m venv /opt/dsg-automation \
     && /opt/dsg-automation/bin/pip install --no-cache-dir -r /app/automation_spacetime/requirements.txt \
+    && /opt/dsg-automation/bin/pip install --no-cache-dir boto3==1.40.70 \
+    && /opt/dsg-automation/bin/python -m py_compile /app/scripts/dsg-kaggle-ssm-bridge.py \
+    && PYTHONPATH=/app /opt/dsg-automation/bin/python -m unittest discover -s /app/tests -p test_dsg_kaggle_ssm_bridge.py -q \
+    && rm /app/tests/test_dsg_kaggle_ssm_bridge.py \
     && chmod 0755 /usr/local/bin/dsg-one-container-entrypoint
 
 ENV DSG_AUTOMATION_PYTHON=/opt/dsg-automation/bin/python \

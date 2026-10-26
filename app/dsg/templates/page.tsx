@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import Link from 'next/link';
 import { Search, Star, ArrowRight, Zap, ShoppingCart, Loader2 } from 'lucide-react';
 
 type Template = {
@@ -36,19 +37,25 @@ function formatPrice(priceSatang: number): string {
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  const [catalogIssue, setCatalogIssue] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [purchasing, setPurchasing] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/dsg/templates')
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.ok) setTemplates(res.data ?? []);
+    const abort = new AbortController();
+    fetch('/api/dsg/templates', { credentials: 'include', cache: 'no-store', signal: abort.signal })
+      .then(async response => {
+        const result = await response.json();
+        if (!response.ok || result.ok !== true || !Array.isArray(result.data)) throw new Error('CATALOG_UNAVAILABLE');
+        return result.data as Template[];
       })
-      .catch(() => {/* silently degrade — grid stays empty */})
-      .finally(() => setLoading(false));
-  }, []);
+      .then(rows => { if (!abort.signal.aborted) { setTemplates(rows); setCatalogIssue(null); } })
+      .catch(() => { if (!abort.signal.aborted) setCatalogIssue('ยังอ่านรายการเทมเพลตไม่ได้ โปรดลองอีกครั้ง'); })
+      .finally(() => { if (!abort.signal.aborted) setLoading(false); });
+    return () => abort.abort();
+  }, [reload]);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(templates.map((t) => t.category)));
@@ -92,16 +99,16 @@ export default function TemplatesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+    <main className="dsg-page min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
       <div className="mx-auto max-w-7xl space-y-8">
         {/* Header */}
         <section className="rounded-3xl border border-indigo-500/20 bg-indigo-500/10 p-6 shadow-2xl shadow-indigo-950/30 md:p-8">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-400/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-indigo-200">
             <Zap className="h-3.5 w-3.5" /> App Templates
           </div>
-          <h1 className="text-3xl font-black tracking-tight md:text-5xl">App Templates</h1>
+          <h1 className="dsg-page-title text-3xl font-black tracking-tight md:text-5xl">App Templates</h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
-            Start building faster with production-ready templates. Pick one, customise it, and ship.
+            เลือกเทมเพลตเป็นจุดเริ่มต้น แล้วปรับให้เหมาะกับงาน แอปที่สร้างยังต้องผ่านการทดสอบและตรวจความพร้อมก่อนใช้งานจริง
           </p>
         </section>
 
@@ -109,12 +116,12 @@ export default function TemplatesPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
+            <input aria-label="Search templates"
               type="text"
               placeholder="Search templates…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-2xl border border-slate-800 bg-slate-900 py-2.5 pl-10 pr-4 text-sm text-slate-100 outline-none focus:border-indigo-500 placeholder:text-slate-500"
+              className="w-full rounded-2xl border border-slate-800 bg-slate-900 py-2.5 pl-10 pr-4 text-sm text-slate-100 outline-none focus:border-indigo-500 placeholder:text-slate-400"
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -141,20 +148,24 @@ export default function TemplatesPage() {
           </div>
         )}
 
+        {catalogIssue && <div role="alert" className="rounded-xl border border-amber-600 bg-amber-950/30 p-4 text-sm text-amber-100">
+          <p>{catalogIssue}</p><button type="button" onClick={() => { setLoading(true); setCatalogIssue(null); setReload(value => value + 1); }} className="dsg-button-secondary mt-3">ลองโหลดรายการใหม่</button>
+        </div>}
+
         {/* Results count */}
-        {!loading && (
-          <p className="text-sm text-slate-500">
+        {!loading && !catalogIssue && (
+          <p className="text-sm text-slate-400">
             {filtered.length} template{filtered.length !== 1 ? 's' : ''}
             {activeCategory !== 'All' ? ` in ${activeCategory}` : ''}
           </p>
         )}
 
         {/* Grid */}
-        {!loading && filtered.length === 0 && (
+        {!loading && !catalogIssue && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-800 bg-slate-900 py-24 text-center">
             <Search className="mb-4 h-10 w-10 text-slate-600" />
             <p className="text-lg font-bold text-slate-300">No templates found</p>
-            <p className="mt-1 text-sm text-slate-500">Try a different search term or category.</p>
+            <p className="mt-1 text-sm text-slate-400">Try a different search term or category.</p>
             <button
               onClick={() => { setSearch(''); setActiveCategory('All'); }}
               className="mt-6 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-500"
@@ -164,7 +175,7 @@ export default function TemplatesPage() {
           </div>
         )}
 
-        {!loading && filtered.length > 0 && (
+        {!loading && !catalogIssue && filtered.length > 0 && (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((template) => {
               const isFree = template.price_satang === 0;
@@ -175,25 +186,25 @@ export default function TemplatesPage() {
                   className="flex flex-col rounded-3xl border border-slate-800 bg-slate-900 p-5 transition-colors hover:border-slate-700"
                 >
                   {/* Badges */}
-                  <div className="mb-4 flex items-start justify-between">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-700 bg-slate-800 text-slate-300">
+                  <div className="mb-4 flex items-start justify-between gap-2">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-700 bg-slate-800 text-slate-300">
                       <ShoppingCart className="h-5 w-5" />
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap justify-end gap-1.5">
                       {template.popular && (
-                        <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
-                          Popular
+                        <span className="shrink-0 whitespace-nowrap rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
+                          แนะนำ
                         </span>
                       )}
                       {template.category && (
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${CATEGORY_COLORS[template.category] ?? 'border-slate-500/40 bg-slate-500/10 text-slate-300'}`}>
+                        <span className={`shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${CATEGORY_COLORS[template.category] ?? 'border-slate-500/40 bg-slate-500/10 text-slate-300'}`}>
                           {template.category}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <h3 className="text-base font-black text-slate-100">{template.name}</h3>
+                  <h2 className="text-base font-black text-slate-100">{template.name}</h2>
                   <p className="mt-1 flex-1 text-sm leading-6 text-slate-400">{template.description}</p>
 
                   {/* Stack */}
@@ -211,8 +222,8 @@ export default function TemplatesPage() {
                       <span className={`text-sm font-bold ${isFree ? 'text-emerald-400' : 'text-amber-300'}`}>
                         {formatPrice(template.price_satang)}
                       </span>
-                      <span className="flex items-center gap-1 text-xs text-slate-500">
-                        <Star className="h-3.5 w-3.5 text-amber-400" />
+                      <span className="flex items-center gap-1 text-xs text-slate-400">
+                        <Star aria-hidden="true" className="h-3.5 w-3.5 text-amber-400" /><span>ดาวในรายการ</span>
                         {formatStars(template.stars)}
                       </span>
                     </div>
@@ -233,12 +244,12 @@ export default function TemplatesPage() {
                         )}
                       </button>
                     ) : (
-                      <a
-                        href={`/dsg/app-builder?template=${template.slug}`}
+                      <Link
+                        href={`/dsg/app-builder?template=${encodeURIComponent(template.slug)}`}
                         className="inline-flex items-center gap-1.5 rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500"
                       >
                         Use template <ArrowRight className="h-3.5 w-3.5" />
-                      </a>
+                      </Link>
                     )}
                   </div>
                 </div>

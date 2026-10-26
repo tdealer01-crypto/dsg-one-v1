@@ -36,7 +36,18 @@ export type DsgAutonomousLevelGate = {
 };
 
 function stableHash(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value, Object.keys(value as Record<string, unknown>).sort())).digest('hex');
+  // Canonicalize recursively: a top-level JSON replacer discards nested fields
+  // and can yield the same hash for different capability evidence.
+  function canonical(input: unknown): unknown {
+    if (Array.isArray(input)) return input.map(canonical);
+    if (input && typeof input === 'object') {
+      return Object.fromEntries(Object.entries(input as Record<string, unknown>)
+        .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+        .map(([key, item]) => [key, canonical(item)]));
+    }
+    return input;
+  }
+  return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 }
 
 export function evaluateDsgAutonomousLevelGate(input?: Partial<Record<DsgAutonomousCapabilityId, DsgAutonomousCapabilityStatus>>): DsgAutonomousLevelGate {
@@ -44,13 +55,13 @@ export function evaluateDsgAutonomousLevelGate(input?: Partial<Record<DsgAutonom
   const providerProofEvidence = `Provider proof summary: ${DSG_PROVIDER_PROOF_SUMMARY.claim}; proofHash=${DSG_PROVIDER_PROOF_SUMMARY.proofHash}; rawArtifacts=${DSG_PROVIDER_PROOF_SUMMARY.rawArtifactPolicy}`;
   const status = (id: DsgAutonomousCapabilityId, fallback: DsgAutonomousCapabilityStatus) => input?.[id] ?? fallback;
   const providerStatus = (id: DsgAutonomousCapabilityId, fallback: DsgAutonomousCapabilityStatus) =>
-    input?.[id] ?? (providerProofComplete ? 'PASS' : fallback);
+    input?.[id] ?? fallback; // Local-only provider summary is not AWS runtime acceptance.
 
   const capabilities: DsgAutonomousCapability[] = [
     {
       id: 'auth_rbac',
       label: 'Verified auth and workspace RBAC',
-      status: status('auth_rbac', 'PASS'),
+      status: status('auth_rbac', 'PARTIAL'),
       requiredForComplete: true,
       evidence: ['Privileged App Builder and Flow Studio routes reject unauthenticated mutation attempts.'],
       nextAction: 'Keep every privileged runtime route behind verified DSG context.',
@@ -66,7 +77,7 @@ export function evaluateDsgAutonomousLevelGate(input?: Partial<Record<DsgAutonom
     {
       id: 'flow_studio',
       label: 'DSG Flow Studio hardened action planner',
-      status: status('flow_studio', 'PASS'),
+      status: status('flow_studio', 'PARTIAL'),
       requiredForComplete: true,
       evidence: ['Flow Studio production smoke verified', 'mutate route locked', 'MCP route allowlisted'],
       nextAction: 'Connect planner outputs to App Builder timeline and artifact ledger.',
@@ -77,10 +88,10 @@ export function evaluateDsgAutonomousLevelGate(input?: Partial<Record<DsgAutonom
       status: providerStatus('sandbox_isolation', 'BLOCKED'),
       requiredForComplete: true,
       evidence: providerProofComplete
-        ? ['Sandbox provider proof lane passed.', providerProofEvidence]
+        ? ['Historical local-only sandbox summary, not a live runtime receipt.', providerProofEvidence]
         : ['Sandbox contract exists, but no isolated provider proof exists yet.'],
-      blockedReason: providerProofComplete ? undefined : 'Need provider-backed isolated execution, command logs, timeout, and artifact storage.',
-      nextAction: providerProofComplete ? 'Keep sandbox proof attached to the safe provider proof summary.' : 'Add provider adapter for isolated build/test execution and attach logs as evidence.',
+      blockedReason: providerProofComplete ? 'LOCAL_SUMMARY_ONLY_NOT_RUNTIME_ACCEPTANCE' : 'Need provider-backed isolated execution, command logs, timeout, and artifact storage.',
+      nextAction: providerProofComplete ? 'Attach independently verifiable sandbox execution receipts to the current release.' : 'Add provider adapter for isolated build/test execution and attach logs as evidence.',
     },
     {
       id: 'agent_repair_loop',
@@ -88,10 +99,10 @@ export function evaluateDsgAutonomousLevelGate(input?: Partial<Record<DsgAutonom
       status: providerStatus('agent_repair_loop', 'PARTIAL'),
       requiredForComplete: true,
       evidence: providerProofComplete
-        ? ['Bounded repair proof lane passed.', providerProofEvidence]
+        ? ['Historical local-only repair summary, not a live runtime receipt.', providerProofEvidence]
         : ['Build log analyzer and deterministic workflow exist, but autonomous repair commits are not provider-backed.'],
-      blockedReason: providerProofComplete ? undefined : 'Need controlled repair attempts against sandbox failures.',
-      nextAction: providerProofComplete ? 'Keep bounded repair proof in the provider proof summary.' : 'Implement bounded repair attempts with diff evidence and stop conditions.',
+      blockedReason: providerProofComplete ? 'LOCAL_SUMMARY_ONLY_NOT_RUNTIME_ACCEPTANCE' : 'Need controlled repair attempts against sandbox failures.',
+      nextAction: providerProofComplete ? 'Attach signed bounded repair execution receipts to the current release.' : 'Implement bounded repair attempts with diff evidence and stop conditions.',
     },
     {
       id: 'remote_browser_session',
@@ -99,10 +110,10 @@ export function evaluateDsgAutonomousLevelGate(input?: Partial<Record<DsgAutonom
       status: providerStatus('remote_browser_session', 'BLOCKED'),
       requiredForComplete: true,
       evidence: providerProofComplete
-        ? ['Browser proof lane passed by manual-browser-evidence.', providerProofEvidence]
+        ? ['Historical manual browser summary, not a signed Cinema session.', providerProofEvidence]
         : ['Flow Studio public-search path is native HTTP evidence, not a remote browser session.'],
-      blockedReason: providerProofComplete ? undefined : 'Need actual browser/session provider, screenshots, navigation log, and takeover checkpoint.',
-      nextAction: providerProofComplete ? 'Replace manual-browser-evidence with automated browser provider evidence when available.' : 'Add remote browser provider adapter and proof capture.',
+      blockedReason: providerProofComplete ? 'LOCAL_SUMMARY_ONLY_NOT_RUNTIME_ACCEPTANCE' : 'Need actual browser/session provider, screenshots, navigation log, and takeover checkpoint.',
+      nextAction: providerProofComplete ? 'Prove signed Cinema connect/execute with approval and browser readback.' : 'Add remote browser provider adapter and proof capture.',
     },
     {
       id: 'artifact_timeline',
@@ -110,10 +121,10 @@ export function evaluateDsgAutonomousLevelGate(input?: Partial<Record<DsgAutonom
       status: providerStatus('artifact_timeline', 'PARTIAL'),
       requiredForComplete: true,
       evidence: providerProofComplete
-        ? ['Artifact timeline proof lane passed.', providerProofEvidence]
+        ? ['Historical local-only timeline summary, not a live runtime receipt.', providerProofEvidence]
         : ['App Builder metadata and proof screens exist, but unified timeline is not complete.'],
-      blockedReason: providerProofComplete ? undefined : 'Need generated files, PR links, build logs, browser proof, and deployment proof in one timeline.',
-      nextAction: providerProofComplete ? 'Keep timeline event hashes attached to the provider proof summary.' : 'Build a single evidence timeline component backed by deterministic report data.',
+      blockedReason: providerProofComplete ? 'LOCAL_SUMMARY_ONLY_NOT_RUNTIME_ACCEPTANCE' : 'Need generated files, PR links, build logs, browser proof, and deployment proof in one timeline.',
+      nextAction: providerProofComplete ? 'Verify actor-bound timeline data and linked evidence hashes.' : 'Build a single evidence timeline component backed by deterministic report data.',
     },
     {
       id: 'preview_deployment_proof',
@@ -121,15 +132,15 @@ export function evaluateDsgAutonomousLevelGate(input?: Partial<Record<DsgAutonom
       status: providerStatus('preview_deployment_proof', 'BLOCKED'),
       requiredForComplete: true,
       evidence: providerProofComplete
-        ? ['Preview deployment proof lane passed.', providerProofEvidence]
+        ? ['Historical local-only preview summary, not a live runtime receipt.', providerProofEvidence]
         : ['Vercel build status exists, but per-job preview proof collector is not wired.'],
-      blockedReason: providerProofComplete ? undefined : 'Need URL health check, response code, screenshot or HTML proof, and stored proof hash per job.',
-      nextAction: providerProofComplete ? 'Keep preview route hashes attached to the provider proof summary.' : 'Add preview proof collector and store proof hash before claim promotion.',
+      blockedReason: providerProofComplete ? 'LOCAL_SUMMARY_ONLY_NOT_RUNTIME_ACCEPTANCE' : 'Need URL health check, response code, screenshot or HTML proof, and stored proof hash per job.',
+      nextAction: providerProofComplete ? 'Verify actual live preview URL and source-bound deployment proof.' : 'Add preview proof collector and store proof hash before claim promotion.',
     },
     {
       id: 'production_smoke_proof',
       label: 'Production smoke proof',
-      status: status('production_smoke_proof', 'PASS'),
+      status: status('production_smoke_proof', 'PARTIAL'),
       requiredForComplete: true,
       evidence: ['Production smoke verified for App Builder and Flow Studio routes.'],
       nextAction: 'Keep production smoke tests explicit and repeatable.',

@@ -91,9 +91,12 @@ describe('DSG access console session bridge', () => {
     const services = readFileSync(join(root, 'lib/dsg/agent-runtime/service-registry.ts'), 'utf8');
     const ship = readFileSync(join(root, '.github/workflows/ship.yml'), 'utf8');
 
-    for (const name of ['App Builder', 'Governance Controls', 'Runtime Health', 'Spacetime MCP', 'Workroom', 'Cinema / Browser', 'Agent v0 / NVIDIA Skills', 'Agent Repair']) {
+    for (const name of ['App Builder', 'Governance Controls', 'Runtime Health', 'Spacetime MCP', 'Workroom', 'Cinema / Browser', 'DSG Agent v0 / Governed MCP', 'Agent v0 / NVIDIA Skills', 'Agent Repair']) {
       expect(page).toContain(name);
     }
+    expect(page).toContain('route.agent.dsg-v0.plan');
+    expect(page).toContain('MCP route · execution not verified');
+    expect(page).toContain("href: '/dsg/workroom'");
     expect(page).toContain('Spacetime remains execution authority');
     expect(page).toContain('Agent Repair is proposal-only');
     expect(page).toContain('Free Kaggle GPU · proposal');
@@ -105,7 +108,8 @@ describe('DSG access console session bridge', () => {
     expect(page).toContain('https://aws.dsg.pics/mcp');
     expect(page).toContain("href: '/dsg/workroom'");
     expect(page).toContain('Authenticated AWS workroom');
-    expect(page).toContain("href: 'https://aws.dsg.pics/app'");
+    expect(page).toContain("href: '/dsg/workroom?tool=browser'");
+    expect(page).toContain('The AWS /app page is Evidence & Conformance, not the Cinema viewer.');
     expect(page).toContain("href: null");
     expect(page).toContain('No verified AWS operator UI route');
     expect(page).toContain('APP HEALTHY');

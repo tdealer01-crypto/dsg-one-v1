@@ -1,14 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { useAppBuilderGoalBridge } from './AppBuilderGoalBridge';
 import type { DsgOutcomePlan } from '@/lib/dsg/app-builder/outcome-intake';
 
 type OutcomeError = { ok: false; error: { code: string; message: string }; nextAction: string };
 
 export function OutcomeIntakePanel() {
-  const [goal, setGoal] = useState('');
+  const bridge = useAppBuilderGoalBridge();
+  const [goal, setGoal] = useState(bridge?.templateDraft?.goal ?? '');
   const [targetUsers, setTargetUsers] = useState('operators, reviewers');
-  const [successOutcome, setSuccessOutcome] = useState('User can see a useful first workflow and the missing evidence before production.');
+  const [successOutcome, setSuccessOutcome] = useState(bridge?.templateDraft?.criteria.join('\n') ?? 'User can see a useful first workflow and the missing evidence before production.');
   const [availableData, setAvailableData] = useState('existing customer or workflow data');
   const [requiredIntegrations, setRequiredIntegrations] = useState('');
   const [riskLevel, setRiskLevel] = useState<'low' | 'medium' | 'high' | 'regulated'>('medium');
@@ -26,6 +28,10 @@ export function OutcomeIntakePanel() {
       });
       const json = (await response.json()) as DsgOutcomePlan | OutcomeError;
       setResult(json);
+      if ('ok' in json && json.ok === true) {
+        // Share only the actual submitted input with the console below.
+        bridge?.publish(json.intake);
+      }
     } catch (error) {
       setResult({
         ok: false,
@@ -53,9 +59,9 @@ export function OutcomeIntakePanel() {
         </button>
       </div>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <label className="block text-sm font-bold text-slate-200 lg:col-span-2">อยากสร้างแอปอะไร
-          <textarea value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="เช่น สร้าง CRM ทีมเล็กที่บันทึกลูกค้า งาน และสถานะดีล" className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-black/30 p-3 text-sm text-white outline-none focus:border-[#f2ca50]/60" />
-        </label>
+        <div className="lg:col-span-2"><label htmlFor="outcome-goal" className="block text-sm font-bold text-slate-200">อยากสร้างแอปอะไร</label>
+          <textarea id="outcome-goal" name="goal" value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="เช่น สร้าง CRM ทีมเล็กที่บันทึกลูกค้า งาน และสถานะดีล" className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-black/30 p-3 text-sm text-white outline-none focus:border-[#f2ca50]/60" />
+        </div>
         <label className="block text-sm font-bold text-slate-200">ใครใช้
           <input value={targetUsers} onChange={(event) => setTargetUsers(event.target.value)} className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 p-3 text-sm text-white outline-none focus:border-[#f2ca50]/60" />
         </label>
@@ -69,7 +75,7 @@ export function OutcomeIntakePanel() {
           <input value={requiredIntegrations} onChange={(event) => setRequiredIntegrations(event.target.value)} placeholder="Stripe, SSO, email, marketplace entitlement" className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 p-3 text-sm text-white outline-none focus:border-[#f2ca50]/60" />
         </label>
         <div className="flex flex-wrap gap-3 lg:col-span-2">
-          <select value={riskLevel} onChange={(event) => setRiskLevel(event.target.value as typeof riskLevel)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-sm text-white">
+          <select aria-label="ระดับความเสี่ยง" value={riskLevel} onChange={(event) => setRiskLevel(event.target.value as typeof riskLevel)} className="rounded-2xl border border-white/10 bg-black/50 p-3 text-sm text-white">
             <option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="regulated">regulated</option>
           </select>
           <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-slate-200">
@@ -83,6 +89,9 @@ export function OutcomeIntakePanel() {
             <div>
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200">Next action</p>
               <p className="mt-2 text-sm leading-6 text-slate-200">{result.nextAction}</p>
+              <a href="#dsg-app-builder-console" className="mt-3 inline-flex rounded-xl border border-cyan-300/40 px-3 py-2 text-sm font-semibold text-cyan-100">
+                ไปต่อใน Console ด้วยเป้าหมายนี้
+              </a>
               <p className="mt-3 text-sm text-slate-300">Suggested templates: {result.suggestedTemplateIds.join(', ')}</p>
               <p className="mt-2 text-sm text-slate-300">Readiness impact: {Object.entries(result.readinessImpact).filter(([, value]) => value).map(([key]) => key).join(', ') || 'planning only'}</p>
             </div>

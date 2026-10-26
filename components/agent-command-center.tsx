@@ -377,7 +377,7 @@ export function AgentCommandCenter() {
       <h2 className="mt-2 text-xl font-black">Governed Agent Command Center</h2>
       <p className="mt-1 text-sm text-[#D7D9DE]">Commands are routed to their exact governed surface. Builder requests use App Builder; low-risk Cinema status reads use Core Spin → DSG Spacetime → provider evidence.</p>
 
-      <textarea
+      <textarea aria-label="คำสั่งสำหรับ Agent Command Center"
         value={command}
         onChange={(event) => setCommand(event.target.value)}
         className="mt-4 h-28 w-full rounded-xl border border-[#C8A24D]/50 bg-[#0C2340] p-3 text-sm text-white outline-none"

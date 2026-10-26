@@ -6,5 +6,5 @@ export const metadata: Metadata = {
 };
 
 export default function GovernancePage() {
-  return <CcvsControlCatalogView />;
+  return <main className="dsg-page"><CcvsControlCatalogView /></main>;
 }

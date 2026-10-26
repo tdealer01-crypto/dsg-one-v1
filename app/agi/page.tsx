@@ -13,11 +13,11 @@ const claim = evaluateDsgClaimGate({
 
 export default function AgiDsgPage() {
   return (
-    <main className="min-h-screen px-6 py-10">
+    <main className="dsg-page min-h-screen px-6 py-10">
       <section className="mx-auto max-w-4xl space-y-6">
         <div className="rounded-3xl border p-8">
           <p className="text-sm uppercase tracking-widest opacity-70">AGI DSG Control Plane</p>
-          <h1 className="mt-4 text-4xl font-semibold">Deterministic runtime governance</h1>
+          <h1 className="dsg-page-title mt-4 text-4xl font-semibold">Deterministic runtime governance</h1>
           <p className="mt-4 text-lg opacity-80">
             Current page is a truthful control surface. It shows the claim gate state and does not report production readiness.
           </p>

@@ -1,5 +1,8 @@
 'use client';
 
+import { DsgCopy } from '@/components/app-language-copy-bridge';
+
+
 import React, { useState } from 'react';
 import { ArrowRight, CheckCircle2, Lock, Search, ShieldAlert, Sparkles } from 'lucide-react';
 import type { FlowOrchestration } from '@/lib/dsg/flow-studio/types';
@@ -94,7 +97,7 @@ export default function FlowStudioPage() {
   const plan = orchestration?.plan;
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+    <main className="dsg-page min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <section className="rounded-3xl border border-indigo-500/20 bg-indigo-500/10 p-6 shadow-2xl shadow-indigo-950/30 md:p-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -102,7 +105,7 @@ export default function FlowStudioPage() {
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-400/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-indigo-200">
                 <Sparkles className="h-3.5 w-3.5" /> DSG Flow Studio
               </div>
-              <h1 className="text-3xl font-black tracking-tight md:text-5xl">Hardened deterministic action planner</h1>
+              <h1 className="dsg-page-title text-3xl font-black tracking-tight md:text-5xl">Hardened deterministic action planner</h1>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 md:text-base">
                 รวมแนวคิดจาก dsg-Flow-Studio แบบปลอดภัย: Vercel takeover plan, dry-run theme mutation, allowlisted URL/Wikipedia search, และ proof boundary โดยไม่เปิด runtime mutation public.
               </p>
@@ -117,8 +120,8 @@ export default function FlowStudioPage() {
         <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="rounded-3xl border border-slate-800 bg-slate-900 p-5">
             <form onSubmit={generatePlan} className="space-y-4">
-              <label className="text-sm font-bold text-slate-300">Goal</label>
-              <textarea
+              <label htmlFor="flow-goal" className="text-sm font-bold text-slate-300"><DsgCopy value="Goal" /></label>
+              <textarea id="flow-goal"
                 value={goal}
                 onChange={(event) => setGoal(event.target.value)}
                 className="h-36 w-full resize-none rounded-2xl border border-slate-800 bg-slate-950 p-4 text-sm leading-6 text-slate-100 outline-none focus:border-indigo-500"

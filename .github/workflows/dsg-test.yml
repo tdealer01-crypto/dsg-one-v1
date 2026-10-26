@@ -31,6 +31,21 @@ jobs:
       - name: Ising MCP regression tests
         run: npx vitest run tests/dsg/mcp-ising-route.test.ts tests/dsg/nvidia-ising.test.ts
 
+      - name: Owner Auth0 approval regression tests
+        run: npx vitest run tests/dsg/approval-client-stepup.test.ts tests/dsg/approval-middleware-callback.test.ts tests/dsg/auth0-approver-mfa-readonly-route.test.ts tests/dsg/user-bound-auth0-spacetime-bridge.test.ts
+
+      - name: Safe login continuation and Cinema/Native deep-link regression
+        run: npx vitest run tests/dsg/login-safe-next-path.test.ts
+
+      - name: DSG operator navigation regression tests
+        run: npx vitest run tests/dsg/sidebar-touch-navigation.test.ts tests/dsg/operator-chat-first.test.ts
+
+      - name: Chat history and real model regression tests
+        run: npx vitest run tests/dsg/chat-history-model.test.ts tests/dsg/chat-history-recovery-route.test.ts
+
+      - name: Cinema Free Auth0, guarded Connect and Viewer session regression
+        run: npx vitest run tests/dsg/cinema-free-link-proof.test.ts tests/dsg/cinema-controller-contract.test.ts tests/dsg/cinema-viewer-entry.test.ts tests/dsg/cinema-viewer-session.test.ts
+
       - name: Claim gate
         run: npm run dsg:claim-gate
 

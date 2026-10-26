@@ -1,0 +1,59 @@
+name: Verify rendered DSG pages and navigation
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: all-pages-ux-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  rendered-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact UI source
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Verify template selection against actual outcome intake
+        run: npm test -- tests/dsg/template-goal-handoff.test.ts
+      - name: Install isolated UI test tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/dsg-ui-tools" --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.64.1 axe-core@4.14.0
+          "$RUNNER_TEMP/dsg-ui-tools/node_modules/.bin/playwright" install --with-deps chromium
+      - run: npm run build
+      - name: Inspect every owned page and click the navigation
+        env:
+          DSG_UI_TOOLS_DIR: ${{ runner.temp }}/dsg-ui-tools
+          DSG_UI_OUTPUT: ${{ runner.temp }}/dsg-ui-proof
+          DSG_UI_APP_URL: http://127.0.0.1:3043
+        run: |
+          set -euo pipefail
+          node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3043 > "$RUNNER_TEMP/dsg-ui-server.log" 2>&1 &
+          DSG_UI_SERVER_PID=$!
+          trap 'kill "$DSG_UI_SERVER_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl -fsS "$DSG_UI_APP_URL/" > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          node scripts/dsg-all-pages-ui-check.mjs
+      - name: Retain explicit local-fixture UI proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-rendered-ui-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/dsg-ui-proof/
+          if-no-files-found: warn
+          retention-days: 7

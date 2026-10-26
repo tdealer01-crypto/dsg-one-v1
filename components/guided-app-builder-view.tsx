@@ -1,5 +1,8 @@
 'use client';
 
+import { DsgCopy } from '@/components/app-language-copy-bridge';
+
+
 import { useMemo, useState } from 'react';
 import {
   CheckCircle2,
@@ -311,7 +314,7 @@ export function GuidedAppBuilderView() {
 
           <div className="border-t border-[#c8c8c8]/15 p-3">
             <div className="flex gap-2">
-              <input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') send(); }} placeholder={stage === 'idea' ? 'พิมพ์สั้น ๆ เช่น เว็บจองคิวร้านกาแฟ' : 'พิมพ์สิ่งที่อยากเพิ่มหรือแก้...'} className="h-11 min-w-0 flex-1 rounded-xl border border-[#c8c8c8]/15 bg-[#111113] px-3 text-sm text-[#f2f2f2] outline-none placeholder:text-[#666] focus:border-[#d6a63a]/50" />
+              <input aria-label="ข้อความสำหรับสร้างแอป" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') send(); }} placeholder={stage === 'idea' ? 'พิมพ์สั้น ๆ เช่น เว็บจองคิวร้านกาแฟ' : 'พิมพ์สิ่งที่อยากเพิ่มหรือแก้...'} className="h-11 min-w-0 flex-1 rounded-xl border border-[#c8c8c8]/15 bg-[#111113] px-3 text-sm text-[#f2f2f2] outline-none placeholder:text-[#666] focus:border-[#d6a63a]/50" />
               <button onClick={send} disabled={!input.trim()} className={cn('inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-xs font-black disabled:opacity-50', toneClass('gold'))}><Send className="h-4 w-4" /> ส่ง</button>
             </div>
           </div>
@@ -321,7 +324,7 @@ export function GuidedAppBuilderView() {
           <section className="rounded-xl border border-[#d6a63a]/25 bg-[#d6a63a]/5 p-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-[#d6a63a]">Customer evidence monitor</p>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-[#d6a63a]"><DsgCopy value="Customer evidence monitor" /></p>
                 <p className="mt-1 text-xs leading-5 text-[#c8c8c8]">สร้าง PR ก่อน ประหยัด Vercel quota และไม่แสดงหลักฐานปลอม</p>
               </div>
               <StatusPill status={job?.claimStatus} />
@@ -333,34 +336,34 @@ export function GuidedAppBuilderView() {
           </section>
 
           <section className="rounded-xl border border-[#c8c8c8]/15 bg-[#0c0c0d] p-3">
-            <p className="text-xs font-black text-[#f2f2f2]">Goal</p>
+            <p className="text-xs font-black text-[#f2f2f2]"><DsgCopy value="Goal" /></p>
             <p className="mt-2 text-xs leading-5 text-[#d9d9d9]">{goal}</p>
           </section>
 
           <section className="grid gap-2 text-xs">
             <div className="rounded-lg border border-[#c8c8c8]/10 bg-[#0c0c0d] p-3">
-              <p className="font-black text-[#8d8d8d]">Success criteria</p>
+              <p className="font-black text-[#8d8d8d]"><DsgCopy value="Success criteria" /></p>
               <ul className="mt-1 space-y-1 leading-5 text-[#d9d9d9]">{criteria.map((criterion) => <li key={criterion}>• {criterion}</li>)}</ul>
             </div>
             <div className="rounded-lg border border-[#c8c8c8]/10 bg-[#0c0c0d] p-3">
-              <p className="font-black text-[#8d8d8d]">Constraints</p>
+              <p className="font-black text-[#8d8d8d]"><DsgCopy value="Constraints" /></p>
               <ul className="mt-1 space-y-1 leading-5 text-[#d9d9d9]">{constraints.map((constraint) => <li key={constraint}>• {constraint}</li>)}</ul>
             </div>
           </section>
 
           <div className="flex flex-wrap gap-2">
-            <button onClick={approve} disabled={!!busy || !job?.proposedPlan} className={cn('inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-40', toneClass('gold'))}><ShieldCheck className="h-4 w-4" /> อนุมัติแผน</button>
+            <button onClick={approve} disabled={!!busy || !job?.proposedPlan} className={cn('inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-40', toneClass('gold'))}><ShieldCheck className="h-4 w-4" /> <DsgCopy value="อนุมัติแผน" /></button>
             <button onClick={sendRuntime} disabled={!!busy || !job?.approvalHash} className={cn('inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-40', toneClass('silver'))}><GitBranch className="h-4 w-4" /> ส่งเข้า runtime</button>
             <button onClick={launch} disabled={!!busy || !job?.approvalHash || job.status !== 'READY_FOR_RUNTIME'} className={cn('inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-40', toneClass('gold'))}>{busy === 'tool-call' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} สร้าง PR</button>
           </div>
 
-          {job?.prd?.summary ? <section className="rounded-xl border border-[#c8c8c8]/15 bg-[#0c0c0d] p-3"><p className="text-xs font-black text-[#f2f2f2]">PRD summary</p><p className="mt-2 text-xs leading-5 text-[#d9d9d9]">{job.prd.summary}</p></section> : null}
+          {job?.prd?.summary ? <section className="rounded-xl border border-[#c8c8c8]/15 bg-[#0c0c0d] p-3"><p className="text-xs font-black text-[#f2f2f2]"><DsgCopy value="PRD summary" /></p><p className="mt-2 text-xs leading-5 text-[#d9d9d9]">{job.prd.summary}</p></section> : null}
 
-          {job?.proposedPlan ? <section className="space-y-2 rounded-xl border border-[#c8c8c8]/15 bg-[#0c0c0d] p-3"><p className="text-xs font-black text-[#f2f2f2]">Plan steps</p>{job.proposedPlan.steps.map((step) => <div key={step.id} className="rounded-lg border border-[#c8c8c8]/10 p-2"><p className="text-[11px] text-[#8d8d8d]">{step.id} · {step.phase} · {step.riskLevel}</p><p className="mt-1 text-xs font-bold text-[#d9d9d9]">{step.title}</p></div>)}</section> : null}
+          {job?.proposedPlan ? <section className="space-y-2 rounded-xl border border-[#c8c8c8]/15 bg-[#0c0c0d] p-3"><p className="text-xs font-black text-[#f2f2f2]"><DsgCopy value="Plan steps" /></p>{job.proposedPlan.steps.map((step) => <div key={step.id} className="rounded-lg border border-[#c8c8c8]/10 p-2"><p className="text-[11px] text-[#8d8d8d]">{step.id} · {step.phase} · {step.riskLevel}</p><p className="mt-1 text-xs font-bold text-[#d9d9d9]">{step.title}</p></div>)}</section> : null}
 
           {toolCall?.output ? (
             <section className="space-y-3 rounded-xl border border-[#d6a63a]/25 bg-[#d6a63a]/5 p-3 text-xs leading-5 text-[#f5d27a]">
-              <div className="flex items-center gap-2 font-black"><FileText className="h-4 w-4" /> PR Evidence</div>
+              <div className="flex items-center gap-2 font-black"><FileText className="h-4 w-4" /> <DsgCopy value="PR Evidence" /></div>
               <p>Repo: {toolCall.output.repository}</p>
               <p>Branch: {toolCall.output.branchName}</p>
               <p>Files: {toolCall.output.generatedFiles.length}</p>

@@ -129,7 +129,7 @@ function ApprovalPanel({ prepared, busy, onApprove }: { prepared: DsgGovernedToo
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         <div>
           <p className="font-black">External action requires explicit control</p>
-          <p className="text-[#d9d9d9]">Review the tool, action, goal, and args before approving. Approval is sent as <span className="font-mono">args.approved=true</span>.</p>
+          <p className="text-[#d9d9d9]">Review the tool, action, goal, and args before approving. A local confirmation flag is <strong>not</strong> an authenticated human approval or provider execution receipt. Use a separately signed approval gate for protected actions.</p>
         </div>
       </div>
       {needsAllowlist ? (

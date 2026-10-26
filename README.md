@@ -1,13 +1,31 @@
+# Current DSG ONE website release — 19 October 2026
+
+**AWS website image DEPLOYED and independently serving the exact source SHA:** `f6a1e11b1b485a4d5b3d3e53f95be0bcaa0b76ad`, ECR digest `sha256:ccc7908229d595ee60597ebb202bcfe56ebbd4f3a309ed00c44ca01e845b3d19` on the existing EC2 host. [AWS Build #39248381900](https://github.com/tdealer01-crypto/dsg-one-v1/actions/runs/39248381900) and [Ship #39248645333](https://github.com/tdealer01-crypto/dsg-one-v1/actions/runs/39248645333) **SUCCESS**; public `https://dsg.pics/api/agent/status` source-SHA readback verified in Ship.
+
+`dsg-autonomous-execution` T0–T4 skill frontmatter and AWS routing were fixed in [PR #224](https://github.com/tdealer01-crypto/dsg-one-v1/pull/224); packaging the `SKILL.md` into the immutable image and adding its image-build trigger were released in [PR #225](https://github.com/tdealer01-crypto/dsg-one-v1/pull/225). **This is website/image deployment proof only.** OAuth-bound skill discovery and real T0→T4 execution through the separate `https://aws.dsg.pics/mcp` service remain **NOT_VERIFIED**; the container shipping a skill file does not by itself register an executable MCP tool or verify provider evidence.
+
+**Release record, SHA/digest, workflow/SSM IDs, stage evidence and acceptance gaps:** [DSG Autonomous Skill AWS Release — 2026-10-19](docs/DSG_AUTONOMOUS_SKILL_AWS_RELEASE_20261019.md).
+
+---
+
+# Production scope — 12 October 2026
+
+> **Verified AWS Marketplace PUBLIC CATALOG READ.** DSG Spacetime owner-gated atomic activation [#38221386222](https://github.com/tdealer01-crypto/DSG-Private-Production-Runtime/actions/runs/38221386222) completed on immutable ECR image `sha256:fd718ca2ed2ab3de5da40fe987d83f45788636eb0d0edc0251f27b53e8e4f701`, with 5/5 AWS services healthy, 30 configured routes, 33 entitled. Real end-user OAuth-bound `route.marketplace.listings-read` executed with policy **ALLOW** and result `{"items":[]}`. Evidence chain was valid at 142 records and cross-user Principal was BLOCKED. [Public scoped evidence](https://dsg-3.gitbook.io/dsg-docs/control-plane/dsg-one-control-plane-current-aws-state/dsg-marketplace-verified-oauth-read-e2e-12-october-2026) ([owner-only audit](https://github.com/tdealer01-crypto/DSG-Private-Production-Runtime/issues/656#issuecomment-6120341073)).
+
+> **Still NOT VERIFIED:** seller/catalog writes, orders/payments, Marketplace-specific independently verified signed Provider v2 receipt, Cinema connect/execute under signed approval, Unity/Quest, and whole-system Production. Earlier Azure statuses below are historical only; AWS is sole current runtime authority.
+
+---
+
 # DSG ONE V1 — Autonomous Governed Runtime
 > [!IMPORTANT]
 > **Production migration authority — AWS.** Current production claims must be bound to the AWS release manifest, immutable ECR source-SHA image, provider readback, and fresh E2E evidence. Azure is historical/manual rollback proof only.
-> Current verified container stage: DSG ONE ECR image source `d80efe7aecb34ae8b06e6ac7e1a0417965fcc7e5`, digest `sha256:1b458ccb13b5e8e456b381f2a1faab3802ff64e7db2c78d6a2881b4cfce94a48`, ECR scan COMPLETE with 0 Critical / 3 High.
-> Runtime truth boundary: container security PASS; live AWS runtime E2E NOT_RUN; public HTTPS cutover NOT_DONE; whole-system production NOT_VERIFIED.
+> **Historical DSG ONE website image checkpoint (2026-09-27, not current Spacetime runtime):** DSG ONE ECR image source `d80efe7aecb34ae8b06e6ac7e1a0417965fcc7e5`, digest `sha256:1b458ccb13b5e8e456b381f2a1faab3802ff64e7db2c78d6a2881b4cfce94a48`, ECR scan COMPLETE with 0 Critical / 3 High.
+> **Historical 2026-09-27 checkpoint only:** container security PASS; live AWS runtime E2E then NOT_RUN; public HTTPS cutover then NOT_DONE. As of 2026-10-12, Spacetime Marketplace public catalog READ: **PASS** with real OAuth and a valid 142-record chain; whole-system Production: **BLOCKED** (nextAction: verify seller writes, buyer orders/checkout/payout, Marketplace-specific signed Provider v2 receipt, approved Cinema connect/execute, Unity/Quest and fresh overall evidence).
 
 DSG ONE V1 is a governed app-builder and autonomous runtime control plane.  
 Includes **DSG SkillGate** — open-source GitHub skill discovery, inspection, verification, lock, and governed-run pipeline.
 
-AWS is the active migration target. No public AWS runtime hostname is asserted until cutover evidence exists.
+**Current runtime authority is AWS.** Public DSG ONE site: https://dsg.pics; governed MCP: https://aws.dsg.pics/mcp. The former no-hostname assertion applies only to the historical migration stage.
 
 ## Historical Azure production evidence — 2026-09-13 ICT
 
@@ -86,9 +104,9 @@ needsApprovalDeniedAtRunGate:   true
 
 ---
 
-## Overall status
+## Historical migration checkpoint
 
-Current AWS migration checkpoint: **2026-09-27**
+Archived AWS migration checkpoint: **2026-09-27**. See the **19 October 2026 website release** at the top of this README for current deployment evidence; the following lines are retained as history.
 
 ```text
 DSG ONE immutable ECR image: PASS
@@ -217,7 +235,7 @@ Agent autonomous use (rules in AGENTS.md):
 
 ```bash
 # Set this only from current verified AWS/public cutover evidence.
-export APP_URL="https://<verified-dsg-one-runtime>"
+export APP_URL="https://dsg.pics" # website origin verified by Ship #39248645333; authenticate privileged route checks
 
 npm run smoke:first-value-flow
 npm run smoke:audit-packet

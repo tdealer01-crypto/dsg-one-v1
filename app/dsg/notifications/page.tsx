@@ -1,5 +1,7 @@
 'use client';
 
+import { DsgWorkspaceActivity } from '@/components/dsg-workspace-activity';
+
 import React, { useState, useCallback } from 'react';
 import {
   Bell,
@@ -134,7 +136,15 @@ export default function NotificationsPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+    <main className="dsg-page min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+      <DsgWorkspaceActivity view="attention" />
+      <details className="dsg-example-panel">
+        <summary>ดูตัวอย่างการแจ้งเตือน · ข้อมูลสาธิต</summary>
+      <aside role="note" className="mx-auto mb-4 max-w-6xl rounded-2xl border border-amber-400/50 bg-amber-500/10 p-4 text-sm text-amber-100">
+        <strong>ตัวอย่างการแจ้งเตือน — ไม่ใช่ข้อมูลจริง</strong>
+        <p className="mt-1">รายการแจ้งเตือนด้านล่างเป็นข้อมูลตัวอย่าง หน้าเว็บนี้ยังไม่ได้เชื่อม API แจ้งเตือนจริง</p>
+        <a href="/dsg/workroom" className="mt-2 inline-block underline">กลับไปแชท DSG ONE</a>
+      </aside>
       <div className="mx-auto max-w-3xl space-y-6">
 
         {/* Header */}
@@ -149,7 +159,7 @@ export default function NotificationsPage() {
               )}
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight">Notifications</h1>
+              <h2 className="dsg-page-title text-2xl font-black tracking-tight">Notifications</h2>
               <p className="text-sm text-slate-400">{unreadCount} unread</p>
             </div>
           </div>
@@ -195,7 +205,7 @@ export default function NotificationsPage() {
           <div className="rounded-3xl border border-slate-800 bg-slate-900 p-12 text-center">
             <Bell className="mx-auto h-10 w-10 text-slate-600" />
             <p className="mt-4 text-lg font-bold text-slate-400">No notifications</p>
-            <p className="mt-2 text-sm text-slate-500">You&apos;re all caught up.</p>
+            <p className="mt-2 text-sm text-slate-400">You&apos;re all caught up.</p>
           </div>
         ) : (
           <ol className="space-y-2">
@@ -222,7 +232,7 @@ export default function NotificationsPage() {
                       }`}>
                         {notif.title}
                       </p>
-                      <span className="shrink-0 text-xs text-slate-500">{notif.relativeTime}</span>
+                      <span className="shrink-0 text-xs text-slate-400">{notif.relativeTime}</span>
                     </div>
                     <p className="mt-1 text-sm leading-6 text-slate-400">{notif.body}</p>
                   </div>
@@ -263,7 +273,7 @@ export default function NotificationsPage() {
           {settingsOpen && (
             <div className="space-y-4 border-t border-slate-800 px-5 pb-5 pt-4">
               <div className="space-y-1">
-                <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500">
+                <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
                   <Mail className="h-3.5 w-3.5" /> Email
                 </p>
                 <Toggle
@@ -289,7 +299,7 @@ export default function NotificationsPage() {
               </div>
 
               <div className="border-t border-slate-800 pt-4">
-                <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500">
+                <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
                   <Slack className="h-3.5 w-3.5" /> Slack
                 </p>
                 <div className="flex items-center justify-between">
@@ -313,6 +323,7 @@ export default function NotificationsPage() {
         </div>
 
       </div>
+      </details>
     </main>
   );
 }

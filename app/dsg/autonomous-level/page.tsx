@@ -1,3 +1,4 @@
+import { DsgCopy } from '@/components/app-language-copy-bridge';
 import { evaluateDsgAutonomousLevelGate } from '@/lib/dsg/autonomous-level/capability-gate';
 import DsgIdentityBridge from './identity-bridge';
 
@@ -11,37 +12,60 @@ export default function DsgAutonomousLevelPage() {
   const gate = evaluateDsgAutonomousLevelGate();
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+    <main className="dsg-page min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <section className="rounded-3xl border border-indigo-500/20 bg-indigo-500/10 p-6 md:p-8">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-200">DSG Autonomous Level Gate</p>
-          <h1 className="mt-3 text-3xl font-black md:text-5xl">{gate.claim}</h1>
+          <h1 className="dsg-page-title mt-3 text-3xl font-black md:text-5xl">{gate.claim}</h1>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 md:text-base">
             This page reports the DSG-owned autonomous capability boundary. It does not promote the complete claim until all required runtime proofs exist.
           </p>
           <div className="mt-6 grid gap-3 md:grid-cols-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs text-slate-500">score</p><p className="text-2xl font-black">{Math.round(gate.score * 100)}%</p></div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs text-slate-500">passed</p><p className="text-2xl font-black">{gate.passed}/{gate.totalRequired}</p></div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs text-slate-500">complete</p><p className="text-2xl font-black">{gate.complete ? 'YES' : 'NO'}</p></div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs text-slate-500">proof hash</p><p className="break-all font-mono text-xs">{gate.proofHash}</p></div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs text-slate-400">score</p><p className="text-2xl font-black">{Math.round(gate.score * 100)}%</p></div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs text-slate-400">passed</p><p className="text-2xl font-black">{gate.passed}/{gate.totalRequired}</p></div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs text-slate-400">complete</p><p className="text-2xl font-black">{gate.complete ? 'YES' : 'NO'}</p></div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs text-slate-400">proof hash</p><p className="break-all font-mono text-xs">{gate.proofHash}</p></div>
           </div>
         </section>
 
-        <DsgIdentityBridge />
+        <section aria-label="ทางเข้าใช้งาน DSG ONE" className="rounded-2xl border border-indigo-400/30 bg-slate-900 p-5">
+          <h2 className="text-xl font-bold">ต้องการสั่งงานหรือสร้างแอป?</h2>
+          <p className="mt-2 text-sm text-slate-300">
+            หน้านี้เป็นรายงานความพร้อม ไม่ใช่หน้า Execute งานจริง เลือกจุดเริ่มต้นเพียงหนึ่งอย่างด้านล่าง
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <a href="/dsg/workroom" className="rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white">
+              สั่งงาน · Workroom
+            </a>
+            <a href="/dsg/app-builder" className="rounded-lg border border-indigo-500 px-4 py-3 text-sm text-indigo-100">
+              สร้างแอป · App Builder
+            </a>
+            <a href="/dsg/approvals" className="rounded-lg border border-slate-600 px-4 py-3 text-sm text-slate-100">
+              อนุมัติคำขอ · Approvals
+            </a>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-700 bg-slate-900 p-4">
+          <h2 className="font-semibold">User-bound Human Approval</h2>
+          <p className="mt-2 text-sm text-slate-300">ตรวจและอนุมัติเฉพาะงานที่ผูกกับบัญชี Auth0 ของคุณ — ไม่ใช้ internal key</p>
+          <a href="/dsg/approvals" className="mt-3 inline-block rounded bg-indigo-600 px-4 py-2 text-sm">เปิดรายการรออนุมัติ</a>
+        </section>
+        <section id="governed-e2e" className="scroll-mt-24"><DsgIdentityBridge /></section>
 
         <section className="grid gap-4 lg:grid-cols-2">
           {gate.capabilities.map((capability) => (
             <article key={capability.id} className="rounded-3xl border border-slate-800 bg-slate-900 p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-mono text-xs text-slate-500">{capability.id}</p>
+                  <p className="font-mono text-xs text-slate-400">{capability.id}</p>
                   <h2 className="mt-1 text-lg font-bold">{capability.label}</h2>
                 </div>
                 <span className={`rounded-full border px-3 py-1 text-xs font-bold ${badge(capability.status)}`}>{capability.status}</span>
               </div>
               {capability.blockedReason && <p className="mt-3 rounded-2xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-100">{capability.blockedReason}</p>}
               <div className="mt-4 space-y-2">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Evidence</p>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400"><DsgCopy value="Evidence" /></p>
                 {capability.evidence.map((item) => <p key={item} className="rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-300">{item}</p>)}
               </div>
               <p className="mt-4 text-sm text-indigo-200">Next: {capability.nextAction}</p>

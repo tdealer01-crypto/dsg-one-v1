@@ -1,5 +1,8 @@
 'use client';
 
+import { DsgCopy } from '@/components/app-language-copy-bridge';
+
+
 import { useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -95,8 +98,7 @@ export function AppBuilderAgentRuntimeView() {
       ...init,
       headers: {
         'content-type': 'application/json',
-        'x-dsg-workspace-id': workspaceId.trim(),
-        'x-dsg-actor-id': actorId.trim(),
+        // Authentication and workspace scope are verified server-side.
         ...(init?.headers || {}),
       },
     });
@@ -105,11 +107,11 @@ export function AppBuilderAgentRuntimeView() {
     return readResult(json);
   }
 
-  async function governedTool(input: DsgGovernedToolRequest, execute = false) {
+  async function governedTool(input: DsgGovernedToolRequest) {
     const response = await fetch('/api/dsg/tools', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...input, execute }),
+      body: JSON.stringify({ ...input, execute: false }),
     });
     const json = (await response.json().catch(() => ({ ok: false, error: { message: 'INVALID_GOVERNED_TOOL_JSON' } }))) as DsgGovernedToolPreparedRequest | DsgGovernedToolExecutionResult;
     if (!response.ok && !('prepared' in json)) throw new Error('GOVERNED_TOOL_PREPARE_FAILED');
@@ -293,7 +295,7 @@ export function AppBuilderAgentRuntimeView() {
               {busy === 'approval' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Approve
             </button>
             <button onClick={createHandoff} disabled={!!busy || !job?.approvalHash} className="inline-flex items-center gap-2 rounded-xl border border-[#c8c8c8]/20 px-3 py-2 text-xs font-black text-[#d9d9d9] disabled:text-[#666]">
-              {busy === 'handoff' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />} Handoff
+              {busy === 'handoff' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />} <DsgCopy value="Handoff" />
             </button>
             <button onClick={launchRuntimeTool} disabled={!!busy || !job?.approvalHash || job.status !== 'READY_FOR_RUNTIME'} className="inline-flex items-center gap-2 rounded-xl border border-[#d6a63a]/35 bg-[#d6a63a]/10 px-3 py-2 text-xs font-black text-[#f5d27a] disabled:border-[#c8c8c8]/10 disabled:bg-[#111113] disabled:text-[#666]">
               {busy === 'tool-call' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />} Launch tool
@@ -310,14 +312,14 @@ export function AppBuilderAgentRuntimeView() {
 
           {job?.prd?.summary && (
             <section className="rounded-xl border border-[#c8c8c8]/15 bg-[#0c0c0d] p-3">
-              <p className="text-xs font-black text-[#f2f2f2]">PRD summary</p>
+              <p className="text-xs font-black text-[#f2f2f2]"><DsgCopy value="PRD summary" /></p>
               <p className="mt-2 text-xs leading-5 text-[#c8c8c8]">{job.prd.summary}</p>
             </section>
           )}
 
           {job?.proposedPlan && (
             <section className="space-y-2 rounded-xl border border-[#c8c8c8]/15 bg-[#0c0c0d] p-3">
-              <p className="text-xs font-black text-[#f2f2f2]">Plan steps</p>
+              <p className="text-xs font-black text-[#f2f2f2]"><DsgCopy value="Plan steps" /></p>
               {job.proposedPlan.steps.map((step) => (
                 <div key={step.id} className="rounded-lg border border-[#c8c8c8]/10 p-2">
                   <p className="text-[11px] font-mono text-[#8d8d8d]">{step.id} · {step.phase} · {step.riskLevel}</p>

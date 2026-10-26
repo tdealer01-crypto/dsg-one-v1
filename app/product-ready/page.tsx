@@ -11,13 +11,13 @@ export default function ProductReadyPage() {
   const ready = report.level !== 'BLOCKED';
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-10 text-slate-100">
+    <main className="dsg-page min-h-screen bg-slate-950 px-6 py-10 text-slate-100">
       <section className="mx-auto max-w-6xl space-y-8">
         <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-black/30">
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-indigo-300">DSG ONE V1</p>
           <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <h1 className="text-3xl font-black tracking-tight md:text-5xl">Product Ready Fullstack Gate</h1>
+              <h1 className="dsg-page-title text-3xl font-black tracking-tight md:text-5xl">Product Ready Fullstack Gate</h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
                 Visible fail-closed readiness check for DSG ONE V1. The UI checks environment and evidence gates before allowing any production-ready claim.
               </p>
@@ -32,7 +32,7 @@ export default function ProductReadyPage() {
         <div className="grid gap-4 md:grid-cols-4">
           {Object.entries(report.decisionFrame.statistics.stats).map(([key, value]) => (
             <div key={key} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-              <p className="text-xs text-slate-500">Parami statistic</p>
+              <p className="text-xs text-slate-400">Parami statistic</p>
               <p className="mt-1 truncate font-mono text-sm text-slate-200">{key}</p>
               <p className="mt-2 text-2xl font-black text-indigo-200">{value}</p>
             </div>
@@ -48,11 +48,11 @@ export default function ProductReadyPage() {
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                       <p className="font-bold text-slate-100">{check.label}</p>
-                      <p className="mt-1 text-xs font-mono text-slate-500">{check.evidence}</p>
+                      <p className="mt-1 text-xs font-mono text-slate-400">{check.evidence}</p>
                     </div>
                     <span className={`rounded-full border px-3 py-1 text-xs font-bold ${badgeClass(check.status)}`}>{check.status}</span>
                   </div>
-                  {check.requiredForProduction && <p className="mt-3 text-xs text-slate-500">Required before production claim.</p>}
+                  {check.requiredForProduction && <p className="mt-3 text-xs text-slate-400">Required before production claim.</p>}
                 </div>
               ))}
             </div>

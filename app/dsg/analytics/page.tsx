@@ -1,5 +1,7 @@
 'use client';
 
+import { DsgWorkspaceActivity } from '@/components/dsg-workspace-activity';
+
 import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, TrendingDown, Cpu, Activity, CheckCircle2, Clock, AlertCircle, Loader2 } from 'lucide-react';
@@ -105,7 +107,15 @@ export default function AnalyticsPage() {
   const chartData = CHART_DATA[range];
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+    <main className="dsg-page min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
+      <DsgWorkspaceActivity view="analytics" />
+      <details className="dsg-example-panel">
+        <summary>ดูตัวอย่างรายงานและกราฟ · ข้อมูลสาธิต</summary>
+      <aside role="note" className="mx-auto mb-4 max-w-6xl rounded-2xl border border-amber-400/50 bg-amber-500/10 p-4 text-sm text-amber-100">
+        <strong>ตัวอย่าง Analytics — ไม่ใช่ข้อมูลจริง</strong>
+        <p className="mt-1">ตัวเลข กราฟ ค่าใช้จ่าย และการใช้ Provider ด้านล่างเป็นข้อมูลตัวอย่าง ไม่ใช่สถิติ Production</p>
+        <a href="/dsg/workroom" className="mt-2 inline-block underline">กลับไปแชท DSG ONE</a>
+      </aside>
       <div className="mx-auto max-w-7xl space-y-8">
 
         {/* Header */}
@@ -115,7 +125,7 @@ export default function AnalyticsPage() {
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-400/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-indigo-200">
                 <Activity className="h-3.5 w-3.5" /> Analytics
               </div>
-              <h1 className="text-3xl font-black tracking-tight md:text-5xl">Analytics &amp; Usage</h1>
+              <h2 className="dsg-page-title text-3xl font-black tracking-tight md:text-5xl">Analytics &amp; Usage</h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
                 Monitor build activity, token consumption, and model performance across your workspace.
               </p>
@@ -214,7 +224,7 @@ export default function AnalyticsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-800 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-800 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                   <th className="pb-3 pr-4">App Name</th>
                   <th className="pb-3 pr-4">Status</th>
                   <th className="pb-3 pr-4">Duration</th>
@@ -236,7 +246,7 @@ export default function AnalyticsPage() {
                     <td className="py-3 pr-4 font-mono text-xs">
                       {build.tokens > 0 ? formatTokens(build.tokens) : '—'}
                     </td>
-                    <td className="py-3 text-xs text-slate-500">{build.date}</td>
+                    <td className="py-3 text-xs text-slate-400">{build.date}</td>
                   </tr>
                 ))}
               </tbody>
@@ -249,6 +259,7 @@ export default function AnalyticsPage() {
           Analytics data updates every 5 minutes. Costs are estimates based on public provider pricing.
         </p>
       </div>
+      </details>
     </main>
   );
 }
@@ -257,7 +268,7 @@ function StatCard({ label, value, sub, icon }: { label: string; value: string; s
   return (
     <div className="rounded-3xl border border-slate-800 bg-slate-900 p-5">
       <div className="mb-4 flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
+        <span className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</span>
         <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-700 bg-slate-800">
           {icon}
         </div>

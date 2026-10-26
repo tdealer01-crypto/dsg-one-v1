@@ -1,5 +1,8 @@
 'use client';
 
+import { DsgCopy } from '@/components/app-language-copy-bridge';
+
+
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
@@ -86,7 +89,7 @@ export function GovernanceView() {
       {/* ── header ── */}
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-100">กำกับดูแล</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-100"><DsgCopy value="กำกับดูแล" /></h1>
           <p className="mt-1 text-slate-500">
             ผู้ใช้เห็นชัดว่าต้องมีหลักฐานอะไร ก่อนระบบจะแสดงตัวเลข policy หรือ claim สีเขียว
           </p>
@@ -154,7 +157,7 @@ export function GovernanceView() {
       {/* ── search ── */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-        <input
+        <input aria-label="ค้นหาหลักฐาน Governance"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="ค้นหา governance proof เช่น policy, sync, audit..."

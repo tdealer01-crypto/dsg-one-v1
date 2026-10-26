@@ -1,43 +1,8 @@
-import { AppBuilderConsoleClient } from '@/components/dsg/app-builder/AppBuilderConsoleClient';
+import { AppBuilderConsoleWorkspace } from '@/components/dsg/app-builder/AppBuilderConsoleClient';
+import { AppBuilderGoalProvider, SelectedTemplateNotice } from '@/components/dsg/app-builder/AppBuilderGoalBridge';
 import { AppBuilderProofPanel, type ProofPanelItem } from '@/components/dsg/app-builder/AppBuilderProofPanel';
 import { OutcomeIntakePanel } from '@/components/dsg/app-builder/OutcomeIntakePanel';
 import { DSG_APP_TEMPLATES, DSG_MARKET_TEMPLATES } from '@/lib/dsg/app-builder/templates/template-registry';
-import type { DsgAppBuilderPrd } from '@/lib/dsg/app-builder/types/prd';
-
-const demoPrd: DsgAppBuilderPrd = {
-  title: 'Market-Ready Agent App Builder',
-  summary:
-    'A governed app-builder workspace that turns a plain-language goal into a PRD, execution plan, approval gate, runtime evidence, and generated-app proof without claiming production readiness before evidence exists.',
-  useCase: 'Enterprise Agent Builder Workspace',
-  userProblem:
-    'Users want to describe the outcome they need, see a realistic preview, approve the plan, and verify proof without navigating scattered tools or trusting black-box AI claims.',
-  targetUsers: ['founder', 'operator', 'SMB owner', 'enterprise reviewer', 'developer'],
-  coreFeatures: [
-    'Outcome-first app request',
-    'Prompt to PRD preview',
-    'Template and risk registry',
-    'Z3 feasibility observer boundary',
-    'Approval and runtime proof gate',
-    'Visible next action for every blocked state',
-  ],
-  nonGoals: [
-    'No hidden autonomous execution',
-    'No direct model-to-secret access',
-    'No production-ready claim without build, deploy, database, auth, and proof evidence',
-    'No mock data presented as production evidence',
-  ],
-  acceptanceCriteria: [
-    'User can state the app outcome in plain language',
-    'User can see PRD and plan before approval',
-    'User can inspect risk, proof, and blocked reasons',
-    'User can open a generated app preview when available',
-    'Production claim remains blocked until runtime evidence exists',
-  ],
-  frontend: ['Next.js App Router', 'React', 'Tailwind'],
-  backend: ['Next API routes', 'DSG controlled executor', 'Governed tool boundary'],
-  database: ['Supabase Postgres', 'Evidence-first persistence boundary'],
-  deployment: ['Vercel', 'GitHub PR flow', 'CI and deployment proof required'],
-};
 
 const marketPillars = [
   {
@@ -154,17 +119,17 @@ const builderStages = [
   { stage: 'Ship', text: 'ส่งต่อ runtime gate พร้อมหลักฐานและ next action' },
 ];
 
-export default function DsgAppBuilderPage() {
+export default async function DsgAppBuilderPage({ searchParams }: { searchParams: Promise<{ template?: string | string[] }> }) {
+  const query = await searchParams;
   return (
-    <main className="min-h-screen overflow-hidden bg-[#090b0f] text-[#eef3f8]">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_15%_8%,rgba(242,202,80,0.20),transparent_30%),radial-gradient(circle_at_90%_18%,rgba(56,189,248,0.16),transparent_28%),linear-gradient(135deg,#090b0f_0%,#111827_48%,#050608_100%)]" />
-      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.028)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(circle_at_center,black,transparent_82%)]" />
+    <AppBuilderGoalProvider key={JSON.stringify(query.template ?? null)} requestedTemplate={query.template}>
+    <main className="dsg-page min-h-screen overflow-hidden bg-[#090b0f] text-[#eef3f8]">
 
       <div className="relative z-10 mx-auto max-w-7xl px-5 py-6 sm:px-8 lg:px-10">
-        <header className="flex items-center justify-between rounded-[2rem] border border-white/10 bg-white/[0.045] px-4 py-3 shadow-[0_0_38px_rgba(242,202,80,0.12)] backdrop-blur-xl">
+        <header className="dsg-page-header flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-[#f2ca50]/75">DSG Agent Builder</p>
-            <h1 className="mt-1 font-serif text-xl font-bold tracking-tight text-white sm:text-3xl">Build useful apps from outcomes</h1>
+            <h1 className="dsg-page-title mt-1 font-serif text-xl font-bold tracking-tight text-white sm:text-3xl">สร้างแอปจากเป้าหมายของคุณ</h1>
           </div>
           <a
             href="/dsg/action-layer"
@@ -175,9 +140,14 @@ export default function DsgAppBuilderPage() {
         </header>
 
         <div className="mt-6">
+          <SelectedTemplateNotice />
           <OutcomeIntakePanel />
         </div>
 
+        <AppBuilderConsoleWorkspace />
+
+        <details className="dsg-example-panel">
+          <summary>คู่มือการสร้างแอป เทมเพลต และเกณฑ์ตรวจความพร้อม</summary>
         <section className="grid gap-6 py-8 lg:grid-cols-[minmax(0,1.05fr)_420px]">
           <div className="rounded-[2.6rem] border border-white/10 bg-[#0f151f]/82 p-6 shadow-[0_0_52px_rgba(0,0,0,0.25)] backdrop-blur-2xl sm:p-8">
             <div className="flex flex-wrap items-center gap-3">
@@ -188,11 +158,11 @@ export default function DsgAppBuilderPage() {
 
             <div className="mt-8 max-w-4xl">
               <p className="font-mono text-xs uppercase tracking-[0.34em] text-slate-400">For users who want speed, clarity, and real output</p>
-              <h2 className="mt-4 font-serif text-5xl font-bold leading-[0.94] tracking-[-0.055em] text-white sm:text-7xl">
+              <h2 className="mt-4 text-2xl font-semibold leading-snug tracking-tight text-white sm:text-3xl">
                 Agent builder ที่ทำให้ผู้ใช้เห็นผลลัพธ์เร็ว และตรวจได้จริง
               </h2>
               <p className="mt-6 max-w-3xl text-base leading-8 text-slate-300 sm:text-lg">
-                รีมิกหน้านี้ให้ตลาดปัจจุบัน: ผู้ใช้ไม่ต้องเรียน workflow ซับซ้อน แค่ระบุเป้าหมาย เห็น PRD/แผน/พรีวิว/หลักฐานในที่เดียว แล้วรู้ทันทีว่าขั้นต่อไปคืออะไร
+                ระบุเป้าหมาย แล้วตรวจ PRD แผน พรีวิว และหลักฐานของงานในพื้นที่เดียวกัน ระบบจะแสดงสถานะและขั้นตอนถัดไปตามข้อมูลที่มี
               </p>
             </div>
 
@@ -238,6 +208,7 @@ export default function DsgAppBuilderPage() {
         </section>
 
         <section className="mt-8">
+          <p className="mb-3 text-sm text-slate-400">Static product readiness checklist — ไม่ใช่สถานะของ Job ผู้ใช้ ตรวจงานที่บันทึกจริงและ Evidence แยกที่ Workspace Console ด้านล่าง</p>
           <AppBuilderProofPanel items={proofPanelItems} productionReadyClaim={false} />
         </section>
 
@@ -249,7 +220,7 @@ export default function DsgAppBuilderPage() {
               <article key={template.id} className="rounded-2xl border border-white/10 bg-black/25 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-slate-500">{template.category}</p>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-slate-400">{template.category}</p>
                     <h3 className="mt-1 font-bold text-white">{template.name}</h3>
                   </div>
                   <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 font-mono text-[11px] font-black text-amber-100">risk: {template.riskLevel}</span>
@@ -265,12 +236,12 @@ export default function DsgAppBuilderPage() {
           </div>
         </section>
 
-        <AppBuilderConsoleClient initialPrd={demoPrd} />
+
 
         <section className="mt-8 rounded-[2rem] border border-white/10 bg-[#0f151f]/78 p-6 backdrop-blur-xl">
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="font-mono text-xs uppercase tracking-[0.22em] text-slate-500">Template Registry</p>
+              <p className="font-mono text-xs uppercase tracking-[0.22em] text-slate-400">Template Registry</p>
               <h2 className="mt-2 text-2xl font-black text-white">Governed starting points</h2>
             </div>
             <p className="max-w-xl text-sm leading-6 text-slate-400">Templates help users start faster, but every generated app still needs runtime proof before any production-ready claim.</p>
@@ -302,7 +273,7 @@ export default function DsgAppBuilderPage() {
         </section>
 
         <section className="mt-8 rounded-[2rem] border border-white/10 bg-[#0f151f]/78 p-6 backdrop-blur-xl">
-          <p className="font-mono text-xs uppercase tracking-[0.22em] text-slate-500">Claim Boundary</p>
+          <p className="font-mono text-xs uppercase tracking-[0.22em] text-slate-400">Claim Boundary</p>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
               <h3 className="font-black text-emerald-200">Allowed now</h3>
@@ -318,7 +289,9 @@ export default function DsgAppBuilderPage() {
             </div>
           </div>
         </section>
+        </details>
       </div>
     </main>
+    </AppBuilderGoalProvider>
   );
 }
