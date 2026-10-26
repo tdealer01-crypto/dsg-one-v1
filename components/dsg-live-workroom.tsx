@@ -171,12 +171,14 @@ export function DsgLiveWorkroom() {
     setFrameworkProbe('unverified');
     setFrameworkVersion('');
     try {
-      const response = await fetch('/api/agent/status', { cache: 'no-store', credentials: 'include' });
+      const response = await fetch('/api/agent/execute', { cache: 'no-store', credentials: 'include' });
       const raw = asRecord(await response.json());
-      const engine = asRecord(asRecord(raw?.readiness)?.automationEngine);
-      const reported = response.ok && raw?.ok === true && engine?.ok === true &&
-        engine.engine === 'microsoft-agent-framework' && engine.version === '1.18.0';
-      if (reported) {
+      const engine = asRecord(raw?.data);
+      // Real engine workflow + checkpoint probe; never infer from env vars.
+      const verified = response.ok && raw?.ok === true &&
+        engine?.engine === 'microsoft-agent-framework' && engine.version === '1.18.0' &&
+        engine.workflowProbe === true && engine.checkpointProbe === true;
+      if (verified) {
         setFrameworkVersion('1.18.0');
         setFrameworkProbe('reported-ready');
       }
@@ -575,7 +577,7 @@ export function DsgLiveWorkroom() {
               <li className="rounded-lg border border-slate-800 p-3">
                 <strong>Microsoft Agent Framework</strong>
                 <span className="ml-2 text-amber-200">{frameworkProbe === 'reported-ready'
-                  ? `Health รายงานพร้อม v${frameworkVersion}`
+                  ? `Engine + Checkpoint Probe ผ่าน v${frameworkVersion}`
                   : frameworkProbe === 'not-checked' ? 'ยังไม่ตรวจ' : 'ยังยืนยัน Health ไม่ได้'}</span>
                 <p className="mt-1 text-xs text-slate-400">กระบวนการ Framework พร้อมไม่เท่ากับ Core Spin งานจริงผ่าน</p>
               </li>
