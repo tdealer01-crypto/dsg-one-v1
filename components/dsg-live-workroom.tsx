@@ -58,15 +58,9 @@ export function DsgLiveWorkroom() {
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'desktop' ? 'desktop' : 'agent'
   );
   const [goal, setGoal] = useState('');
-  const [autoExecute, setAutoExecute] = useState(true);
-  const verifiedExecutionCount = useRef(0);
-  const agentStopRequested = useRef(false);
-  const activeAgentGoal = useRef<string | null>(null);
-  const [continueAfterApproval, setContinueAfterApproval] = useState(false);
   const [kaggleLaunchRevision, setKaggleLaunchRevision] = useState(0);
   const awaitingKaggleForGoal = useRef<string | null>(null);
   const [chat, setChat] = useState<ChatTurn[]>([]);
-  const [conversationMemory, setConversationMemory] = useState<'loading' | 'available' | 'unavailable'>('loading');
   const [proposal, setProposal] = useState<Action | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [receipt, setReceipt] = useState<unknown>(null);
@@ -103,45 +97,6 @@ export function DsgLiveWorkroom() {
     return () => { live = false; };
   }, []);
 
-  useEffect(() => {
-    if (!ready) return;
-    let live = true;
-    void (async () => {
-      try {
-        const response = await fetch('/api/dsg/agent-v0/conversation', { cache: 'no-store', credentials: 'include' });
-        const raw = asRecord(await response.json());
-        const data = asRecord(raw?.data);
-        if (!response.ok || raw?.ok !== true || !Array.isArray(data?.messages)) throw new Error('AGENT_V0_MEMORY_READ_UNAVAILABLE');
-        const turns: ChatTurn[] = (data.messages as unknown[])
-          .map(item => asRecord(item))
-          .filter((item): item is JsonRecord => Boolean(item))
-          .filter(item => (item.role === 'user' || item.role === 'assistant') && typeof item.text === 'string')
-          .slice(-40)
-          .map(item => ({ role: item.role as ChatTurn['role'], text: String(item.text) }));
-        if (!live) return;
-        setChat(existing => existing.length ? existing : turns);
-        setConversationMemory('available');
-      } catch {
-        if (live) setConversationMemory('unavailable');
-      }
-    })();
-    return () => { live = false; };
-  }, [ready]);
-
-  async function saveAgentTurn(role: ChatTurn['role'], text: string) {
-    try {
-      const response = await fetch('/api/dsg/agent-v0/conversation', {
-        method: 'POST', credentials: 'include', cache: 'no-store',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ role, text }),
-      });
-      const result = asRecord(await response.json());
-      setConversationMemory(response.status === 201 && result?.ok === true ? 'available' : 'unavailable');
-    } catch {
-      setConversationMemory('unavailable');
-    }
-  }
-
   useEffect(() => { transcript.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [chat]);
 
   async function tool(name: string, args: JsonRecord): Promise<ToolReply> {
@@ -170,7 +125,7 @@ export function DsgLiveWorkroom() {
     return data;
   }
 
-  async function act(work: () => Promise<unknown>) {
+  async function act(work: () => Promise<void>) {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
@@ -256,7 +211,6 @@ export function DsgLiveWorkroom() {
       setObservedPage(observation);
     }
     setReceipt(publicWorkroomReceipt(data.receipt));
-    verifiedExecutionCount.current += 1;
     setFlowPhase('evidence');
     setVerifiedAction(label);
     if (request.route_id === 'route.cinema-remote.connect') {
@@ -375,11 +329,6 @@ export function DsgLiveWorkroom() {
     for (const step of current.steps) {
       await execute(step.request, step.label, step.approvalRequestId ? permits.get(step.approvalRequestId) : undefined);
     }
-    // The original goal resumes after React applies pending=null and the
-    // current one-shot approved action has fully returned real evidence.
-    if (activeAgentGoal.current && !agentStopRequested.current) {
-      setContinueAfterApproval(true);
-    }
   }
 
   async function checkShellProcess() {
@@ -450,19 +399,9 @@ export function DsgLiveWorkroom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending, ready]);
 
-  useEffect(() => {
-    if (!continueAfterApproval || pending || !ready || busy) return;
-    const message = activeAgentGoal.current;
-    setContinueAfterApproval(false);
-    if (message) void act(() => sendGoal(message));
-    // Resume only after the exact request passed approval and evidence.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [continueAfterApproval, pending, ready, busy]);
-
-  async function sendGoal(continueMessage?: string) {
-    const message = (continueMessage ?? goal).trim();
+  async function sendGoal() {
+    const message = goal.trim();
     if (!message || message.length > 4000) return;
-    const resumingSameGoal = activeAgentGoal.current === message && continueMessage === message;
     const available = catalogLoaded ? routes : await loadCatalog();
     const contracts = [
       { name: 'browser.remote.status', target: browserTarget, description: 'อ่านสถานะการเชื่อมต่อ Remote Browser', required: [], optional: [], risk: 'read' },
@@ -470,42 +409,26 @@ export function DsgLiveWorkroom() {
       { name: 'device.remote.status', target: desktopTarget, description: 'อ่านสถานะ DSG Desktop Native ที่ผูกอยู่', required: [], optional: [], risk: 'read' },
       { name: 'device.process.list', target: desktopTarget, description: 'อ่านรายการ process ของ DSG Desktop Native', required: [], optional: [], risk: 'read' },
       { name: 'device.fs.read', target: desktopTarget, description: 'อ่านไฟล์จาก DSG Desktop Native', required: ['path'], optional: ['offset', 'length'], risk: 'read' },
-      { name: 'device.fs.write', target: desktopTarget, description: 'เขียนไฟล์ไปยัง DSG Desktop Native ตามสิทธิ์แผนและ Signed Approval', required: ['path', 'content'], optional: [], risk: 'high' },
+      { name: 'device.fs.write', target: desktopTarget, description: 'เขียนไฟล์ผ่าน Signed Approval ของ DSG Native เดิม', required: ['path', 'content'], optional: [], risk: 'high' },
       { name: 'device.shell.exec', target: desktopTarget, description: 'เรียกคำสั่งบน DSG Desktop Native หลังมีแผนและการอนุมัติ', required: ['command'], optional: [], risk: 'high' },
     ].filter(contract => available.some(route => route.capability === contract.name && route.target_node === contract.target));
     if (!contracts.length) throw new Error('NO_LIVE_TOOL_CONTRACTS_FOR_AGENT');
-    // Retain an awaiting goal without adding a duplicate user message on retry.
-    if (!resumingSameGoal && awaitingKaggleForGoal.current !== message) {
+
+    if (awaitingKaggleForGoal.current !== message) {
       setChat(items => [...items, { role: 'user', text: message }]);
-      await saveAgentTurn('user', message);
     }
-    activeAgentGoal.current = autoExecute ? message : null;
     setProposal(null);
     setStatus('กำลังส่งเป้าหมายให้ DSG Agent v0');
-    // One user goal may take several verified tool actions. Qwen never
-    // dispatches a provider directly; every action gets its own governed plan.
-    // Stop on approval, uncertain postcondition, unchanged evidence or repeats.
-    agentStopRequested.current = false;
-    let lastAction = '';
-    let repeated = 0;
-    for (let stepIndex = 0; stepIndex < 25; stepIndex += 1) {
-      if (agentStopRequested.current) {
-        activeAgentGoal.current = null;
-        setStatus('หยุดงานตามที่ร้องขอ · ไม่มีการส่งขั้นถัดไป และไม่ย้อนคำสั่งที่ทำไปแล้ว');
-        return;
-      }
-      let result: JsonRecord | null;
-      try {
-        result = await run('action.plan', 'node.agent.dsg-v0', () => ({
-          goal: message,
-          tools: contracts.map(({ target: _target, ...contract }) => contract),
-          verified_history: history.current,
-          step: stepIndex, request_key: 'chat-' + crypto.randomUUID(),
-        }), 'วางแผนด้วย Agent v0');
+    let result: JsonRecord | null;
+    try {
+      result = await run('action.plan', 'node.agent.dsg-v0', () => ({
+        goal: message,
+        tools: contracts.map(({ target: _target, ...contract }) => contract),
+        verified_history: history.current,
+        step: Math.min(history.current.length, 25), request_key: 'chat-' + crypto.randomUUID(),
+      }), 'วางแผนด้วย Agent v0');
     } catch (error) {
-      // One authenticated owner-only wake attempt on a missing Brain binding.
-      // Never wake on provider denial, MFA, policy or inference errors.
-      if (stepIndex !== 0 || !shouldRequestKaggleWake(error)) throw error;
+      if (!shouldRequestKaggleWake(error)) throw error;
       setFlowPhase('needs-check');
       setStatus('Brain ยังไม่พร้อม กำลังตรวจสิทธิ์เจ้าของเพื่อขอเปิด Kaggle ฟรี');
       const accessToken = await getDsgBrowserSession().getTokenSilently();
@@ -522,73 +445,31 @@ export function DsgLiveWorkroom() {
       if (response.status === 202 && outcome?.ok === true && outcome.status === 'OWNER_DISPATCH_ACCEPTED') {
         awaitingKaggleForGoal.current = message;
         setKaggleLaunchRevision(current => current + 1);
-        setStatus('ส่งคำขอเปิด Kaggle แล้ว · ยังไม่ได้ผลจาก Qwen หรือหลักฐานว่า Worker พร้อมใช้ เก็บเป้าหมายไว้ให้กดวางแผนซ้ำหลังตรวจสถานะ');
-        setChat(items => [...items, { role: 'assistant', text: 'กำลังเตรียม Kaggle Brain สำหรับแผนนี้ (ยังไม่สำเร็จ) ตรวจสถานะ GPU ด้านบน เมื่อพร้อมให้กดวางแผนด้วย Agent v0 อีกครั้ง' }]);
+        setStatus('ส่งคำขอเปิด Kaggle แล้ว · ยังไม่มีหลักฐานว่า Worker พร้อมใช้ เก็บเป้าหมายไว้ให้กดวางแผนซ้ำหลังตรวจสถานะ');
         return;
       }
       if (response.status === 409 && code === 'KAGGLE_LAUNCH_ALREADY_IN_PROGRESS') {
         awaitingKaggleForGoal.current = message;
         setKaggleLaunchRevision(current => current + 1);
-        setStatus('มีคำขอเปิด Kaggle อยู่แล้ว · ไม่ส่งคำขอเปิดซ้ำ รอหลักฐาน Worker แล้วค่อยวางแผนอีกครั้ง');
+        setStatus('มีคำขอเปิด Kaggle อยู่แล้ว · ไม่เปิดซ้ำ ให้ตรวจ Worker ก่อนลองทำงานต่อ');
         return;
       }
       throw new Error(code);
     }
-      if (!result) return;
-      if (result.authority !== 'proposal-only' || result.brain_mode !== 'local_qwen3_planner' ||
-          typeof result.model !== 'string' || !result.model.startsWith('DSG-Agent-v0')) {
-        throw new Error('AGENT_V0_MODEL_NOT_VERIFIED');
-      }
-      if (result.status === 'COMPLETED' && typeof asRecord(result.final_result)?.text === 'string') {
-        const finalText = String(asRecord(result.final_result)!.text);
-        setChat(items => [...items, { role: 'assistant', text: finalText }]);
-        await saveAgentTurn('assistant', finalText);
-        setStatus('Agent รายงานว่างานจบแล้ว · ตรวจหลักฐานของแต่ละขั้นจากด้านล่าง');
-        awaitingKaggleForGoal.current = null;
-        activeAgentGoal.current = null;
-        setGoal('');
-        return;
-      }
-      const next = asRecord(result.action_proposal);
-      const nextArguments = asRecord(next?.arguments);
-      const contract = contracts.find(item => item.name === next?.action);
-      if (result.status !== 'ACTION_REQUIRED' || !contract || !nextArguments) {
-        throw new Error('AGENT_V0_PROPOSAL_NOT_SUPPORTED');
-      }
-      const proposed: Action = {
-        capability: contract.name, target: contract.target,
-        arguments: nextArguments, label: contract.description,
-      };
-      if (!autoExecute) {
-        activeAgentGoal.current = null;
-        setProposal(proposed);
-        setChat(items => [...items, { role: 'assistant', text: `Agent เสนอให้${contract.description} ตรวจรายละเอียดก่อนกดทำตามแผน` }]);
-        awaitingKaggleForGoal.current = null;
-        return;
-      }
-      const fingerprint = JSON.stringify([proposed.capability, proposed.arguments]);
-      repeated = fingerprint === lastAction ? repeated + 1 : 0;
-      lastAction = fingerprint;
-      if (repeated >= 2) throw new Error('AGENT_V0_REPEATED_ACTION_NO_PROGRESS');
-
-      const before = verifiedExecutionCount.current;
-      setStatus(`กำลังดำเนินงานขั้นที่ ${stepIndex + 1} ผ่าน Spacetime: ${proposed.label}`);
-      if (agentStopRequested.current) {
-        activeAgentGoal.current = null;
-        setStatus('หยุดก่อนสั่งขั้นถัดไปตามคำขอ · ยังไม่ได้รัน action ที่เสนอ');
-        return;
-      }
-      const outcome = await executeAgentProposal(proposed);
-      if (!outcome || verifiedExecutionCount.current <= before) {
-        setStatus('หยุดเพื่อตรวจสิทธิ์หรือผลจาก Provider · ไม่มีการรันคำสั่งเดิมซ้ำอัตโนมัติ');
-        return;
-      }
-      if (proposed.capability === 'device.shell.exec' && nativeShellOutcome(outcome).state !== 'succeeded') {
-        setStatus('ส่งคำสั่งให้ Native แล้ว แต่ยังต้องยืนยัน Exit Code ก่อนวางแผนขั้นถัดไป');
-        return;
-      }
-    }
-    throw new Error('AGENT_V0_STEP_BUDGET_REACHED_REVIEW_EVIDENCE');
+    if (!result) return;
+    if (result.authority !== 'proposal-only' || result.brain_mode !== 'local_qwen3_planner' ||
+        typeof result.model !== 'string' || !result.model.startsWith('DSG-Agent-v0')) throw new Error('AGENT_V0_MODEL_NOT_VERIFIED');
+    const next = asRecord(result.action_proposal);
+    const nextArguments = asRecord(next?.arguments);
+    const contract = contracts.find(item => item.name === next?.action);
+    if (result.status === 'ACTION_REQUIRED' && contract && nextArguments) {
+      setProposal({ capability: contract.name, target: contract.target, arguments: nextArguments, label: contract.description });
+      setChat(items => [...items, { role: 'assistant', text: `Agent v0 เสนอให้${contract.description} ตรวจรายละเอียดก่อนกดทำตามแผน` }]);
+    } else if (result.status === 'COMPLETED' && typeof asRecord(result.final_result)?.text === 'string') {
+      setChat(items => [...items, { role: 'assistant', text: String(asRecord(result.final_result)!.text) }]);
+    } else throw new Error('AGENT_V0_PROPOSAL_NOT_SUPPORTED');
+    awaitingKaggleForGoal.current = null;
+    setGoal('');
   }
 
   async function browserConnect() {
@@ -598,40 +479,41 @@ export function DsgLiveWorkroom() {
       setStatus('Cinema เชื่อมต่อแล้วในเซสชันที่ตรวจไว้ · สั่งงานได้โดยใช้ Signed Approval ของคำสั่งนั้น ไม่ต้องขอ Connect ซ้ำ');
       return;
     }
-    return run('browser.remote.connect', browserTarget, planId => ({ action: 'browser.remote.connect', arguments: {
+    await run('browser.remote.connect', browserTarget, planId => ({ action: 'browser.remote.connect', arguments: {
       plan_id: planId, agent_identity: agent().agent_id, step_id: 'connect', ttl_seconds: 600,
     } }), 'เชื่อม Remote Browser');
   }
 
   async function browserVerifier(kind: 'browser.extract' | 'browser.screenshot') {
-    return run('browser.remote.read', browserTarget,
+    await run('browser.remote.read', browserTarget,
       planId => cinemaVerifierReadPayload(planId, agent().agent_id, kind),
       kind === 'browser.screenshot' ? 'ตรวจภาพหน้าเว็บด้วย Agent Verifier' : 'อ่านหน้าเว็บด้วย Agent Verifier');
   }
 
-  async function executeAgentProposal(action: Action): Promise<JsonRecord | null> {
-    // The model proposes intent, never authority. Exact registered Routes,
-    // owner approval, deterministic receipts and evidence remain mandatory.
+  async function executeAgentProposal(action: Action) {
+    // Planner selects intent, but Workroom constructs the exact plan-bound
+    // controller payload. Model proposals cannot mint permits or credentials.
     if (action.capability === 'browser.remote.read') {
-      const result = await browserVerifier(cinemaVerifierKind(action.arguments.kind));
-      return result;
+      await browserVerifier(cinemaVerifierKind(action.arguments.kind));
+      return;
     }
     if (action.capability === 'browser.remote.connect') {
-      return (await browserConnect()) ?? null;
+      await browserConnect();
+      return;
     }
     if (action.capability === 'browser.remote.execute') {
       if (typeof action.arguments.url !== 'string') throw new Error('PUBLIC_BROWSER_URL_REQUIRED');
-      const result = await browserNavigate(action.arguments.url);
-      return result;
+      await browserNavigate(action.arguments.url);
+      return;
     }
-    return run(action.capability, action.target,
+    await run(action.capability, action.target,
       () => ({ action: action.capability, arguments: action.arguments }), action.label);
   }
 
   async function browserNavigate(targetUrl: string = url) {
     const steps: PlannedStep[] = cinemaNavigationSteps(targetUrl, agent().agent_id,
       !mayReuseRecentCinemaConnection(cinemaConnectedVerifiedAt.current, Date.now()));
-    return runSteps(steps, 'เปิดเว็บและอ่านผลตามสิทธิ์ที่ตรวจแล้ว');
+    await runSteps(steps, 'เปิดเว็บและอ่านผลตามสิทธิ์ที่ตรวจแล้ว');
   }
 
   return (
@@ -683,10 +565,6 @@ export function DsgLiveWorkroom() {
           <button type="button" className={button} onClick={() => selectTool('browser')}>
             Shared Browser / Multi-Controller · เปิดเครื่องมือที่ใช้ร่วมกับ Agent
           </button>
-          <p role="status" className={`text-xs ${conversationMemory === 'available' ? 'text-sky-300' : 'text-amber-200'}`}>
-            {conversationMemory === 'available' ? 'ความจำบทสนทนา: อ่านและบันทึกผ่าน DSG Memory เดิมตามบัญชีและ Workspace'
-              : conversationMemory === 'loading' ? 'กำลังตรวจความจำบทสนทนา' : 'ความจำบทสนทนาไม่พร้อม · ข้อความในหน้านี้อาจไม่คงอยู่หลังรีเฟรช'}
-          </p>
           <DsgKaggleGpuStatus key={kaggleLaunchRevision} />
           <details className="rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm">
             <summary className="cursor-pointer font-semibold">Core Spin · Physics · Repair · Brain · Framework · Memory</summary>
@@ -716,22 +594,9 @@ export function DsgLiveWorkroom() {
             <div ref={transcript} />
           </div>
           <form onSubmit={event => { event.preventDefault(); void act(sendGoal); }} className="space-y-3">
-            <label className="flex items-start gap-2 text-sm text-slate-200">
-              <input type="checkbox" className="mt-1 accent-indigo-500" checked={autoExecute} disabled={busy}
-                onChange={event => setAutoExecute(event.target.checked)} />
-              <span>ทำงานต่ออัตโนมัติตามเป้าหมาย เมื่อ Route และ Evidence ผ่าน (งานที่ต้องอนุมัติยังใช้สิทธิ์เดิม)</span>
-            </label>
             <label htmlFor="workroom-goal" className="block text-sm font-semibold">ให้ DSG Agent v0 วางแผนงานอะไร</label>
             <textarea id="workroom-goal" value={goal} onChange={event => setGoal(event.target.value)} maxLength={4000} rows={3} className={field} placeholder="เช่น ตรวจสถานะ Cinema หรือช่วยวางแผนอ่านไฟล์บน DSG Native" />
-            <div className="flex flex-wrap gap-2">
-              <button type="submit" className={`${button} bg-indigo-700`} disabled={!ready || busy || !goal.trim() || Boolean(pending)}>{busy ? 'Agent กำลังทำงาน…' : autoExecute ? 'เริ่มงานด้วย Agent v0' : 'วางแผนด้วย Agent v0'}</button>
-              {busy && <button type="button" className={button} onClick={() => {
-                agentStopRequested.current = true;
-                activeAgentGoal.current = null;
-                setContinueAfterApproval(false);
-                setStatus('กำลังหยุดก่อนขั้นถัดไป · คำสั่งที่ส่งให้ Provider แล้วต้องตรวจผลก่อน');
-              }}>หยุดหลังขั้นปัจจุบัน</button>}
-            </div>
+            <button type="submit" className={`${button} bg-indigo-700`} disabled={!ready || busy || !goal.trim() || Boolean(pending)}>{busy ? 'กำลังตรวจ Brain จริง…' : 'วางแผนด้วย Agent v0'}</button>
           </form>
           {proposal && <div className="rounded-xl border border-indigo-400 p-4">
             <p className="font-semibold">ขั้นตอนที่เสนอ: {proposal.label}</p>
@@ -807,12 +672,7 @@ export function DsgLiveWorkroom() {
               target="_blank" rel="noreferrer" className={`${button} bg-indigo-700`}>อนุมัติงาน {index + 1} ↗</a>
           ))}
           <button className={button} disabled={busy || !ready} onClick={() => void act(resume)}>ตรวจการอนุมัติและทำงานต่อ</button>
-          <button className={button} disabled={busy} onClick={() => {
-            activeAgentGoal.current = null;
-            setContinueAfterApproval(false);
-            setPending(null);
-            setStatus('หยุดรอในหน้านี้ คำขอที่ยังไม่อนุมัติจะหมดอายุเอง');
-          }}>หยุดรอ</button>
+          <button className={button} disabled={busy} onClick={() => { setPending(null); setStatus('หยุดรอในหน้านี้ คำขอที่ยังไม่อนุมัติจะหมดอายุเอง'); }}>หยุดรอ</button>
         </div>
       </section>}
       {receipt != null && <section className="mt-5 rounded-xl border border-emerald-600/50 p-4" aria-label="ผลการทำงานที่ตรวจหลักฐานแล้ว"><h3 className="font-bold text-emerald-200">ผลขั้นตอน · {verifiedAction || 'งานล่าสุด'} — ตรวจหลักฐานของขั้นตอนนี้แล้ว</h3>
