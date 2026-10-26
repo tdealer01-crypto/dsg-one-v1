@@ -12,6 +12,13 @@ import { nativeShellOutcome } from '@/lib/dsg/user-bound/native-shell-outcome';
 import { nativeDeviceSummary, type NativeDeviceSummary } from '@/lib/dsg/user-bound/native-device-summary';
 import { isVerifiedCinemaConnectResult, mayReuseRecentCinemaConnection } from '@/lib/dsg/user-bound/cinema-session-reuse';
 import { describeWorkroomFailure } from '@/lib/dsg/user-bound/workroom-failure';
+import { boundedPlanRequest, getBoundedApproverSession } from '@/lib/dsg/user-bound/bounded-plan-client';
+import {
+  confirmReviewedBoundedPlan, mayConfirmBoundedReview, nativeBoundedDraft,
+  verifyBoundedPreview, verifiedBoundedCompletion,
+  consumeBoundedConfirmation, applyBoundedStatus, boundedPlanMayClose,
+  type BoundedPreview, type NativeBoundedDraft,
+} from '@/lib/dsg/user-bound/bounded-plan-contract';
 import {
   asRecord, catalogRoutes, composeWorkroomRoutes, publicWorkroomReceipt,
   uniqueWorkroomRoute, workroomReceiptMatches,
@@ -25,6 +32,11 @@ type Pending = { label: string; steps: PendingStep[] };
 type Action = { capability: string; target: string; arguments: JsonRecord; label: string };
 type PlannedStep = { capability: string; target: string; makePayload: (planId: string) => JsonRecord; label: string };
 type FlowPhase = 'goal' | 'plan' | 'approval' | 'execute' | 'verify' | 'evidence' | 'needs-check';
+type BoundedSession = {
+  requestId: string; generation: number; principal: string; workspaceId: string; deviceId: string;
+  draft?: NativeBoundedDraft; preview?: BoundedPreview; expiresAt?: number;
+  acknowledged: boolean; submissionStarted: boolean; grantId?: string; report?: JsonRecord;
+};
 const flowStages: { phase: FlowPhase; label: string }[] = [
   { phase: 'goal', label: 'เป้าหมาย' }, { phase: 'plan', label: 'แผน' },
   { phase: 'approval', label: 'อนุมัติเมื่อจำเป็น' }, { phase: 'execute', label: 'ทำงาน' },
@@ -34,6 +46,30 @@ const button = 'min-h-11 rounded-xl border border-slate-600 px-4 py-2 text-sm fo
 const field = 'w-full rounded-xl border border-slate-500 bg-slate-950 p-3 text-sm text-white';
 const browserTarget = 'node.cinema-remote';
 const desktopTarget = 'node.desktop-native';
+const boundedId = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,119}$/;
+
+function boundedFailure(error: unknown): string {
+  const code = error instanceof Error ? error.message : '';
+  if (code === 'BOUNDED_PLAN_NOT_CONFIGURED') return 'BLOCKED · runtime ยังไม่เปิดแผนแบบมีขอบเขต ต้องตั้งค่า provider และ worker ที่เชื่อถือได้ก่อน';
+  if (code === 'BOUNDED_PLAN_POLICY_DENIED') return 'BLOCKED · นโยบาย runtime ไม่รับขอบเขตนี้ ตรวจอุปกรณ์ แผนที่รองรับ และ MFA ของเจ้าของก่อน';
+  if (code === 'BOUNDED_PLAN_CONFIRMATION_UNCERTAIN') return 'ยังยืนยันผลการอนุมัติไม่ได้ · ตรวจสถานะคำขอเดิมด้านล่างก่อน ไม่ส่งการยืนยันซ้ำ';
+  if (code === 'BOUNDED_REVIEW_CHANGED_OR_EXPIRED') return 'การตรวจแผนหมดอายุหรือบริบทเปลี่ยนแล้ว · หยุดและตรวจแผนใหม่ก่อนอนุมัติ';
+  if (code === 'BOUNDED_NATIVE_DEVICE_REQUIRED') return 'ต้องตรวจอุปกรณ์ที่ผูกไว้ให้สำเร็จก่อนตรวจแผน Native แบบมีขอบเขต';
+  if (code === 'NATIVE_CREATE_NEW_MODE_REQUIRED') return 'แผนสร้างไฟล์ต้องระบุ path, content และ mode=create_new ตามสัญญา Native ปัจจุบัน · ให้วางแผนใหม่';
+  if (code.startsWith('BOUNDED_')) return 'BLOCKED · ยังตรวจขอบเขตหรือผลของแผนนี้ไม่ได้ (' + (/^[A-Z0-9_]{3,100}$/.test(code) ? code : 'BOUNDED_PLAN_UNAVAILABLE') + ') · ตรวจคำขอเดิมก่อนทำต่อ';
+  return describeWorkroomFailure(error);
+}
+
+function boundedStatusText(report: JsonRecord): string {
+  const states: Record<string, string> = {
+    WAITING_REVIEW: 'รอตรวจแผน', WAITING_MFA: 'รอเจ้าของยืนยัน MFA',
+    WAITING_WORKER_CONFIGURATION: 'ต้องตั้งค่า worker ที่รองรับก่อน', WAITING_ENQUEUE: 'ยังไม่เข้าคิว worker',
+    WAITING_WORKER: 'อยู่ในคิว รอ worker', IN_FLIGHT_UNVERIFIED: 'กำลังทำงาน ยังไม่มีผลที่ตรวจครบ',
+    RECONCILE_REQUIRED: 'ต้องตรวจผลที่ค้างอยู่ ไม่ส่งงานซ้ำ', BLOCKED: 'BLOCKED · ตรวจนโยบาย อุปกรณ์และ provider',
+    COMPLETED: 'backend รายงานว่าทำงานเสร็จพร้อมหลักฐาน', REVOKED: 'เพิกถอนสิทธิ์แล้ว', EXPIRED: 'สิทธิ์หมดอายุแล้ว',
+  };
+  return states[String(report.status)] ?? 'ยังยืนยันสถานะงานไม่ได้';
+}
 
 function approvalHref(approvalRequestId?: string): string {
   return approvalRequestId
@@ -49,6 +85,10 @@ export function DsgLiveWorkroom() {
   const busyRef = useRef(false);
   const cinemaConnectedVerifiedAt = useRef(0);
   const subject = useRef<string | null>(null);
+  const workspace = useRef<string | null>(null);
+  const boundedGeneration = useRef(0);
+  const boundedRef = useRef<BoundedSession | null>(null);
+  const [bounded, setBounded] = useState<BoundedSession | null>(null);
   const [routes, setRoutes] = useState<WorkroomRoute[]>([]);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [frameworkProbe, setFrameworkProbe] = useState<'not-checked' | 'reported-ready' | 'unverified'>('not-checked');
@@ -75,42 +115,82 @@ export function DsgLiveWorkroom() {
   const [shellProcessId, setShellProcessId] = useState<string | null>(null);
   const [shellOutcome, setShellOutcome] = useState<'running' | 'succeeded' | 'failed' | 'unknown' | null>(null);
   const [nativeDevice, setNativeDevice] = useState<NativeDeviceSummary | null>(null);
+  const nativeDeviceIdentity = useRef('');
+  nativeDeviceIdentity.current = nativeDevice?.deviceId ?? '';
 
   useEffect(() => {
     let live = true;
+    const generation = boundedGeneration;
     void (async () => {
       try {
         const response = await fetch('/api/dsg/identity/link', { credentials: 'include', cache: 'no-store' });
         const link = await response.json();
         if (!response.ok || !link.ok) throw new Error('DSG_WORKSPACE_SESSION_REQUIRED');
-        if (live) subject.current = link.principal?.sub ?? null;
+        if (live) { subject.current = link.principal?.sub ?? null; workspace.current = link.workspaceId ?? null; }
         const authenticated = await getDsgBrowserSession().isAuthenticated();
         if (!live) return;
         setReady(authenticated && Boolean(subject.current));
         setStatus(authenticated && subject.current
           ? 'เซสชันเครื่องมือพร้อม กดอ่านเครื่องมือที่ระบบมีอยู่'
           : 'เข้าสู่ระบบเครื่องมือครั้งเดียวเพื่อใช้ Agent v0 และรีโมต');
+        const previous = new URLSearchParams(window.location.search).get('bounded_request_id');
+        if (authenticated && subject.current && workspace.current && previous && boundedId.test(previous)) {
+          saveBounded({ requestId: previous, generation: ++boundedGeneration.current,
+            principal: subject.current, workspaceId: workspace.current, deviceId: '',
+            acknowledged: false, submissionStarted: true });
+          setStatus('พบคำขอเดิม · ตรวจสถานะได้โดยไม่ขออนุมัติซ้ำ รายละเอียดแผนในหน่วยความจำไม่ถูกกู้หลังรีโหลด');
+        }
       } catch {
         if (live) setStatus('ตรวจเซสชันไม่ได้ เปิดหน้าสิทธิ์แล้วเลือก workspace');
       } finally { if (live) setInitializing(false); }
     })();
-    return () => { live = false; };
+    return () => { live = false; generation.current++; };
   }, []);
 
   useEffect(() => { transcript.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [chat]);
 
-  async function tool(name: string, args: JsonRecord): Promise<ToolReply> {
-    let accessToken: string;
+  function saveBounded(next: BoundedSession | null) {
+    boundedRef.current = next;
+    setBounded(next);
+    const location = new URL(window.location.href);
+    if (next) location.searchParams.set('bounded_request_id', next.requestId);
+    else location.searchParams.delete('bounded_request_id');
+    window.history.replaceState(window.history.state, '', location.pathname + location.search + location.hash);
+  }
+
+  async function boundedAct(work: () => Promise<void>) {
+    await act(async () => {
+      try { await work(); }
+      catch (error) { setFlowPhase('needs-check'); setStatus(boundedFailure(error)); }
+    });
+  }
+
+  async function requesterToken() {
     try {
       const token = await getDsgBrowserSession().getTokenSilently();
       if (!token) throw new Error('AUTH0_TOKEN_UNAVAILABLE');
-      accessToken = token;
-    }
-    catch (error) {
+      return token;
+    } catch (error) {
       setReady(false);
       throw new Error(classifyAuth0SessionFailure(error) === 'AUTH0_REFRESH_NOT_AVAILABLE'
         ? 'AUTH0_REAUTH_REQUIRED' : 'AUTH0_TOKEN_UNAVAILABLE');
     }
+  }
+
+  async function checkBoundedContext(current?: BoundedSession) {
+    const response = await fetch('/api/dsg/identity/link', { credentials: 'include', cache: 'no-store' });
+    const link = asRecord(await response.json());
+    const principal = asRecord(link?.principal);
+    if (!response.ok || link?.ok !== true || principal?.sub !== subject.current ||
+        link.workspaceId !== workspace.current || link.workspaceRole !== 'OWNER' ||
+        (current && (current.principal !== principal?.sub || current.workspaceId !== link.workspaceId))) {
+      boundedGeneration.current++;
+      throw new Error('BOUNDED_REVIEW_CHANGED_OR_EXPIRED');
+    }
+  }
+
+  async function tool(name: string, args: JsonRecord): Promise<ToolReply> {
+    const accessToken = await requesterToken();
     const response = await fetch('/api/dsg/spacetime/user-tools', {
       method: 'POST', credentials: 'include', cache: 'no-store',
       headers: { 'content-type': 'application/json' },
@@ -132,7 +212,8 @@ export function DsgLiveWorkroom() {
     try { await work(); }
     catch (error) {
       setFlowPhase('needs-check');
-      setStatus(describeWorkroomFailure(error));
+      setStatus(error instanceof Error && error.message === 'NATIVE_CREATE_NEW_MODE_REQUIRED'
+        ? boundedFailure(error) : describeWorkroomFailure(error));
     } finally { busyRef.current = false; setBusy(false); }
   }
 
@@ -282,7 +363,7 @@ export function DsgLiveWorkroom() {
   }
 
   async function runSteps(steps: PlannedStep[], label: string) {
-    if (pending) throw new Error('FINISH_OR_CANCEL_PENDING_REQUEST_FIRST');
+    if (pending || boundedRef.current) throw new Error('FINISH_OR_CANCEL_PENDING_REQUEST_FIRST');
     setVerifiedAction(null);
     setReceipt(null);
     setObservedPage(null);
@@ -314,6 +395,164 @@ export function DsgLiveWorkroom() {
   async function run(capability: string, target: string, makePayload: (planId: string) => JsonRecord, label: string) {
     return runSteps([{ capability, target, makePayload, label }], label);
   }
+
+  async function reviewBoundedNative(action: Action) {
+    if (pending || boundedRef.current) throw new Error('FINISH_OR_CANCEL_PENDING_REQUEST_FIRST');
+    if (!nativeDevice || nativeDevice.online !== true || !workspace.current || !subject.current)
+      throw new Error('BOUNDED_NATIVE_DEVICE_REQUIRED');
+    if (action.capability !== 'device.fs.write' || action.target !== desktopTarget ||
+        action.arguments.mode !== 'create_new' || typeof action.arguments.path !== 'string' ||
+        typeof action.arguments.content !== 'string' || Object.keys(action.arguments).length !== 3)
+      throw new Error('NATIVE_CREATE_NEW_MODE_REQUIRED');
+    const generation = ++boundedGeneration.current;
+    await checkBoundedContext();
+    setReceipt(null); setVerifiedAction(null); setObservedPage(null);
+    // The trusted postcondition reads the full file using the same plan, actor
+    // and exact path. It is not staged as a second write authority.
+    const planned = await preparePlan([
+      { capability: 'device.fs.write', target: desktopTarget, label: action.label,
+        makePayload: () => ({ action: 'device.fs.write', arguments: { ...action.arguments } }) },
+      { capability: 'device.fs.read', target: desktopTarget, label: 'ตรวจไฟล์ที่สร้างตามแผนเดิม',
+        makePayload: () => ({ action: 'device.fs.read', arguments: { path: action.arguments.path } }) },
+    ], 'สร้างไฟล์ใหม่และตรวจเนื้อหาตามขอบเขตที่เจ้าของตรวจ');
+    if (!planned[0].route.signed_approval_required || !planned[0].route.bind_payload ||
+        !planned[1].route.bind_payload || planned[1].route.approval_required || planned[1].route.signed_approval_required)
+      throw new Error('BOUNDED_NATIVE_WRITE_READ_PLAN_REQUIRED');
+    const draft = nativeBoundedDraft(planned[0].request, planned[1].request,
+      { workspaceId: workspace.current, deviceId: nativeDevice.deviceId });
+    const staged = await boundedPlanRequest('stage', await requesterToken(), {
+      workspace_id: draft.workspaceId, device_id: draft.deviceId, requests: draft.requests,
+      duration_seconds: 300,
+    });
+    if (generation !== boundedGeneration.current) throw new Error('BOUNDED_REVIEW_CHANGED_OR_EXPIRED');
+    if (typeof staged.request_id !== 'string' || !boundedId.test(staged.request_id) ||
+        typeof staged.expires_at !== 'number') throw new Error('BOUNDED_REVIEW_SCOPE_NOT_VERIFIED');
+    // Save the existing ID before view I/O so a view failure never stages again.
+    saveBounded({ requestId: staged.request_id, generation, principal: subject.current,
+      workspaceId: draft.workspaceId, deviceId: draft.deviceId, draft, expiresAt: staged.expires_at,
+      acknowledged: false, submissionStarted: false });
+    setProposal(null);
+    await viewBoundedPlan();
+  }
+
+  async function viewBoundedPlan() {
+    const current = boundedRef.current;
+    if (!current?.draft || current.submissionStarted) return;
+    await checkBoundedContext(current);
+    const result = await boundedPlanRequest('view', await requesterToken(), { request_id: current.requestId });
+    const preview = await verifyBoundedPreview(result, current.draft, current.requestId, current.expiresAt);
+    if (current.generation !== boundedGeneration.current || boundedRef.current?.requestId !== current.requestId)
+      throw new Error('BOUNDED_REVIEW_CHANGED_OR_EXPIRED');
+    saveBounded({ ...current, preview, acknowledged: false });
+    setFlowPhase('approval');
+    setStatus('ตรวจขอบเขตและเนื้อหาไฟล์ด้านล่างให้ครบก่อนยืนยัน จากนั้นระบบจะขอ MFA ใหม่สำหรับแผนนี้');
+  }
+
+  function beginBoundedConfirmation() {
+    const current = boundedRef.current;
+    if (busyRef.current || !ready || !current?.preview || !current.acknowledged || current.submissionStarted) return;
+    // Open in the click gesture for browsers that block popups after async I/O.
+    const popup = window.open('', 'dsg-bounded-owner-approval', 'popup=yes,width=500,height=700');
+    if (!popup) { setStatus('เปิดหน้าต่าง MFA ไม่ได้ · อนุญาต popup ให้ dsg.pics แล้วลองยืนยันแผนเดิมอีกครั้ง'); return; }
+    void boundedAct(async () => {
+      try { await confirmBoundedPlan(popup); }
+      finally { if (!popup.closed) popup.close(); }
+    });
+  }
+
+  async function confirmBoundedPlan(popup: Window) {
+    const current = boundedRef.current;
+    if (!current?.preview) return;
+    const preview = current.preview;
+    const result = await confirmReviewedBoundedPlan(preview, {
+      isCurrent: () => {
+        const latest = boundedRef.current;
+        return Boolean(latest && latest.requestId === current.requestId && latest.preview?.reviewDigest === preview.reviewDigest &&
+          latest.principal === subject.current && latest.workspaceId === workspace.current &&
+          latest.deviceId === nativeDeviceIdentity.current && mayConfirmBoundedReview({
+            acknowledged: latest.acknowledged, submissionStarted: latest.submissionStarted,
+            reviewedGeneration: latest.generation,
+          }, boundedGeneration.current));
+      },
+      requestMfa: async () => {
+        await checkBoundedContext(current);
+        setStatus('กำลังขอ MFA ใหม่หลังตรวจแผน · ใช้บัญชีเจ้าของที่ผูกกับพื้นที่ทำงานเดียวกัน');
+        // getTokenWithPopup always performs loginWithPopup. The existing Auth0
+        // Action challenges MFA for ext_dsg_stepup, with no max-age relaxation.
+        const token = await getBoundedApproverSession().getTokenWithPopup({ authorizationParams: {
+          redirect_uri: 'https://dsg.pics/dsg/approvals', audience: 'https://aws.dsg.pics',
+          scope: 'openid profile email dsg.approve', ext_dsg_stepup: '1',
+        } }, { popup });
+        await checkBoundedContext(current);
+        return token;
+      },
+      // A NOT_GRANTED status read before submission cannot authorize clearing
+      // an uncertain confirmation afterward. Only a new status may resolve it.
+      onSubmitting: () => saveBounded(consumeBoundedConfirmation(current)),
+      confirm: (token, args) => boundedPlanRequest('confirm', token, args),
+    });
+    const latest = boundedRef.current;
+    if (!latest || latest.generation !== current.generation || current.generation !== boundedGeneration.current) return;
+    saveBounded({ ...latest, grantId: typeof result.grant_id === 'string' ? result.grant_id : undefined });
+    setFlowPhase('verify');
+    setStatus('ยืนยันขอบเขตแล้ว · กำลังอ่านสถานะ worker โดยไม่ขออนุมัติซ้ำ');
+    await readBoundedStatus();
+  }
+
+  async function readBoundedStatus() {
+    const current = boundedRef.current;
+    if (!current) return;
+    await checkBoundedContext(current);
+    const report = await boundedPlanRequest('status', await requesterToken(), { request_id: current.requestId });
+    if (current.generation !== boundedGeneration.current || boundedRef.current?.requestId !== current.requestId) return;
+    if (current.draft && (report.plan_id !== current.draft.requests[0].plan_id ||
+        report.plan_hash !== current.draft.requests[0].plan_hash || report.device_id !== current.deviceId))
+      throw new Error('BOUNDED_REVIEW_SCOPE_NOT_VERIFIED');
+    saveBounded(applyBoundedStatus(current, report));
+    if (current.preview && verifiedBoundedCompletion(report, current.preview)) {
+      for (const [index, expected] of current.preview.steps.entries()) {
+        const request = current.draft?.requests[index];
+        const completed = (Array.isArray(report.steps) ? report.steps : [])
+          .map(asRecord).find(step => step?.step_id === expected.stepId);
+        if (!request || typeof request.payload.action !== 'string' || typeof completed?.evidence_hash !== 'string') continue;
+        const entry = { action: request.payload.action, outcome: 'VERIFIED',
+          plan_id: request.plan_id, route_id: request.route_id, evidence_hash: completed.evidence_hash };
+        // Re-reading the same completed request must not repeat planner context.
+        // Match ordinary execution history; never include file content.
+        if (!history.current.some(previous => previous.plan_id === entry.plan_id &&
+            previous.route_id === entry.route_id && previous.evidence_hash === entry.evidence_hash)) {
+          history.current = [...history.current, entry].slice(-6);
+        }
+      }
+      setFlowPhase('evidence');
+      setStatus('งานแบบมีขอบเขตเสร็จแล้ว · runtime ตรวจหลักฐานและผลอ่านไฟล์ตามแผนที่ตรวจไว้ครบ');
+    } else {
+      setFlowPhase(report.status === 'BLOCKED' || report.status === 'RECONCILE_REQUIRED' ? 'needs-check' : 'verify');
+      setStatus(boundedStatusText(report) + (report.status === 'COMPLETED' && !current.preview
+        ? ' · หลังรีโหลด หน้านี้แสดงสถานะจาก backend โดยไม่ได้กู้แผนเดิมเพื่อเทียบซ้ำ' : ' · อ่านสถานะเดิมได้โดยไม่ส่งงานหรืออนุมัติซ้ำ'));
+    }
+  }
+
+  async function revokeBoundedPlan() {
+    const current = boundedRef.current;
+    if (!current?.grantId) return;
+    await checkBoundedContext(current);
+    await boundedPlanRequest('revoke', await requesterToken(), { grant_id: current.grantId });
+    setStatus('เพิกถอนสิทธิ์แล้ว · กำลังตรวจสถานะเดิม งานที่ส่งไปแล้วอาจยังต้องตรวจผล');
+    await readBoundedStatus();
+  }
+
+  function closeBoundedPlan() {
+    const current = boundedRef.current;
+    if (!current || !boundedPlanMayClose(current)) return;
+    boundedGeneration.current++;
+    saveBounded(null);
+    setStatus('ปิดการตรวจแผนนี้แล้ว · คำขอที่ยังไม่อนุมัติจะหมดอายุเอง ไม่มีการส่งงานซ้ำ');
+  }
+
+  useEffect(() => {
+    if (bounded?.preview) document.getElementById('dsg-bounded-plan')?.focus();
+  }, [bounded?.preview]);
 
   // A newly created, exact-plan approval should be visible immediately on
   // mobile and keyboard navigation, not hidden beneath the advanced tools.
@@ -409,6 +648,7 @@ export function DsgLiveWorkroom() {
   }, [pending, ready]);
 
   async function sendGoal() {
+    if (boundedRef.current) throw new Error('FINISH_OR_CANCEL_PENDING_REQUEST_FIRST');
     const message = goal.trim();
     if (!message || message.length > 4000) return;
     const available = catalogLoaded ? routes : await loadCatalog();
@@ -418,7 +658,7 @@ export function DsgLiveWorkroom() {
       { name: 'device.remote.status', target: desktopTarget, description: 'อ่านสถานะ DSG Desktop Native ที่ผูกอยู่', required: [], optional: [], risk: 'read' },
       { name: 'device.process.list', target: desktopTarget, description: 'อ่านรายการ process ของ DSG Desktop Native', required: [], optional: [], risk: 'read' },
       { name: 'device.fs.read', target: desktopTarget, description: 'อ่านไฟล์จาก DSG Desktop Native', required: ['path'], optional: ['offset', 'length'], risk: 'read' },
-      { name: 'device.fs.write', target: desktopTarget, description: 'เขียนไฟล์ผ่าน Signed Approval ของ DSG Native เดิม', required: ['path', 'content'], optional: [], risk: 'high' },
+      { name: 'device.fs.write', target: desktopTarget, description: 'สร้างไฟล์ใหม่ผ่าน Signed Approval ของ DSG Native (mode=create_new เท่านั้น)', required: ['path', 'content', 'mode'], optional: [], risk: 'high' },
       { name: 'device.shell.exec', target: desktopTarget, description: 'เรียกคำสั่งบน DSG Desktop Native หลังมีแผนและการอนุมัติ', required: ['command'], optional: [], risk: 'high' },
     ].filter(contract => available.some(route => route.capability === contract.name && route.target_node === contract.target));
     if (!contracts.length) throw new Error('NO_LIVE_TOOL_CONTRACTS_FOR_AGENT');
@@ -515,6 +755,9 @@ export function DsgLiveWorkroom() {
       await browserNavigate(action.arguments.url);
       return;
     }
+    if (action.capability === 'device.fs.write' && (action.arguments.mode !== 'create_new' ||
+        typeof action.arguments.path !== 'string' || typeof action.arguments.content !== 'string' ||
+        Object.keys(action.arguments).length !== 3)) throw new Error('NATIVE_CREATE_NEW_MODE_REQUIRED');
     await run(action.capability, action.target,
       () => ({ action: action.capability, arguments: action.arguments }), action.label);
   }
@@ -605,21 +848,31 @@ export function DsgLiveWorkroom() {
           <form onSubmit={event => { event.preventDefault(); void act(sendGoal); }} className="space-y-3">
             <label htmlFor="workroom-goal" className="block text-sm font-semibold">ให้ DSG Agent v0 วางแผนงานอะไร</label>
             <textarea id="workroom-goal" value={goal} onChange={event => setGoal(event.target.value)} maxLength={4000} rows={3} className={field} placeholder="เช่น ตรวจสถานะ Cinema หรือช่วยวางแผนอ่านไฟล์บน DSG Native" />
-            <button type="submit" className={`${button} bg-indigo-700`} disabled={!ready || busy || !goal.trim() || Boolean(pending)}>{busy ? 'กำลังตรวจ Brain จริง…' : 'วางแผนด้วย Agent v0'}</button>
+            <button type="submit" className={`${button} bg-indigo-700`} disabled={!ready || busy || !goal.trim() || Boolean(pending || bounded)}>{busy ? 'กำลังตรวจ Brain จริง…' : 'วางแผนด้วย Agent v0'}</button>
           </form>
           {proposal && <div className="rounded-xl border border-indigo-400 p-4">
             <p className="font-semibold">ขั้นตอนที่เสนอ: {proposal.label}</p>
-            <pre className="mt-2 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(publicWorkroomReceipt(proposal.arguments), null, 2)}</pre>
-            <button className={`${button} mt-3`} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => {
+            {proposal.capability === 'device.fs.write' ? <div className="mt-2 space-y-2 text-sm">
+              <p className="break-all">ไฟล์ใหม่: {String(proposal.arguments.path ?? '')}</p>
+              <p>วิธีเขียน: {proposal.arguments.mode === 'create_new' ? 'สร้างใหม่เท่านั้น' : 'ยังไม่ตรงสัญญา Native ปัจจุบัน'}</p>
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-950 p-3">{String(proposal.arguments.content ?? '')}</pre>
+            </div> : <pre className="mt-2 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(publicWorkroomReceipt(proposal.arguments), null, 2)}</pre>}
+            <button className={`${button} mt-3`} disabled={busy || !ready || Boolean(pending || bounded)} onClick={() => void act(async () => {
               await executeAgentProposal(proposal);
               setProposal(null);
             })}>ทำตามขั้นตอนนี้</button>
+            {proposal.capability === 'device.fs.write' && <div className="mt-3 border-t border-slate-700 pt-3">
+              <p className="text-sm text-slate-300">แผนแบบมีขอบเขต (ขั้นสูง): สร้างไฟล์ใหม่และตรวจเนื้อหาในแผนเดียวกัน ต้องใช้อุปกรณ์ที่ตรวจแล้วและ runtime ที่เปิดรองรับขอบเขตนี้</p>
+              {!nativeDevice && <p className="mt-2 text-sm text-amber-200">เปิด “สั่งงานอุปกรณ์” แล้วตรวจอุปกรณ์ที่เชื่อมต่อก่อน</p>}
+              <button className={`${button} mt-2`} disabled={busy || !ready || Boolean(pending || bounded)}
+                onClick={() => void boundedAct(() => reviewBoundedNative(proposal))}>ตรวจแผนแบบมีขอบเขต</button>
+            </div>}
           </div>}
         </>}
         {tab === 'browser' && <>
           <p className="text-sm text-slate-300">ใช้ Cinema บน AWS เดิม การเชื่อมและการควบคุมต้องผ่านคำขออนุมัติที่ผูกกับแผน</p>
           <p className="text-xs text-slate-400">Human Viewer: ต้องยืนยันบัญชี Cinema เดิม · Agent Executor: ควบคุมตามแผนที่อนุมัติ · Agent Verifier: อ่านหน้าเว็บ/ภาพหน้าจอเท่านั้น ทั้งสามบทบาทใช้โปรไฟล์ Browser เดียวกันเมื่อการผูกเซสชันผ่านการตรวจสอบ</p>
-          <DsgCinemaOauthViewer ready={ready} unavailable={initializing || busy || Boolean(pending)}
+          <DsgCinemaOauthViewer ready={ready} unavailable={initializing || busy || Boolean(pending || bounded)}
             onSignIn={beginLoginRedirect}
             onRequestConnect={() => act(browserConnect)}
             onWorkingChange={working => { busyRef.current = working; setBusy(working); }}
@@ -627,14 +880,14 @@ export function DsgLiveWorkroom() {
               () => ({ action: 'browser.remote.status', arguments: {} }), 'ตรวจเซสชันร่วมของ Viewer และ Agent')} />
           {catalogLoaded && !isAvailable('browser.remote.status', browserTarget) && <p className="text-amber-200">runtime ยังไม่เปิดเส้นทาง Browser — ตรวจ deployment ก่อนเชื่อม</p>}
           <div className="flex flex-wrap gap-2">
-            <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('browser.remote.status', browserTarget, () => ({ action: 'browser.remote.status', arguments: {} }), 'อ่านสถานะ Browser'); })}>ตรวจสถานะ Browser</button>
-            <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await browserVerifier('browser.extract'); })}>Agent Verifier · อ่านหน้าเว็บ</button>
-            <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await browserVerifier('browser.screenshot'); })}>Agent Verifier · ภาพหน้าจอ</button>
+            <button className={button} disabled={busy || !ready || Boolean(pending || bounded)} onClick={() => void act(async () => { await run('browser.remote.status', browserTarget, () => ({ action: 'browser.remote.status', arguments: {} }), 'อ่านสถานะ Browser'); })}>ตรวจสถานะ Browser</button>
+            <button className={button} disabled={busy || !ready || Boolean(pending || bounded)} onClick={() => void act(async () => { await browserVerifier('browser.extract'); })}>Agent Verifier · อ่านหน้าเว็บ</button>
+            <button className={button} disabled={busy || !ready || Boolean(pending || bounded)} onClick={() => void act(async () => { await browserVerifier('browser.screenshot'); })}>Agent Verifier · ภาพหน้าจอ</button>
             <a href="https://aws.dsg.pics/app" target="_blank" rel="noopener noreferrer" className={button}>Evidence &amp; Conformance ↗ (ไม่ใช่ Cinema Viewer)</a>
           </div>
           <label htmlFor="workroom-browser-url" className="block text-sm font-semibold">เว็บที่จะเปิด</label>
           <input id="workroom-browser-url" type="url" value={url} onChange={event => setUrl(event.target.value)} className={field} />
-          <button className={button} disabled={busy || !ready || Boolean(pending) || !url.trim()} onClick={() => void act(browserNavigate)}>ขอเชื่อม เปิดเว็บ และอ่านผล</button>
+          <button className={button} disabled={busy || !ready || Boolean(pending || bounded) || !url.trim()} onClick={() => void act(browserNavigate)}>ขอเชื่อม เปิดเว็บ และอ่านผล</button>
         </>}
         {tab === 'desktop' && <>
           <p className="text-sm text-slate-300">สั่งงานบนอุปกรณ์ DSG Native ที่ระบบเชื่อมไว้ ชื่อเครื่องและความพร้อมจะแสดงจากผลตรวจจริง</p>
@@ -647,25 +900,72 @@ export function DsgLiveWorkroom() {
           </div> : <p className="text-sm text-slate-400">ยังไม่มีผลตรวจอุปกรณ์ในหน้านี้ · ใช้ปุ่มตรวจอุปกรณ์เพื่อดูข้อมูลล่าสุด</p>}
           {catalogLoaded && !isAvailable('device.remote.status', desktopTarget) && <p className="text-amber-200">DSG Desktop Native ยังไม่ได้ enroll กับ runtime — จับคู่เครื่องก่อนใช้งาน</p>}
           <div className="flex flex-wrap gap-2">
-            <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('device.remote.status', desktopTarget, () => ({ action: 'device.remote.status', arguments: {} }), 'ตรวจ Remote Desktop'); })}>ตรวจอุปกรณ์ที่เชื่อมต่อ</button>
-            <button className={button} disabled={busy || !ready || Boolean(pending)} onClick={() => void act(async () => { await run('device.process.list', desktopTarget, () => ({ action: 'device.process.list', arguments: {} }), 'อ่านรายการ process'); })}>ดูโปรแกรมที่กำลังทำงาน</button>
+            <button className={button} disabled={busy || !ready || Boolean(pending || bounded)} onClick={() => void act(async () => { await run('device.remote.status', desktopTarget, () => ({ action: 'device.remote.status', arguments: {} }), 'ตรวจ Remote Desktop'); })}>ตรวจอุปกรณ์ที่เชื่อมต่อ</button>
+            <button className={button} disabled={busy || !ready || Boolean(pending || bounded)} onClick={() => void act(async () => { await run('device.process.list', desktopTarget, () => ({ action: 'device.process.list', arguments: {} }), 'อ่านรายการ process'); })}>ดูโปรแกรมที่กำลังทำงาน</button>
             <a href="/control/" target="_blank" rel="noreferrer" className={button}>จัดการอุปกรณ์ ↗</a>
           </div>
           <label htmlFor="workroom-file-path" className="block text-sm font-semibold">ไฟล์ที่จะอ่าน</label>
           <input id="workroom-file-path" value={path} onChange={event => setPath(event.target.value)} className={field} placeholder="พาธในอุปกรณ์ที่ผูกไว้" />
-          <button className={button} disabled={busy || !ready || Boolean(pending) || !path.trim()} onClick={() => void act(async () => { await run('device.fs.read', desktopTarget, () => ({ action: 'device.fs.read', arguments: { path: path.trim(), length: 100 } }), 'อ่านไฟล์จาก Desktop'); })}>อ่านไฟล์</button>
+          <button className={button} disabled={busy || !ready || Boolean(pending || bounded) || !path.trim()} onClick={() => void act(async () => { await run('device.fs.read', desktopTarget, () => ({ action: 'device.fs.read', arguments: { path: path.trim(), length: 100 } }), 'อ่านไฟล์จาก Desktop'); })}>อ่านไฟล์</button>
           <label htmlFor="workroom-shell-command" className="block text-sm font-semibold">สั่งให้ DSG Native ทำอะไร (Shell Command)</label>
           <textarea id="workroom-shell-command" rows={2} value={command} onChange={event => setCommand(event.target.value)} className={field} placeholder="เช่น pwd หรือ ls -la" />
-          <button className={button} disabled={busy || !ready || Boolean(pending) || !command.trim()} onClick={() => void act(async () => { await run('device.shell.exec', desktopTarget, () => ({ action: 'device.shell.exec', arguments: { command: command.trim(), wait_seconds: 3 } }), 'ทำคำสั่งบน DSG Native'); })}>เริ่มงาน · อนุมัติเมื่อจำเป็น</button>
+          <button className={button} disabled={busy || !ready || Boolean(pending || bounded) || !command.trim()} onClick={() => void act(async () => { await run('device.shell.exec', desktopTarget, () => ({ action: 'device.shell.exec', arguments: { command: command.trim(), wait_seconds: 3 } }), 'ทำคำสั่งบน DSG Native'); })}>เริ่มงาน · อนุมัติเมื่อจำเป็น</button>
           {shellProcessId && (
             <div className="rounded-xl border border-indigo-400/30 p-3 text-sm">
               <p>สถานะคำสั่ง: {shellOutcome === 'running' ? 'กำลังทำงาน' : 'รอตรวจผล'}</p>
-              <button className={`${button} mt-2`} disabled={busy || !ready || Boolean(pending)}
+              <button className={`${button} mt-2`} disabled={busy || !ready || Boolean(pending || bounded)}
                 onClick={() => void act(checkShellProcess)}>ตรวจผลคำสั่งเดิม (ไม่รันซ้ำ)</button>
             </div>
           )}
         </>}
       </div>
+      {bounded && <section id="dsg-bounded-plan" tabIndex={-1} aria-label="แผนแบบมีขอบเขตที่ตรวจไว้"
+        className="mt-5 scroll-mt-20 space-y-3 rounded-xl border border-amber-400/50 p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-300">
+        <h3 className="font-bold text-amber-100">ตรวจแผนแบบมีขอบเขตก่อน MFA</h3>
+        {bounded.preview && bounded.draft ? <>
+          <p className="text-sm text-slate-300">สร้างไฟล์ใหม่เท่านั้น · สิทธิ์จำกัดตามแผนนี้ · หมดอายุ {new Date(bounded.preview.expiresAt * 1000).toLocaleTimeString('th-TH')}</p>
+          <dl className="grid gap-2 break-all text-sm">
+            <div><dt className="text-slate-400">พื้นที่ทำงาน</dt><dd>{bounded.preview.workspaceId}</dd></div>
+            <div><dt className="text-slate-400">อุปกรณ์</dt><dd>{nativeDevice?.deviceId === bounded.deviceId ? nativeDevice.label : bounded.preview.deviceId}</dd></div>
+          </dl>
+          {bounded.preview.steps.map(step => <div key={step.stepId} className="rounded-lg bg-slate-950 p-3 text-sm">
+            <p className="whitespace-pre-wrap break-words">{step.summary}</p>
+            <p className="mt-2 break-all">ไฟล์: {step.target}</p>
+          </div>)}
+          <p className="text-sm font-semibold">เนื้อหาที่จะสร้างและตรวจอ่านกลับเต็มไฟล์</p>
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-950 p-3 text-sm">{bounded.draft.content}</pre>
+          <p className="break-all text-xs text-slate-300">Digest ของขอบเขตที่ตรวจ: <code>{bounded.preview.reviewDigest}</code></p>
+          <details className="rounded-lg border border-slate-700 p-3 text-xs text-slate-400">
+            <summary className="cursor-pointer py-1">ข้อมูลอ้างอิงของขอบเขต</summary>
+            <p className="mt-2 break-all">คำขอ: {bounded.requestId}</p>
+            <p className="break-all">แผน: {bounded.preview.planId} · {bounded.preview.planHash}</p>
+            <p className="break-all">อุปกรณ์: {bounded.preview.deviceId}</p>
+            {bounded.preview.steps.map(step => <p key={step.stepId} className="mt-2 break-all">{step.stepId} · {step.routeId} · {step.effect} · {step.risk}<br />{step.origin}<br />Payload hash: {step.payloadHash}</p>)}
+          </details>
+          {!bounded.submissionStarted && <>
+            <label className="flex min-h-11 items-start gap-3 rounded-lg border border-slate-700 p-3 text-sm">
+              <input type="checkbox" className="mt-1" checked={bounded.acknowledged} disabled={busy}
+                onChange={event => { const current = boundedRef.current; if (current) saveBounded({ ...current, acknowledged: event.target.checked }); }} />
+              ตรวจไฟล์ เนื้อหา อุปกรณ์ พื้นที่ทำงาน และขอบเขตข้างต้นแล้ว พร้อมยืนยัน MFA สำหรับแผนนี้
+            </label>
+            <button className={`${button} bg-indigo-700`} disabled={busy || !ready || !bounded.acknowledged}
+              onClick={beginBoundedConfirmation}>ยืนยันแผนนี้ด้วย MFA ใหม่</button>
+          </>}
+        </> : <p className="text-sm text-slate-300">{bounded.draft
+          ? 'สร้างคำขอเดิมแล้ว แต่ยังอ่านขอบเขตไม่ครบ กดอ่านขอบเขตเดิมก่อนยืนยัน MFA'
+          : 'กู้เฉพาะหมายเลขคำขอหลังรีโหลด อ่านสถานะหรือเพิกถอนสิทธิ์เดิมได้ โดยไม่สร้างแผนหรือขออนุมัติซ้ำ'}</p>}
+        {bounded.report && <p role="status" className="rounded-lg bg-slate-950 p-3 text-sm">{boundedStatusText(bounded.report)} · ขั้นตอนที่มีหลักฐาน {String(bounded.report.completed_steps)}/{String(bounded.report.total_steps)}</p>}
+        {bounded.submissionStarted && !bounded.report && <p className="text-sm text-amber-200">ส่งการยืนยันแล้วหรือกู้คำขอเดิมมา · ต้องอ่านสถานะก่อน ไม่มีการส่งยืนยันซ้ำ</p>}
+        <div className="flex flex-wrap gap-2">
+          {bounded.draft && !bounded.preview && !bounded.submissionStarted && <button className={button} disabled={busy || !ready}
+            onClick={() => void boundedAct(viewBoundedPlan)}>อ่านขอบเขตคำขอเดิม</button>}
+          <button className={button} disabled={busy || !ready} onClick={() => void boundedAct(readBoundedStatus)}>อ่านสถานะเดิม</button>
+          {bounded.grantId && bounded.report?.authorization_status !== 'REVOKED' && bounded.report?.authorization_status !== 'EXPIRED' &&
+            <button className={button} disabled={busy || !ready} onClick={() => void boundedAct(revokeBoundedPlan)}>เพิกถอนสิทธิ์แผนนี้</button>}
+          {boundedPlanMayClose(bounded) && <button className={button} disabled={busy}
+              onClick={closeBoundedPlan}>{bounded.submissionStarted ? 'ปิดการติดตามแผนนี้' : 'ยกเลิกการตรวจแผนนี้'}</button>}
+        </div>
+      </section>}
       {pending && <section id="dsg-pending-approval" tabIndex={-1} className="mt-5 scroll-mt-20 rounded-xl border border-amber-400/50 p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-300" aria-label="งานรออนุมัติ">
         <h3 className="font-bold text-amber-100">รอเจ้าของอนุมัติคำขอที่แสดง</h3>
         <p className="mt-2 text-sm text-slate-300">ตรวจคำขอด้านล่างแล้วอนุมัติตามขอบเขต จากนั้นกลับมาแท็บนี้ ระบบจะตรวจคำขอเดิมและทำขั้นตอนต่อเรียงตามแผนเมื่อเซสชันยังอยู่ (ภายใน 10 นาที)</p>
