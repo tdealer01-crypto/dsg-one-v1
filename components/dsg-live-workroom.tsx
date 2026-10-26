@@ -60,6 +60,7 @@ export function DsgLiveWorkroom() {
   const [goal, setGoal] = useState('');
   const [autoExecute, setAutoExecute] = useState(true);
   const verifiedExecutionCount = useRef(0);
+  const agentStopRequested = useRef(false);
   const [kaggleLaunchRevision, setKaggleLaunchRevision] = useState(0);
   const awaitingKaggleForGoal = useRef<string | null>(null);
   const [chat, setChat] = useState<ChatTurn[]>([]);
@@ -425,9 +426,14 @@ export function DsgLiveWorkroom() {
     // One user goal may take several verified tool actions. Qwen never
     // dispatches a provider directly; every action gets its own governed plan.
     // Stop on approval, uncertain postcondition, unchanged evidence or repeats.
+    agentStopRequested.current = false;
     let lastAction = '';
     let repeated = 0;
     for (let stepIndex = 0; stepIndex < 25; stepIndex += 1) {
+      if (agentStopRequested.current) {
+        setStatus('หยุดงานตามที่ร้องขอ · ไม่มีการส่งขั้นถัดไป และไม่ย้อนคำสั่งที่ทำไปแล้ว');
+        return;
+      }
       let result: JsonRecord | null;
       try {
         result = await run('action.plan', 'node.agent.dsg-v0', () => ({
@@ -503,6 +509,10 @@ export function DsgLiveWorkroom() {
 
       const before = verifiedExecutionCount.current;
       setStatus(`กำลังดำเนินงานขั้นที่ ${stepIndex + 1} ผ่าน Spacetime: ${proposed.label}`);
+      if (agentStopRequested.current) {
+        setStatus('หยุดก่อนสั่งขั้นถัดไปตามคำขอ · ยังไม่ได้รัน action ที่เสนอ');
+        return;
+      }
       const outcome = await executeAgentProposal(proposed);
       if (!outcome || verifiedExecutionCount.current <= before) {
         setStatus('หยุดเพื่อตรวจสิทธิ์หรือผลจาก Provider · ไม่มีการรันคำสั่งเดิมซ้ำอัตโนมัติ');
@@ -642,7 +652,13 @@ export function DsgLiveWorkroom() {
             </label>
             <label htmlFor="workroom-goal" className="block text-sm font-semibold">ให้ DSG Agent v0 วางแผนงานอะไร</label>
             <textarea id="workroom-goal" value={goal} onChange={event => setGoal(event.target.value)} maxLength={4000} rows={3} className={field} placeholder="เช่น ตรวจสถานะ Cinema หรือช่วยวางแผนอ่านไฟล์บน DSG Native" />
-            <button type="submit" className={`${button} bg-indigo-700`} disabled={!ready || busy || !goal.trim() || Boolean(pending)}>{busy ? 'Agent กำลังทำงาน…' : autoExecute ? 'เริ่มงานด้วย Agent v0' : 'วางแผนด้วย Agent v0'}</button>
+            <div className="flex flex-wrap gap-2">
+              <button type="submit" className={`${button} bg-indigo-700`} disabled={!ready || busy || !goal.trim() || Boolean(pending)}>{busy ? 'Agent กำลังทำงาน…' : autoExecute ? 'เริ่มงานด้วย Agent v0' : 'วางแผนด้วย Agent v0'}</button>
+              {busy && <button type="button" className={button} onClick={() => {
+                agentStopRequested.current = true;
+                setStatus('กำลังหยุดก่อนขั้นถัดไป · คำสั่งที่ส่งให้ Provider แล้วต้องตรวจผลก่อน');
+              }}>หยุดหลังขั้นปัจจุบัน</button>}
+            </div>
           </form>
           {proposal && <div className="rounded-xl border border-indigo-400 p-4">
             <p className="font-semibold">ขั้นตอนที่เสนอ: {proposal.label}</p>
