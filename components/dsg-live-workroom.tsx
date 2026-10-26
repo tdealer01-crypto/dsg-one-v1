@@ -283,6 +283,13 @@ export function DsgLiveWorkroom() {
     return runSteps([{ capability, target, makePayload, label }], label);
   }
 
+  // A newly created, exact-plan approval should be visible immediately on
+  // mobile and keyboard navigation, not hidden beneath the advanced tools.
+  // Focus only; this never claims approval, executes or generates another permit.
+  useEffect(() => {
+    if (pending) document.getElementById('dsg-pending-approval')?.focus();
+  }, [pending]);
+
   async function resume() {
     if (!pending) return;
     const current = pending;
@@ -568,7 +575,7 @@ export function DsgLiveWorkroom() {
           )}
         </>}
       </div>
-      {pending && <section className="mt-5 rounded-xl border border-amber-400/50 p-4" aria-label="งานรออนุมัติ">
+      {pending && <section id="dsg-pending-approval" tabIndex={-1} className="mt-5 scroll-mt-20 rounded-xl border border-amber-400/50 p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-300" aria-label="งานรออนุมัติ">
         <h3 className="font-bold text-amber-100">รอเจ้าของอนุมัติคำขอที่แสดง</h3>
         <p className="mt-2 text-sm text-slate-300">ตรวจคำขอด้านล่างแล้วอนุมัติตามขอบเขต จากนั้นกลับมาแท็บนี้ ระบบจะตรวจคำขอเดิมและทำขั้นตอนต่อเรียงตามแผนเมื่อเซสชันยังอยู่ (ภายใน 10 นาที)</p>
         <details className="mt-3 rounded-lg border border-slate-700 p-3"><summary className="cursor-pointer text-sm">รายละเอียดเทคนิคของคำขอ</summary><pre className="mt-2 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(publicWorkroomReceipt(pending.steps.map(step => ({
