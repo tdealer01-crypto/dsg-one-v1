@@ -106,6 +106,8 @@ describe('DSG Cinema multi-controller Agent menu', () => {
     expect(workroom).toContain("tool('spacetime_request_approval'");
     expect(workroom).toContain("tool('spacetime_claim_approval'");
     expect(workroom).toContain("tool('spacetime_verify_evidence'");
+    expect(workroom).toContain("document.getElementById('dsg-pending-approval')?.focus()");
+    expect(workroom).toContain('id="dsg-pending-approval" tabIndex={-1}');
     expect(viewer).toContain('onClick={() => void onRequestConnect()}');
   });
 
