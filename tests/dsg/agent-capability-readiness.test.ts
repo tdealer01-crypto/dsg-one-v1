@@ -40,4 +40,14 @@ describe('truthful existing DSG agent capability readiness', () => {
     expect(rows.find(row => row.id === 'memory')?.registered).toBe(true);
     expect(rows.find(row => row.id === 'brain')?.registered).toBe(false);
   });
+  it('does not accept duplicate or wrong-source routes as available', () => {
+    const correct = route('action.plan', 'node.agent.dsg-v0');
+    const wrong = route('repair.evaluate', 'node.repair-kernel', 'node.agent');
+    const rows = agentCapabilityReadiness([correct, { ...correct, route_id: 'route.duplicate' }, wrong]);
+    expect(rows.find(item => item.id === 'brain')?.registered).toBe(false);
+    expect(rows.find(item => item.id === 'core-spin')?.registered).toBe(false);
+    expect(rows.find(item => item.id === 'repair-evaluate')?.registered).toBe(false);
+    expect(rows.find(item => item.id === 'brain')?.routeId).toBeNull();
+  });
+
 });
