@@ -14,7 +14,7 @@ export function describeCinemaAccountIssue(reason: string): string {
     case 'CINEMA_FREE_ACCOUNT_NOT_LINKED':
       return 'เข้าสู่ระบบ DSG ONE แล้ว แต่ยังไม่ผูกบัญชี Cinema Free เดิม — ยืนยันบัญชีเดิมครั้งเดียวด้านล่าง ไม่ต้องล็อกอิน Google ซ้ำ';
     case 'SAME_ACCOUNT_BROWSER_VIEWER_NOT_READY':
-      return 'Shared Browser ของบัญชีนี้ยังไม่พร้อม โปรดตรวจ Remote ON และบัญชีที่ผูกอยู่ก่อน ไม่สร้างโปรไฟล์ใหม่';
+      return 'Shared Browser ยังไม่เชื่อมกับ Agent ของบัญชีนี้ ตรวจ Remote ON แล้วกด “ขอเชื่อม Browser” ในส่วนนี้ อนุมัติคำขอที่ผูกแผนเมื่อจำเป็น จากนั้นกดเปิด Viewer อีกครั้ง ไม่สร้างโปรไฟล์ใหม่';
     case 'CINEMA_VIEWER_SESSION_MISMATCH':
       return 'Viewer กับ Agent อยู่คนละเซสชัน จึงยังไม่เปิดหน้าต่างเข้าสู่ระบบ ต้องแก้การผูก Cinema ของบัญชีนี้ให้ตรงกันก่อน';
     case 'BROWSER_POPUP_BLOCKED':
@@ -58,10 +58,12 @@ async function callCinema(path: '/status' | '/link' | '/viewer', oldFreeKey?: st
   return body;
 }
 
-export function DsgCinemaOauthViewer({ ready, unavailable = false, onSignIn, readGovernedStatus, onWorkingChange }: {
+export function DsgCinemaOauthViewer({ ready, unavailable = false, onSignIn, onRequestConnect, readGovernedStatus, onWorkingChange }: {
   ready: boolean;
   unavailable?: boolean;
   onSignIn: () => Promise<void>;
+  /** Calls the existing plan-bound Cinema Connect action; never opens a provider session directly. */
+  onRequestConnect: () => Promise<void>;
   readGovernedStatus: () => Promise<unknown>;
   onWorkingChange: (working: boolean) => void;
 }) {
@@ -156,19 +158,26 @@ export function DsgCinemaOauthViewer({ ready, unavailable = false, onSignIn, rea
         ใช้บัญชี DSG ONE เดิม ไม่ต้องกรอก API Key ทุกครั้งหลังผูกบัญชี Free แล้ว
         การเข้าถึงของ Agent ยังคงต้องผ่าน Plan และ Approval
       </p>
+      <p className="mb-3 text-sm text-slate-300">
+        1. ตรวจบัญชี Cinema เดิม · 2. ขอเชื่อม Browser ด้วยแผนและการอนุมัติเดิม · 3. เปิด Viewer ของเซสชันเดียวกับ Agent
+      </p>
       <div className="flex flex-wrap gap-2">
         <button disabled={!ready || unavailable || working} type="button" onClick={() => void checkLink()}
-          className="rounded-lg border border-slate-600 px-3 py-2 disabled:opacity-40">
+          className="min-h-11 rounded-lg border border-slate-600 px-3 py-2 disabled:opacity-40">
           ตรวจบัญชี Free
         </button>
+        <button disabled={!ready || unavailable || working} type="button" onClick={() => void onRequestConnect()}
+          className="min-h-11 rounded-lg border border-indigo-400 px-3 py-2 disabled:opacity-40">
+          ขอเชื่อม Browser · อนุมัติเมื่อจำเป็น
+        </button>
         <button disabled={unavailable || working} type="button" onClick={() => void openViewer()}
-          className="rounded-lg bg-indigo-700 px-3 py-2 disabled:opacity-40">
+          className="min-h-11 rounded-lg bg-indigo-700 px-3 py-2 disabled:opacity-40">
           {ready ? 'เปิด Shared Browser ของฉัน' : 'เข้าสู่ระบบเพื่อเปิด Shared Browser'}
         </button>
       </div>
       <p role="status" className="mt-2 break-words text-xs text-slate-300">
         {message || (ready
-          ? 'กดเปิด Shared Browser ได้เลย ระบบจะตรวจบัญชีและเซสชัน Agent ให้ในครั้งเดียว'
+          ? 'ตรวจบัญชีเดิมและขอเชื่อม Browser ก่อน ระบบจะขออนุมัติตามแผนเฉพาะเมื่อจำเป็น แล้วตรวจว่า Viewer ตรงกับ Agent ก่อนเปิด'
           : 'เข้าสู่ระบบเครื่องมือผ่านปุ่มนี้ แล้วกลับมาเปิด Viewer ของบัญชีเดิม')}
       </p>
       {!linked && <details className="mt-3 border-t border-slate-700 pt-3">
