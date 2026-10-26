@@ -58,6 +58,8 @@ export function DsgLiveWorkroom() {
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'desktop' ? 'desktop' : 'agent'
   );
   const [goal, setGoal] = useState('');
+  const [autoExecute, setAutoExecute] = useState(true);
+  const verifiedExecutionCount = useRef(0);
   const [kaggleLaunchRevision, setKaggleLaunchRevision] = useState(0);
   const awaitingKaggleForGoal = useRef<string | null>(null);
   const [chat, setChat] = useState<ChatTurn[]>([]);
@@ -211,6 +213,7 @@ export function DsgLiveWorkroom() {
       setObservedPage(observation);
     }
     setReceipt(publicWorkroomReceipt(data.receipt));
+    verifiedExecutionCount.current += 1;
     setFlowPhase('evidence');
     setVerifiedAction(label);
     if (request.route_id === 'route.cinema-remote.connect') {
@@ -418,18 +421,24 @@ export function DsgLiveWorkroom() {
     }
     setProposal(null);
     setStatus('กำลังส่งเป้าหมายให้ DSG Agent v0');
-    let result: JsonRecord | null;
-    try {
-      result = await run('action.plan', 'node.agent.dsg-v0', () => ({
-        goal: message,
-        tools: contracts.map(({ target: _target, ...contract }) => contract),
-        verified_history: history.current,
-        step: Math.min(history.current.length, 25), request_key: 'chat-' + crypto.randomUUID(),
-      }), 'วางแผนด้วย Agent v0');
+    // One user goal may take several verified tool actions. Qwen never
+    // dispatches a provider directly; every action gets its own governed plan.
+    // Stop on approval, uncertain postcondition, unchanged evidence or repeats.
+    let lastAction = '';
+    let repeated = 0;
+    for (let stepIndex = 0; stepIndex < 25; stepIndex += 1) {
+      let result: JsonRecord | null;
+      try {
+        result = await run('action.plan', 'node.agent.dsg-v0', () => ({
+          goal: message,
+          tools: contracts.map(({ target: _target, ...contract }) => contract),
+          verified_history: history.current,
+          step: stepIndex, request_key: 'chat-' + crypto.randomUUID(),
+        }), 'วางแผนด้วย Agent v0');
     } catch (error) {
       // One authenticated owner-only wake attempt on a missing Brain binding.
       // Never wake on provider denial, MFA, policy or inference errors.
-      if (!shouldRequestKaggleWake(error)) throw error;
+      if (stepIndex !== 0 || !shouldRequestKaggleWake(error)) throw error;
       setFlowPhase('needs-check');
       setStatus('Brain ยังไม่พร้อม กำลังตรวจสิทธิ์เจ้าของเพื่อขอเปิด Kaggle ฟรี');
       const accessToken = await getDsgBrowserSession().getTokenSilently();
@@ -458,20 +467,52 @@ export function DsgLiveWorkroom() {
       }
       throw new Error(code);
     }
-    if (!result) return;
-    if (result.authority !== 'proposal-only' || result.brain_mode !== 'local_qwen3_planner' ||
-        typeof result.model !== 'string' || !result.model.startsWith('DSG-Agent-v0')) throw new Error('AGENT_V0_MODEL_NOT_VERIFIED');
-    const next = asRecord(result.action_proposal);
-    const nextArguments = asRecord(next?.arguments);
-    const contract = contracts.find(item => item.name === next?.action);
-    if (result.status === 'ACTION_REQUIRED' && contract && nextArguments) {
-      setProposal({ capability: contract.name, target: contract.target, arguments: nextArguments, label: contract.description });
-      setChat(items => [...items, { role: 'assistant', text: `Agent v0 เสนอให้${contract.description} ตรวจรายละเอียดก่อนกดทำตามแผน` }]);
-    } else if (result.status === 'COMPLETED' && typeof asRecord(result.final_result)?.text === 'string') {
-      setChat(items => [...items, { role: 'assistant', text: String(asRecord(result.final_result)!.text) }]);
-    } else throw new Error('AGENT_V0_PROPOSAL_NOT_SUPPORTED');
-    awaitingKaggleForGoal.current = null;
-    setGoal('');
+      if (!result) return;
+      if (result.authority !== 'proposal-only' || result.brain_mode !== 'local_qwen3_planner' ||
+          typeof result.model !== 'string' || !result.model.startsWith('DSG-Agent-v0')) {
+        throw new Error('AGENT_V0_MODEL_NOT_VERIFIED');
+      }
+      if (result.status === 'COMPLETED' && typeof asRecord(result.final_result)?.text === 'string') {
+        setChat(items => [...items, { role: 'assistant', text: String(asRecord(result.final_result)!.text) }]);
+        setStatus('Agent รายงานว่างานจบแล้ว · ตรวจหลักฐานของแต่ละขั้นจากด้านล่าง');
+        awaitingKaggleForGoal.current = null;
+        setGoal('');
+        return;
+      }
+      const next = asRecord(result.action_proposal);
+      const nextArguments = asRecord(next?.arguments);
+      const contract = contracts.find(item => item.name === next?.action);
+      if (result.status !== 'ACTION_REQUIRED' || !contract || !nextArguments) {
+        throw new Error('AGENT_V0_PROPOSAL_NOT_SUPPORTED');
+      }
+      const proposed: Action = {
+        capability: contract.name, target: contract.target,
+        arguments: nextArguments, label: contract.description,
+      };
+      if (!autoExecute) {
+        setProposal(proposed);
+        setChat(items => [...items, { role: 'assistant', text: `Agent เสนอให้${contract.description} ตรวจรายละเอียดก่อนกดทำตามแผน` }]);
+        awaitingKaggleForGoal.current = null;
+        return;
+      }
+      const fingerprint = JSON.stringify([proposed.capability, proposed.arguments]);
+      repeated = fingerprint === lastAction ? repeated + 1 : 0;
+      lastAction = fingerprint;
+      if (repeated >= 2) throw new Error('AGENT_V0_REPEATED_ACTION_NO_PROGRESS');
+
+      const before = verifiedExecutionCount.current;
+      setStatus(`กำลังดำเนินงานขั้นที่ ${stepIndex + 1} ผ่าน Spacetime: ${proposed.label}`);
+      const outcome = await executeAgentProposal(proposed);
+      if (!outcome || verifiedExecutionCount.current <= before) {
+        setStatus('หยุดเพื่อตรวจสิทธิ์หรือผลจาก Provider · ไม่มีการรันคำสั่งเดิมซ้ำอัตโนมัติ');
+        return;
+      }
+      if (proposed.capability === 'device.shell.exec' && nativeShellOutcome(outcome).state !== 'succeeded') {
+        setStatus('ส่งคำสั่งให้ Native แล้ว แต่ยังต้องยืนยัน Exit Code ก่อนวางแผนขั้นถัดไป');
+        return;
+      }
+    }
+    throw new Error('AGENT_V0_STEP_BUDGET_REACHED_REVIEW_EVIDENCE');
   }
 
   async function browserConnect() {
@@ -481,41 +522,38 @@ export function DsgLiveWorkroom() {
       setStatus('Cinema เชื่อมต่อแล้วในเซสชันที่ตรวจไว้ · สั่งงานได้โดยใช้ Signed Approval ของคำสั่งนั้น ไม่ต้องขอ Connect ซ้ำ');
       return;
     }
-    await run('browser.remote.connect', browserTarget, planId => ({ action: 'browser.remote.connect', arguments: {
+    return run('browser.remote.connect', browserTarget, planId => ({ action: 'browser.remote.connect', arguments: {
       plan_id: planId, agent_identity: agent().agent_id, step_id: 'connect', ttl_seconds: 600,
     } }), 'เชื่อม Remote Browser');
   }
 
   async function browserVerifier(kind: 'browser.extract' | 'browser.screenshot') {
-    await run('browser.remote.read', browserTarget,
+    return run('browser.remote.read', browserTarget,
       planId => cinemaVerifierReadPayload(planId, agent().agent_id, kind),
       kind === 'browser.screenshot' ? 'ตรวจภาพหน้าเว็บด้วย Agent Verifier' : 'อ่านหน้าเว็บด้วย Agent Verifier');
   }
 
-  async function executeAgentProposal(action: Action) {
-    // Planner selects intent, but Workroom constructs the exact plan-bound
-    // controller payload. Model proposals cannot mint permits or credentials.
+  async function executeAgentProposal(action: Action): Promise<JsonRecord | null> {
+    // The model proposes intent, never authority. Exact registered Routes,
+    // owner approval, deterministic receipts and evidence remain mandatory.
     if (action.capability === 'browser.remote.read') {
-      await browserVerifier(cinemaVerifierKind(action.arguments.kind));
-      return;
+      return browserVerifier(cinemaVerifierKind(action.arguments.kind));
     }
     if (action.capability === 'browser.remote.connect') {
-      await browserConnect();
-      return;
+      return (await browserConnect()) ?? null;
     }
     if (action.capability === 'browser.remote.execute') {
       if (typeof action.arguments.url !== 'string') throw new Error('PUBLIC_BROWSER_URL_REQUIRED');
-      await browserNavigate(action.arguments.url);
-      return;
+      return browserNavigate(action.arguments.url);
     }
-    await run(action.capability, action.target,
+    return run(action.capability, action.target,
       () => ({ action: action.capability, arguments: action.arguments }), action.label);
   }
 
   async function browserNavigate(targetUrl: string = url) {
     const steps: PlannedStep[] = cinemaNavigationSteps(targetUrl, agent().agent_id,
       !mayReuseRecentCinemaConnection(cinemaConnectedVerifiedAt.current, Date.now()));
-    await runSteps(steps, 'เปิดเว็บและอ่านผลตามสิทธิ์ที่ตรวจแล้ว');
+    return runSteps(steps, 'เปิดเว็บและอ่านผลตามสิทธิ์ที่ตรวจแล้ว');
   }
 
   return (
@@ -596,9 +634,14 @@ export function DsgLiveWorkroom() {
             <div ref={transcript} />
           </div>
           <form onSubmit={event => { event.preventDefault(); void act(sendGoal); }} className="space-y-3">
+            <label className="flex items-start gap-2 text-sm text-slate-200">
+              <input type="checkbox" className="mt-1 accent-indigo-500" checked={autoExecute} disabled={busy}
+                onChange={event => setAutoExecute(event.target.checked)} />
+              <span>ทำงานต่ออัตโนมัติตามเป้าหมาย เมื่อ Route และ Evidence ผ่าน (งานที่ต้องอนุมัติยังใช้สิทธิ์เดิม)</span>
+            </label>
             <label htmlFor="workroom-goal" className="block text-sm font-semibold">ให้ DSG Agent v0 วางแผนงานอะไร</label>
             <textarea id="workroom-goal" value={goal} onChange={event => setGoal(event.target.value)} maxLength={4000} rows={3} className={field} placeholder="เช่น ตรวจสถานะ Cinema หรือช่วยวางแผนอ่านไฟล์บน DSG Native" />
-            <button type="submit" className={`${button} bg-indigo-700`} disabled={!ready || busy || !goal.trim() || Boolean(pending)}>{busy ? 'กำลังตรวจ Brain จริง…' : 'วางแผนด้วย Agent v0'}</button>
+            <button type="submit" className={`${button} bg-indigo-700`} disabled={!ready || busy || !goal.trim() || Boolean(pending)}>{busy ? 'Agent กำลังทำงาน…' : autoExecute ? 'เริ่มงานด้วย Agent v0' : 'วางแผนด้วย Agent v0'}</button>
           </form>
           {proposal && <div className="rounded-xl border border-indigo-400 p-4">
             <p className="font-semibold">ขั้นตอนที่เสนอ: {proposal.label}</p>
