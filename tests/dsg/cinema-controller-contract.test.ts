@@ -99,6 +99,14 @@ describe('DSG Cinema multi-controller Agent menu', () => {
     expect(workroom).toContain('Agent Verifier · ภาพหน้าจอ');
     expect(workroom).toContain("selectTool('browser')");
     expect(viewer).toContain("callCinema('/viewer')");
+    // Connect is never a direct browser API call: it uses the unchanged
+    // governed Workroom plan, request/claim approval and signed execution path.
+    expect(workroom).toContain('onRequestConnect={() => act(browserConnect)}');
+    expect(workroom).toContain("await run('browser.remote.connect'");
+    expect(workroom).toContain("tool('spacetime_request_approval'");
+    expect(workroom).toContain("tool('spacetime_claim_approval'");
+    expect(workroom).toContain("tool('spacetime_verify_evidence'");
+    expect(viewer).toContain('onClick={() => void onRequestConnect()}');
   });
 
   it('shows which DSG identity or Cinema binding failed without another silent login redirect', () => {
