@@ -18,4 +18,9 @@ describe('Kaggle owner wake condition', () => {
     }
     expect(shouldRequestKaggleWake('DSG_BRAIN_BASE_URL_INVALID')).toBe(false);
   });
+  it('does not wake Kaggle when an authorization error embeds a Brain error string', () => {
+    expect(shouldRequestKaggleWake(new Error('AUTH_DENIED:DSG_BRAIN_BASE_URL_INVALID'))).toBe(false);
+    expect(shouldRequestKaggleWake(new Error('PROVIDER_FAILURE:DSG_BRAIN_UPSTREAM_UNAVAILABLE'))).toBe(false);
+  });
+
 });
