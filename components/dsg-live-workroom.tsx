@@ -5,6 +5,7 @@ import { getDsgBrowserSession, DSG_AUTH0_CALLBACK } from '@/lib/dsg/user-bound/b
 import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
 import { DsgKaggleGpuStatus } from '@/components/dsg-kaggle-gpu-status';
 import { shouldRequestKaggleWake } from '@/lib/dsg/user-bound/kaggle-on-demand';
+import { agentCapabilityReadiness } from '@/lib/dsg/user-bound/agent-capability-readiness';
 import { DsgCinemaOauthViewer } from '@/components/dsg-cinema-oauth-viewer';
 import { cinemaAgentToolContracts, cinemaNavigationSteps, cinemaVerifierKind, cinemaVerifierObservation, cinemaVerifierReadPayload } from '@/lib/dsg/user-bound/cinema-controller-contract';
 import { nativeShellOutcome } from '@/lib/dsg/user-bound/native-shell-outcome';
@@ -50,6 +51,8 @@ export function DsgLiveWorkroom() {
   const subject = useRef<string | null>(null);
   const [routes, setRoutes] = useState<WorkroomRoute[]>([]);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
+  const [frameworkProbe, setFrameworkProbe] = useState<'not-checked' | 'reported-ready' | 'unverified'>('not-checked');
+  const [frameworkVersion, setFrameworkVersion] = useState('');
   const [tab, setTab] = useState<'agent' | 'browser' | 'desktop'>(() =>
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'browser' ? 'browser' :
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'desktop' ? 'desktop' : 'agent'
@@ -160,6 +163,30 @@ export function DsgLiveWorkroom() {
     setStatus('อ่านเครื่องมือแล้ว ต้องตรวจผลจาก provider แยกก่อนสรุปว่าเชื่อมต่อได้');
     return found;
   }
+
+  async function checkAgentComponents() {
+    // Existing authenticated catalog is the only source of route availability.
+    await loadCatalog();
+    // This is a reported process/engine health probe, not an agent-run E2E proof.
+    setFrameworkProbe('unverified');
+    setFrameworkVersion('');
+    try {
+      const response = await fetch('/api/agent/status', { cache: 'no-store', credentials: 'include' });
+      const raw = asRecord(await response.json());
+      const engine = asRecord(asRecord(raw?.readiness)?.automationEngine);
+      const reported = response.ok && raw?.ok === true && engine?.ok === true &&
+        engine.engine === 'microsoft-agent-framework' && engine.version === '1.18.0';
+      if (reported) {
+        setFrameworkVersion('1.18.0');
+        setFrameworkProbe('reported-ready');
+      }
+    } catch {
+      // Unverified never becomes success through a network exception.
+    }
+    setStatus('อ่านแคตตาล็อกและ Framework Health แล้ว · สถานะ Route ไม่ได้พิสูจน์ว่าทำงาน E2E สำเร็จ');
+  }
+
+  const capabilityReports = agentCapabilityReadiness(routes);
 
   function agent() {
     if (!subject.current) throw new Error('VERIFIED_AUTH0_SUBJECT_REQUIRED');
@@ -541,6 +568,29 @@ export function DsgLiveWorkroom() {
             Shared Browser / Multi-Controller · เปิดเครื่องมือที่ใช้ร่วมกับ Agent
           </button>
           <DsgKaggleGpuStatus key={kaggleLaunchRevision} />
+          <details className="rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm">
+            <summary className="cursor-pointer font-semibold">Core Spin · Physics · Repair · Brain · Framework · Memory</summary>
+            <p className="mt-2 text-slate-400">ผลตรวจเป็นการลงทะเบียน Route และ Health ที่รายงานเท่านั้น ไม่ใช่หลักฐานว่าโมเดล, GPU, Provider หรือ Memory E2E ผ่าน</p>
+            <button type="button" className={`${button} mt-3`} disabled={busy || !ready}
+              onClick={() => void act(checkAgentComponents)}>ตรวจทุกฟังก์ชันจาก Runtime จริง</button>
+            <ul className="mt-3 space-y-2">
+              <li className="rounded-lg border border-slate-800 p-3">
+                <strong>Microsoft Agent Framework</strong>
+                <span className="ml-2 text-amber-200">{frameworkProbe === 'reported-ready'
+                  ? `Health รายงานพร้อม v${frameworkVersion}`
+                  : frameworkProbe === 'not-checked' ? 'ยังไม่ตรวจ' : 'ยังยืนยัน Health ไม่ได้'}</span>
+                <p className="mt-1 text-xs text-slate-400">กระบวนการ Framework พร้อมไม่เท่ากับ Core Spin งานจริงผ่าน</p>
+              </li>
+              {capabilityReports.map(item => <li key={item.id} className="rounded-lg border border-slate-800 p-3">
+                <strong>{item.label}</strong>
+                <span className={`ml-2 ${catalogLoaded && item.registered ? 'text-sky-300' : 'text-amber-200'}`}>
+                  {!catalogLoaded ? 'ยังไม่ตรวจ' : item.registered ? 'ลงทะเบียน Route แล้ว' : 'ยังไม่พบ Route'}
+                </span>
+                <p className="mt-1 text-xs text-slate-400">{item.detail}</p>
+                {catalogLoaded && item.routeId && <p className="mt-1 break-all font-mono text-xs text-slate-500">{item.routeId}</p>}
+              </li>)}
+            </ul>
+          </details>
           <div role="log" aria-label="บทสนทนา Agent v0" aria-live="polite" className="max-h-80 space-y-3 overflow-y-auto">
             {chat.map((turn, index) => <p key={index} className={`whitespace-pre-wrap rounded-xl p-3 text-sm ${turn.role === 'user' ? 'bg-indigo-900/60' : 'bg-slate-950'}`}><strong>{turn.role === 'user' ? 'คุณ' : 'Agent v0'}: </strong>{turn.text}</p>)}
             <div ref={transcript} />
