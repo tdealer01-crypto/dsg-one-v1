@@ -168,7 +168,7 @@ export function DsgLiveWorkroom() {
     return data;
   }
 
-  async function act(work: () => Promise<void>) {
+  async function act(work: () => Promise<unknown>) {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
@@ -591,14 +591,16 @@ export function DsgLiveWorkroom() {
     // The model proposes intent, never authority. Exact registered Routes,
     // owner approval, deterministic receipts and evidence remain mandatory.
     if (action.capability === 'browser.remote.read') {
-      return browserVerifier(cinemaVerifierKind(action.arguments.kind));
+      const result = await browserVerifier(cinemaVerifierKind(action.arguments.kind));
+      return result;
     }
     if (action.capability === 'browser.remote.connect') {
       return (await browserConnect()) ?? null;
     }
     if (action.capability === 'browser.remote.execute') {
       if (typeof action.arguments.url !== 'string') throw new Error('PUBLIC_BROWSER_URL_REQUIRED');
-      return browserNavigate(action.arguments.url);
+      const result = await browserNavigate(action.arguments.url);
+      return result;
     }
     return run(action.capability, action.target,
       () => ({ action: action.capability, arguments: action.arguments }), action.label);
