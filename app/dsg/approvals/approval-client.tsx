@@ -90,6 +90,10 @@ export default function ApprovalClient() {
           clientId: 'jI1uiKcQu7mqORsaCrogKTQVsAcZuQSt',
           authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE },
           cacheLocation: 'memory',
+          // Keep only the SDK's short-lived, host-scoped PKCE transaction in
+          // a cookie so an Android cross-tab callback can finish. Tokens stay
+          // in memory; this does not grant approval or extend MFA freshness.
+          useCookiesForTransactions: true,
           useRefreshTokens: false,
         });
         client.current = c;
@@ -126,27 +130,18 @@ export default function ApprovalClient() {
         const authenticated = await c.isAuthenticated();
         setTokenReady(authenticated);
         setAuthFailure(null);
-        // A user who clicked an exact pending-request link already asked to
-        // review that request. Start the existing PKCE Auth0 login immediately
-        // rather than requiring another tiny tap in an Android webview.
-        // Never auto-approve, run MFA, or redirect for the generic approvals
-        // page. Do not loop if an OAuth callback was just handled.
-        if (!authenticated && reviewApprovalId && !(params.has('code') && params.has('state'))) {
-          authPhase = 'login';
-          setStatus('กำลังพาไปยืนยันว่าเป็นเจ้าของผ่าน Auth0 สำหรับคำขอนี้');
-          await c.loginWithRedirect({
-            authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE },
-            appState: { kind: 'review' as const, approvalRequestId: reviewApprovalId },
-          });
-          return;
-        }
+        // An exact link is an intent to review, not consent to start another
+        // redirect. Preserve its ID and let the user explicitly start sign-in
+        // after a missing/expired session or an interrupted Android callback.
         if (authenticated && reviewApprovalId) {
           setRequestedApprovalId(reviewApprovalId);
           window.history.replaceState(null, '', CALLBACK + '?approval_request_id=' + encodeURIComponent(reviewApprovalId));
         }
         setStatus(authenticated
           ? 'เข้าสู่ระบบ Auth0 แล้ว พร้อมตรวจรายการรออนุมัติ'
-          : 'กดเข้าสู่ระบบเพื่อรับสิทธิ์ dsg.approve สำหรับเซสชันนี้');
+          : reviewApprovalId
+            ? 'คำขอพร้อมตรวจแล้ว · กดยืนยันตัวตนหนึ่งครั้งเพื่อดูงานนี้'
+            : 'กดเข้าสู่ระบบเพื่อรับสิทธิ์ dsg.approve สำหรับเซสชันนี้');
         if (stepUpIntent) {
           setStatus('Auth0 ยืนยันกลับมาแล้ว กำลังตรวจ signed MFA proof กับ DSG Spacetime');
           setPendingStepUpIntent(stepUpIntent);

@@ -34,9 +34,10 @@ describe('DSG exact-request human approval UX', () => {
     expect(ui).toContain("decision === 'APPROVE' && selected.risk_tier === 'high'");
     expect(ui).toContain("onClick={() => void decide('REJECT')}");
   });
-  it('automatically starts interactive Auth0 only for a user-clicked exact request link', () => {
-    expect(ui).toContain("!authenticated && reviewApprovalId && !(params.has('code') && params.has('state'))");
-    expect(ui).toContain("appState: { kind: 'review' as const, approvalRequestId: reviewApprovalId }");
+  it('preserves the exact request for an explicit sign-in without an automatic redirect loop', () => {
+    const initialize = ui.slice(ui.indexOf('async function initialize()'), ui.indexOf('const obtainToken'));
+    expect(initialize).not.toContain('loginWithRedirect');
+    expect(ui).toContain("{ kind: 'review' as const, approvalRequestId: queryApprovalId }");
     expect(ui).toContain("authorizationParams: { redirect_uri: CALLBACK, audience: AUDIENCE, scope: SCOPE }");
     expect(ui).not.toContain("decision: 'APPROVE', approvalRequestId: reviewApprovalId");
     expect(ui).not.toContain("localStorage.setItem");
