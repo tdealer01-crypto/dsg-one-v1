@@ -33,6 +33,46 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+/**
+ * Read-only Microsoft Agent Framework runtime probe for the existing
+ * authenticated Workroom. Reuses the same installed engine exercised by POST;
+ * it never composes a plan, launches Kaggle or executes a provider tool.
+ */
+export async function GET(request: Request) {
+  try {
+    await requireVerifiedDsgActor(request.headers, 'job:read');
+  } catch (error) {
+    const code = error instanceof Error ? error.message : 'DSG_AUTH_FAILED';
+    return NextResponse.json({ ok: false, error: { code } }, {
+      status: authStatus(code), headers: { 'Cache-Control': 'private, no-store' },
+    });
+  }
+  try {
+    const report = await probeAutomationEngine();
+    const verified = report.ok === true &&
+      report.engine === 'microsoft-agent-framework' &&
+      report.version === '1.18.0' &&
+      report.workflow_probe === true &&
+      report.checkpoint_probe === true;
+    return NextResponse.json({
+      ok: verified,
+      data: {
+        engine: 'microsoft-agent-framework',
+        version: report.version ?? null,
+        workflowProbe: report.workflow_probe === true,
+        checkpointProbe: report.checkpoint_probe === true,
+        executionAuthority: 'none',
+        providerExecutionVerified: false,
+      },
+      ...(!verified ? { error: { code: 'AGENT_ENGINE_PROBE_INCOMPLETE' } } : {}),
+    }, { status: verified ? 200 : 503, headers: { 'Cache-Control': 'private, no-store' } });
+  } catch {
+    return NextResponse.json({
+      ok: false, error: { code: 'AGENT_ENGINE_PROBE_UNAVAILABLE' },
+    }, { status: 503, headers: { 'Cache-Control': 'private, no-store' } });
+  }
+}
+
 export async function POST(request: Request) {
   let actor: Awaited<ReturnType<typeof requireVerifiedDsgActor>>;
   try {

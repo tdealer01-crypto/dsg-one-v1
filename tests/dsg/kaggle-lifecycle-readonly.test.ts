@@ -88,7 +88,7 @@ describe('owner-only AWS SSM Kaggle status', () => {
     const api = path('app/api/dsg/agent-v0/lifecycle/route.ts');
     const adapter = path('lib/dsg/server/kaggle-ssm-bridge.ts');
     const python = path('scripts/dsg-kaggle-ssm-bridge.py');
-    expect(live).toContain('<DsgKaggleGpuStatus />');
+    expect(live).toContain('<DsgKaggleGpuStatus');
     expect(live).toContain("run('action.plan', 'node.agent.dsg-v0'");
     expect(status).toContain("credentials: 'include'");
     expect(api).toContain("requireVerifiedDsgActor(request.headers, 'job:read')");

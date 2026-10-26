@@ -129,7 +129,7 @@ export function DsgKaggleGpuStatus() {
         </button>
       </div>
       <p className="mt-2 text-amber-200">
-        สถานะ GPU: ยังไม่ยืนยันจาก Kaggle โดยตรง · Workroom ไม่ได้เปิด GPU อัตโนมัติในเวอร์ชันนี้
+        สถานะ GPU: ยังไม่ยืนยันจาก Kaggle โดยตรง · เมื่อ Brain ไม่ถูกผูกหรือเข้าไม่ถึง Workroom จะขอเปิด Kaggle แบบฟรีให้เจ้าของที่ยืนยันแล้วเพียงหนึ่งครั้งต่อคำสั่ง แต่ยังต้องตรวจ Worker ก่อนถือว่าพร้อมใช้
       </p>
       {data?.ok && (
         <div className="mt-3 space-y-2">

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { getDsgBrowserSession, DSG_AUTH0_CALLBACK } from '@/lib/dsg/user-bound/browser-session';
 import { classifyAuth0SessionFailure } from '@/lib/dsg/user-bound/oauth-refresh';
 import { DsgKaggleGpuStatus } from '@/components/dsg-kaggle-gpu-status';
+import { shouldRequestKaggleWake } from '@/lib/dsg/user-bound/kaggle-on-demand';
+import { agentCapabilityReadiness } from '@/lib/dsg/user-bound/agent-capability-readiness';
 import { DsgCinemaOauthViewer } from '@/components/dsg-cinema-oauth-viewer';
 import { cinemaAgentToolContracts, cinemaNavigationSteps, cinemaVerifierKind, cinemaVerifierObservation, cinemaVerifierReadPayload } from '@/lib/dsg/user-bound/cinema-controller-contract';
 import { nativeShellOutcome } from '@/lib/dsg/user-bound/native-shell-outcome';
@@ -49,11 +51,15 @@ export function DsgLiveWorkroom() {
   const subject = useRef<string | null>(null);
   const [routes, setRoutes] = useState<WorkroomRoute[]>([]);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
+  const [frameworkProbe, setFrameworkProbe] = useState<'not-checked' | 'reported-ready' | 'unverified'>('not-checked');
+  const [frameworkVersion, setFrameworkVersion] = useState('');
   const [tab, setTab] = useState<'agent' | 'browser' | 'desktop'>(() =>
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'browser' ? 'browser' :
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tool') === 'desktop' ? 'desktop' : 'agent'
   );
   const [goal, setGoal] = useState('');
+  const [kaggleLaunchRevision, setKaggleLaunchRevision] = useState(0);
+  const awaitingKaggleForGoal = useRef<string | null>(null);
   const [chat, setChat] = useState<ChatTurn[]>([]);
   const [proposal, setProposal] = useState<Action | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -157,6 +163,32 @@ export function DsgLiveWorkroom() {
     setStatus('อ่านเครื่องมือแล้ว ต้องตรวจผลจาก provider แยกก่อนสรุปว่าเชื่อมต่อได้');
     return found;
   }
+
+  async function checkAgentComponents() {
+    // Existing authenticated catalog is the only source of route availability.
+    await loadCatalog();
+    // This is a reported process/engine health probe, not an agent-run E2E proof.
+    setFrameworkProbe('unverified');
+    setFrameworkVersion('');
+    try {
+      const response = await fetch('/api/agent/execute', { cache: 'no-store', credentials: 'include' });
+      const raw = asRecord(await response.json());
+      const engine = asRecord(raw?.data);
+      // Real engine workflow + checkpoint probe; never infer from env vars.
+      const verified = response.ok && raw?.ok === true &&
+        engine?.engine === 'microsoft-agent-framework' && engine.version === '1.18.0' &&
+        engine.workflowProbe === true && engine.checkpointProbe === true;
+      if (verified) {
+        setFrameworkVersion('1.18.0');
+        setFrameworkProbe('reported-ready');
+      }
+    } catch {
+      // Unverified never becomes success through a network exception.
+    }
+    setStatus('อ่านแคตตาล็อกและ Framework Health แล้ว · สถานะ Route ไม่ได้พิสูจน์ว่าทำงาน E2E สำเร็จ');
+  }
+
+  const capabilityReports = agentCapabilityReadiness(routes);
 
   function agent() {
     if (!subject.current) throw new Error('VERIFIED_AUTH0_SUBJECT_REQUIRED');
@@ -386,18 +418,53 @@ export function DsgLiveWorkroom() {
       { name: 'device.remote.status', target: desktopTarget, description: 'อ่านสถานะ DSG Desktop Native ที่ผูกอยู่', required: [], optional: [], risk: 'read' },
       { name: 'device.process.list', target: desktopTarget, description: 'อ่านรายการ process ของ DSG Desktop Native', required: [], optional: [], risk: 'read' },
       { name: 'device.fs.read', target: desktopTarget, description: 'อ่านไฟล์จาก DSG Desktop Native', required: ['path'], optional: ['offset', 'length'], risk: 'read' },
+      { name: 'device.fs.write', target: desktopTarget, description: 'เขียนไฟล์ผ่าน Signed Approval ของ DSG Native เดิม', required: ['path', 'content'], optional: [], risk: 'high' },
       { name: 'device.shell.exec', target: desktopTarget, description: 'เรียกคำสั่งบน DSG Desktop Native หลังมีแผนและการอนุมัติ', required: ['command'], optional: [], risk: 'high' },
     ].filter(contract => available.some(route => route.capability === contract.name && route.target_node === contract.target));
     if (!contracts.length) throw new Error('NO_LIVE_TOOL_CONTRACTS_FOR_AGENT');
-    setChat(items => [...items, { role: 'user', text: message }]);
+
+    if (awaitingKaggleForGoal.current !== message) {
+      setChat(items => [...items, { role: 'user', text: message }]);
+    }
     setProposal(null);
     setStatus('กำลังส่งเป้าหมายให้ DSG Agent v0');
-    const result = await run('action.plan', 'node.agent.dsg-v0', () => ({
-      goal: message,
-      tools: contracts.map(({ target: _target, ...contract }) => contract),
-      verified_history: history.current,
-      step: Math.min(history.current.length, 25), request_key: 'chat-' + crypto.randomUUID(),
-    }), 'วางแผนด้วย Agent v0');
+    let result: JsonRecord | null;
+    try {
+      result = await run('action.plan', 'node.agent.dsg-v0', () => ({
+        goal: message,
+        tools: contracts.map(({ target: _target, ...contract }) => contract),
+        verified_history: history.current,
+        step: Math.min(history.current.length, 25), request_key: 'chat-' + crypto.randomUUID(),
+      }), 'วางแผนด้วย Agent v0');
+    } catch (error) {
+      if (!shouldRequestKaggleWake(error)) throw error;
+      setFlowPhase('needs-check');
+      setStatus('Brain ยังไม่พร้อม กำลังตรวจสิทธิ์เจ้าของเพื่อขอเปิด Kaggle ฟรี');
+      const accessToken = await getDsgBrowserSession().getTokenSilently();
+      if (!accessToken) throw new Error('AUTH0_TOKEN_UNAVAILABLE');
+      const response = await fetch('/api/dsg/agent-v0/launch', {
+        method: 'POST', credentials: 'include', cache: 'no-store',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'start_free_gpu', accessToken }),
+      });
+      const raw = await response.json().catch(() => null);
+      const outcome = asRecord(raw);
+      const code = typeof outcome?.error === 'string' && /^[A-Z0-9_]{3,100}$/.test(outcome.error)
+        ? outcome.error : 'KAGGLE_OWNER_DISPATCH_UNAVAILABLE';
+      if (response.status === 202 && outcome?.ok === true && outcome.status === 'OWNER_DISPATCH_ACCEPTED') {
+        awaitingKaggleForGoal.current = message;
+        setKaggleLaunchRevision(current => current + 1);
+        setStatus('ส่งคำขอเปิด Kaggle แล้ว · ยังไม่มีหลักฐานว่า Worker พร้อมใช้ เก็บเป้าหมายไว้ให้กดวางแผนซ้ำหลังตรวจสถานะ');
+        return;
+      }
+      if (response.status === 409 && code === 'KAGGLE_LAUNCH_ALREADY_IN_PROGRESS') {
+        awaitingKaggleForGoal.current = message;
+        setKaggleLaunchRevision(current => current + 1);
+        setStatus('มีคำขอเปิด Kaggle อยู่แล้ว · ไม่เปิดซ้ำ ให้ตรวจ Worker ก่อนลองทำงานต่อ');
+        return;
+      }
+      throw new Error(code);
+    }
     if (!result) return;
     if (result.authority !== 'proposal-only' || result.brain_mode !== 'local_qwen3_planner' ||
         typeof result.model !== 'string' || !result.model.startsWith('DSG-Agent-v0')) throw new Error('AGENT_V0_MODEL_NOT_VERIFIED');
@@ -410,6 +477,7 @@ export function DsgLiveWorkroom() {
     } else if (result.status === 'COMPLETED' && typeof asRecord(result.final_result)?.text === 'string') {
       setChat(items => [...items, { role: 'assistant', text: String(asRecord(result.final_result)!.text) }]);
     } else throw new Error('AGENT_V0_PROPOSAL_NOT_SUPPORTED');
+    awaitingKaggleForGoal.current = null;
     setGoal('');
   }
 
@@ -506,7 +574,30 @@ export function DsgLiveWorkroom() {
           <button type="button" className={button} onClick={() => selectTool('browser')}>
             Shared Browser / Multi-Controller · เปิดเครื่องมือที่ใช้ร่วมกับ Agent
           </button>
-          <DsgKaggleGpuStatus />
+          <DsgKaggleGpuStatus key={kaggleLaunchRevision} />
+          <details className="rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm">
+            <summary className="cursor-pointer font-semibold">Core Spin · Physics · Repair · Brain · Framework · Memory</summary>
+            <p className="mt-2 text-slate-400">ผลตรวจเป็นการลงทะเบียน Route และ Health ที่รายงานเท่านั้น ไม่ใช่หลักฐานว่าโมเดล, GPU, Provider หรือ Memory E2E ผ่าน</p>
+            <button type="button" className={`${button} mt-3`} disabled={busy || !ready}
+              onClick={() => void act(checkAgentComponents)}>ตรวจ Route และ Framework (ไม่ใช่ E2E)</button>
+            <ul className="mt-3 space-y-2">
+              <li className="rounded-lg border border-slate-800 p-3">
+                <strong>Microsoft Agent Framework</strong>
+                <span className="ml-2 text-amber-200">{frameworkProbe === 'reported-ready'
+                  ? `Engine + In-memory Checkpoint ผ่าน v${frameworkVersion}`
+                  : frameworkProbe === 'not-checked' ? 'ยังไม่ตรวจ' : 'ยังยืนยัน Health ไม่ได้'}</span>
+                <p className="mt-1 text-xs text-slate-400">ทดสอบ Workflow และ Checkpoint ในหน่วยความจำเท่านั้น ยังไม่พิสูจน์ Supabase Durable Checkpoint หรือ Provider E2E</p>
+              </li>
+              {capabilityReports.map(item => <li key={item.id} className="rounded-lg border border-slate-800 p-3">
+                <strong>{item.label}</strong>
+                <span className={`ml-2 ${catalogLoaded && item.registered ? 'text-sky-300' : 'text-amber-200'}`}>
+                  {!catalogLoaded ? 'ยังไม่ตรวจ' : item.registered ? 'ลงทะเบียน Route แล้ว' : 'ยังไม่พบ Route'}
+                </span>
+                <p className="mt-1 text-xs text-slate-400">{item.detail}</p>
+                {catalogLoaded && item.routeId && <p className="mt-1 break-all font-mono text-xs text-slate-500">{item.routeId}</p>}
+              </li>)}
+            </ul>
+          </details>
           <div role="log" aria-label="บทสนทนา Agent v0" aria-live="polite" className="max-h-80 space-y-3 overflow-y-auto">
             {chat.map((turn, index) => <p key={index} className={`whitespace-pre-wrap rounded-xl p-3 text-sm ${turn.role === 'user' ? 'bg-indigo-900/60' : 'bg-slate-950'}`}><strong>{turn.role === 'user' ? 'คุณ' : 'Agent v0'}: </strong>{turn.text}</p>)}
             <div ref={transcript} />
