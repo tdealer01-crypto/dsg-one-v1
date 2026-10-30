@@ -68,3 +68,21 @@ To genuinely issue actions across these surfaces under one verified user:
 - ChatGPT Android Custom MCP unavailable per current support guidance; compatibility of a **different** app mechanism must be proven rather than assumed.
 
 **Deployment policy:** AWS-only, no Azure. CI and security review before merge; no automated production promotion from this documentation.
+
+
+## 31 October 2026 — Agent v0 / Safe Autonomy production checkpoint
+
+A fresh authenticated AWS Spacetime verification on the current production deployment proved the canonical `route.agent.dsg-v0.plan` route for its exact proposal-only scope:
+
+- decision: `ALLOW`
+- provider: `nvidia`
+- model: `nvidia/nemotron-3.5-lightning-30b-a3b`
+- brain mode: `nvidia_nemotron_planner`
+- authority: `proposal-only`
+- execution authority: `NONE`
+- Action Kernel: `Z3_QUBO_TOP_K`, solver pipeline `z3 → ising-qubo → z3`
+- evidence chain: valid at 553 records before the call; new evidence index 553; valid at 554 records after the append
+
+The DSG ONE autonomous-level readback remains `DSG_AUTONOMOUS_LEVEL_PARTIAL` at 1/9 required capabilities. Therefore the website may describe **Safe Autonomy**, not Full Autonomy: plan-authorized low-risk/read-only actions may continue automatically, while Approval, MFA, signed permits, paid resources, destructive mutations and scope changes remain fail-closed gates.
+
+This checkpoint supersedes stale homepage wording that implied the canonical planner depended on an unavailable Kaggle Worker. The existing Kaggle free-GPU path remains a bounded legacy fallback in source; it is not the current verified production planner identity and must not be presented as required for the successful NVIDIA route.
