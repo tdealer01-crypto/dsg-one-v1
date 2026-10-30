@@ -28,10 +28,10 @@ const systemEntries = [
     external: false,
   },
   {
-    title: 'DSG Agent v0 · Qwen Planner',
-    description: 'ส่งเป้าหมายให้ Qwen เสนอแผนผ่าน AWS Spacetime (proposal-only) ตรวจผลจากโมเดลจริงเท่านั้น; Kaggle Worker อาจยังไม่พร้อม',
+    title: 'DSG Agent v0 · NVIDIA Planner',
+    description: 'ส่งเป้าหมายให้ Agent v0 เสนอแผนผ่าน AWS Spacetime แบบ proposal-only; Production action.plan ผ่านจริงด้วย NVIDIA Nemotron และ Evidence ที่ตรวจได้',
     href: '/dsg/workroom?tool=agent-v0',
-    badge: 'วางแผน · ตรวจ Inference ก่อนลงมือทำ',
+    badge: 'Safe Autonomy · low-risk/read-only · high-risk gated',
     external: false,
   },
   {
@@ -129,7 +129,7 @@ export default function HomePage() {
 
           <nav aria-label="เมนูหลัก" className="hidden items-center gap-2 [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center lg:flex">
             <Link href="/dsg/workroom" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-300 hover:bg-slate-800 hover:text-white">สั่งงาน</Link>
-            <Link href="/dsg/workroom?tool=agent-v0" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-slate-800 hover:text-white">Agent v0 · Qwen</Link>
+            <Link href="/dsg/workroom?tool=agent-v0" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-slate-800 hover:text-white">Agent v0 · NVIDIA</Link>
             <Link href="/dsg/workroom?tool=desktop" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-cyan-200">อุปกรณ์ Native</Link>
             <Link href="/dsg/workroom?tool=browser" className="rounded-xl px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-slate-800 hover:text-white">ควบคุมเว็บ</Link>
             <a href="#how-it-works" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white">
@@ -251,8 +251,8 @@ export default function HomePage() {
             ))}
           </div>
           <p className="mt-5 text-xs leading-6 text-amber-200/80">
-            Production truth boundary: OAuth-bound signed read-only provider E2E is verified for its exact scope.
-            Cinema high-risk connect/execute, Quest and whole-system E2E are not verified. A reachable page is not an execution receipt.
+            Production truth boundary: 31 Oct 2026 fresh Agent v0 action.plan is verified for its exact proposal-only scope with NVIDIA Nemotron, Z3 → Ising/QUBO → Z3 and a valid evidence append.
+            Safe Autonomy may continue only plan-authorized low-risk/read-only work; Approval, MFA, signed permits, paid/destructive actions and unrelated Cinema/Native/Quest scopes remain separately gated. A reachable page is not an execution receipt.
             MCP clients continue to use the separate OAuth-protected https://aws.dsg.pics/mcp endpoint.
           </p>
         </section>
