@@ -241,7 +241,7 @@ export default function DsgAccessPage() {
               </div>
               <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
                 <div className="font-bold">Previously verified signed read-only production E2E · {integrations.historical_readonly_e2e.historical_result} (dated {integrations.historical_readonly_e2e.accepted_on})</div>
-                <div className="mt-1 text-xs leading-5">Scope: {integrations.historical_readonly_e2e.scope}. This is a dated verified acceptance, not a fresh OAuth operation in this website session. Cinema Connect/Execute, Quest/Unity and whole-system E2E are NOT VERIFIED.</div>
+                <div className="mt-1 text-xs leading-5">Scope: {integrations.historical_readonly_e2e.scope}. This remains a dated acceptance for that exact route. Separately, fresh 31 Oct production evidence verifies Agent v0 canonical action.plan with NVIDIA Nemotron as proposal-only; it does not upgrade Cinema Connect/Execute, Quest/Unity or whole-system E2E.</div>
                 <a href={integrations.historical_readonly_e2e.source} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex text-xs font-bold underline underline-offset-2">Read public evidence</a>
               </div>
             </>
@@ -301,7 +301,7 @@ export default function DsgAccessPage() {
         </section>
 
         <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 text-sm leading-6 text-slate-400">
-          <strong className="text-slate-200">Security boundary:</strong> login proves identity; workspace membership proves role. Spacetime remains execution authority. Agent Repair is proposal-only. Browser is the universal application interface. Chat/CLI/WWW remain operator surfaces, not the persistent control plane.
+          <strong className="text-slate-200">Security boundary:</strong> login proves identity; workspace membership proves role. Spacetime remains execution authority. Agent v0 and Agent Repair are proposal-only. Safe Autonomy may continue only plan-authorized low-risk/read-only work; Approval, MFA, signed permits and mutations remain explicit gates. Browser is the universal application interface. Chat/CLI/WWW remain operator surfaces, not the persistent control plane.
         </section>
       </div>
     </main>
