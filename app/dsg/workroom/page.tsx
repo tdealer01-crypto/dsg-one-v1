@@ -139,7 +139,7 @@ function DsgWorkroomContent() {
             <nav aria-label="ทางลัดการทำงาน" className="mt-3 flex flex-wrap gap-2 text-sm">
               <a href="#dsg-chat-message" className="min-h-11 rounded-xl bg-indigo-700 px-3 py-3 font-semibold text-white">1. สั่งงาน</a>
               <button type="button" onClick={openAgentV0} aria-controls="dsg-advanced-tools"
-                className="min-h-11 rounded-xl border border-indigo-500 px-3 py-3 font-semibold text-indigo-100">วางแผนด้วย DSG Agent v0 (Qwen)</button>
+                className="min-h-11 rounded-xl border border-indigo-500 px-3 py-3 font-semibold text-indigo-100">วางแผนด้วย DSG Agent v0 (NVIDIA)</button>
               <a href="#dsg-jobs" onClick={() => document.getElementById('dsg-jobs')?.setAttribute('open', '')}
                 className="min-h-11 rounded-xl border border-slate-700 px-3 py-3 text-slate-200">2. ติดตามงาน</a>
               <Link href="/dsg/approvals" className="min-h-11 rounded-xl border border-slate-700 px-3 py-3 text-slate-200">3. อนุมัติเมื่อจำเป็น</Link>
@@ -181,13 +181,13 @@ function DsgWorkroomContent() {
             {advancedOpen && (
               <div className="mt-4 space-y-5">
                 <p className="text-sm text-slate-400">
-                  วางแผนด้วย DSG Agent v0 หรือควบคุมเว็บ/อุปกรณ์จริงจากแท็บด้านล่าง หากโมเดลหรืออุปกรณ์ยังไม่พร้อม ระบบจะแจ้งเหตุผล ไม่แสดงผลสำเร็จจำลอง
+                  วางแผนด้วย DSG Agent v0 หรือควบคุมเว็บ/อุปกรณ์จริงจากแท็บด้านล่าง Agent v0 เป็น proposal-only; งาน low-risk/read-only ที่อยู่ในแผนเดินต่อได้แบบ Safe Autonomy แต่ Approval/MFA/signed permit และ mutation ยังหยุดที่ Gate เดิม หากโมเดลหรืออุปกรณ์ไม่พร้อม ระบบจะแจ้งเหตุผล ไม่แสดงผลสำเร็จจำลอง
                 </p>
                 <DsgLiveWorkroom key={selected.workspace_id} />
                 <AgentCommandCenter />
                 <PublicProductionSnapshot compact />
                 <nav aria-label="เครื่องมือขั้นสูง" className="flex flex-wrap gap-3 text-sm text-indigo-200">
-                  <Link href="/dsg/workroom?tool=agent-v0#live-controls">Agent v0 · Qwen Planner</Link>
+                  <Link href="/dsg/workroom?tool=agent-v0#live-controls">Agent v0 · NVIDIA Planner</Link>
                   <Link href="/dsg/app-builder"><DsgCopy value="สร้างแอป" /></Link>
                   <Link href="/dsg/approvals">คำขออนุมัติ</Link>
                   <a href="/control/">เครื่องที่เชื่อมต่อ</a>
