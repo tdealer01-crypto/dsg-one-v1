@@ -11,9 +11,9 @@ describe('new DSG Agent v0 governed Workroom entry', () => {
     const landing = source('app/page.tsx');
     const workroom = source('app/dsg/workroom/page.tsx');
     const access = source('app/dsg/access/page.tsx');
-    expect(landing).toContain("title: 'DSG Agent v0 · Qwen Planner'");
+    expect(landing).toContain("title: 'DSG Agent v0 · NVIDIA Planner'");
     expect(landing).toContain('href="/dsg/workroom?tool=agent-v0"');
-    expect(workroom).toContain('วางแผนด้วย DSG Agent v0 (Qwen)');
+    expect(workroom).toContain('วางแผนด้วย DSG Agent v0 (NVIDIA)');
     expect(workroom).toContain("next.searchParams.set('tool', 'agent-v0')");
     expect(workroom).toContain("tool === 'agent-v0'");
     expect(access).toContain("href: '/dsg/workroom?tool=agent-v0'");
@@ -33,6 +33,9 @@ describe('new DSG Agent v0 governed Workroom entry', () => {
     const chatModel = source('lib/dsg/agent-runtime/chat-model.ts');
     expect(live).toContain("run('action.plan', 'node.agent.dsg-v0'");
     expect(live).toContain("result.authority !== 'proposal-only'");
+    expect(live).toContain("result.brain_mode === 'nvidia_nemotron_planner'");
+    expect(live).toContain("result.model === 'nvidia/nemotron-3.5-lightning-30b-a3b'");
+    expect(live).toContain("result.execution_authority === 'NONE'");
     expect(live).toContain("result.model.startsWith('DSG-Agent-v0')");
     // User-facing errors are now mapped centrally without exposing raw provider text.
     const failure = source('lib/dsg/user-bound/workroom-failure.ts');
