@@ -667,7 +667,7 @@ export function DsgLiveWorkroom() {
       setChat(items => [...items, { role: 'user', text: message }]);
     }
     setProposal(null);
-    setStatus('กำลังส่งเป้าหมายให้ DSG Agent v0');
+    setStatus('กำลังส่งเป้าหมายให้ DSG Agent v0 ผ่าน governed action.plan');
     let result: JsonRecord | null;
     try {
       result = await run('action.plan', 'node.agent.dsg-v0', () => ({
@@ -679,7 +679,7 @@ export function DsgLiveWorkroom() {
     } catch (error) {
       if (!shouldRequestKaggleWake(error)) throw error;
       setFlowPhase('needs-check');
-      setStatus('Brain ยังไม่พร้อม กำลังตรวจสิทธิ์เจ้าของเพื่อขอเปิด Kaggle ฟรี');
+      setStatus('Planner ปัจจุบันยังไม่พร้อม · กำลังตรวจเฉพาะ legacy Kaggle free fallback ที่มีอยู่ โดยไม่เปิดทรัพยากรเสียเงิน');
       const accessToken = await getDsgBrowserSession().getTokenSilently();
       if (!accessToken) throw new Error('AUTH0_TOKEN_UNAVAILABLE');
       const response = await fetch('/api/dsg/agent-v0/launch', {
@@ -706,8 +706,12 @@ export function DsgLiveWorkroom() {
       throw new Error(code);
     }
     if (!result) return;
-    if (result.authority !== 'proposal-only' || result.brain_mode !== 'local_qwen3_planner' ||
-        typeof result.model !== 'string' || !result.model.startsWith('DSG-Agent-v0')) throw new Error('AGENT_V0_MODEL_NOT_VERIFIED');
+    const verifiedPlanner = result.authority === 'proposal-only' && result.execution_authority === 'NONE' &&
+      typeof result.model === 'string' && (
+        (result.brain_mode === 'nvidia_nemotron_planner' && result.model === 'nvidia/nemotron-3.5-lightning-30b-a3b') ||
+        (result.brain_mode === 'local_qwen3_planner' && result.model.startsWith('DSG-Agent-v0'))
+      );
+    if (!verifiedPlanner) throw new Error('AGENT_V0_MODEL_NOT_VERIFIED');
     const next = asRecord(result.action_proposal);
     const nextArguments = asRecord(next?.arguments);
     const contract = contracts.find(item => item.name === next?.action);
